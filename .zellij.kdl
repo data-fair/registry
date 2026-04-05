@@ -1,0 +1,28 @@
+layout {
+    pane {
+      split_direction "vertical"
+      pane name="registry" borderless=true {
+        command "bash"
+        args "-ic" "nvm use > /dev/null 2>&1 && bash"
+      }
+      pane name="deps" {
+        command "bash"
+        args "-ic" "npm run dev-deps"
+      }
+    }
+    pane {
+      split_direction "vertical"
+      pane name="ui" {
+        command "bash"
+        args "-ic" "nvm use > /dev/null 2>&1 && npm -w ui run dev"
+      }
+      pane name="api" {
+        command "bash"
+        args "-ic" "nvm use > /dev/null 2>&1 && npm -w api run dev"
+      }
+    }
+    pane size=2 borderless=true {
+        command "bash"
+        args "-ic" "echo -n -e \"Dev server available at \\e[1;96mhttp://localhost:$NGINX_PORT\\033[0m\""
+    }
+}

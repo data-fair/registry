@@ -1,0 +1,78 @@
+[
+  {
+    "id": "dmeadus0",
+    "firstName": "Danna",
+    "lastName": "Meadus",
+    "email": "dmeadus0@answers.com",
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "albanm",
+    "firstName": "Alban",
+    "lastName": "Mouton",
+    "email": "alban.mouton@koumoul.com",
+    "isAdmin": true,
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "superadmin",
+    "email": "superadmin@test.com",
+    "isAdmin": true,
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "dev-standalone1",
+    "email": "dev-standalone1@test.com",
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "dev1-contrib1",
+    "email": "dev1-contrib1@test.com",
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "dev1-user1",
+    "email": "dev1-user1@test.com",
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "test-standalone1",
+    "email": "test-standalone1@test.com",
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "test1-admin1",
+    "email": "test1-admin1@test.com",
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "test1-contrib1",
+    "email": "test1-contrib1@test.com",
+    "password": {
+      "clear": "passwd"
+    }
+  },
+  {
+    "id": "test1-user1",
+    "email": "test1-user1@test.com",
+    "password": {
+      "clear": "passwd"
+    }
+  }
+]

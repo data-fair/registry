@@ -1,0 +1,89 @@
+services:
+
+  #####
+  # reverse proxy for the whole environment
+  #####
+
+  nginx:
+    image: nginx:1.29.4-alpine
+    network_mode: host
+    environment:
+      - NGINX_PORT=${NGINX_PORT}
+      - DEV_API_PORT=${DEV_API_PORT}
+      - DEV_UI_PORT=${DEV_UI_PORT}
+      - MAILDEV_UI_PORT=${MAILDEV_UI_PORT}
+      - EVENTS_PORT=${EVENTS_PORT}
+      - SD_PORT=${SD_PORT}
+    volumes:
+      - ./dev/resources/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+
+  #####
+  # mail server mock
+  #####
+
+  maildev:
+    image: maildev/maildev:2.1.0
+    ports:
+      - ${MAILDEV_UI_PORT}:1080
+      - ${MAILDEV_SMTP_PORT}:1025
+    healthcheck:
+      test: 'wget -O - http://127.0.0.1:$${MAILDEV_WEB_PORT}$${MAILDEV_BASE_PATHNAME}/healthz || exit 1'
+
+  #####
+  # related services from the data-fair stack
+  #####
+
+  simple-directory:
+    image: ghcr.io/data-fair/simple-directory:master
+    network_mode: host
+    depends_on:
+      - mongo
+    environment:
+      PORT: ${SD_PORT}
+      ADMINS: |
+        ["superadmin@test.com"]
+      CIPHER_PASSWORD: dev
+      CONTACT: contact@test.com
+      MANAGE_SITES: true
+      MONGO_URL: mongodb://localhost:${MONGO_PORT}/simple-directory
+      OBSERVER_ACTIVE: false
+      PUBLIC_URL: http://localhost:${NGINX_PORT}/simple-directory
+      STORAGE_TYPE: file
+      SECRET_SITES: secret-sites
+      AUTHRATELIMIT_ATTEMPTS: 500
+      AUTHRATELIMIT_DURATION: 30
+      MAILDEV_ACTIVE: true
+      MAIL_DEV_URL: http://localhost:${MAILDEV_UI_PORT}
+      MAILS_TRANSPORT: |
+        {"port": "MAILDEV_SMTP_PORT","ignoreTLS": true,"host": "localhost"}
+      ANONYMOUS_CONTACT_FORM: true
+    volumes:
+      - ./dev/resources/users.json:/app/data/users.json
+      - ./dev/resources/organizations.json:/app/data/organizations.json
+
+  events:
+    image: ghcr.io/data-fair/events:main
+    network_mode: host
+    environment:
+      - PORT=${EVENTS_PORT}
+      - MONGO_URL=mongodb://localhost:${MONGO_PORT}/data-fair-events
+      - PRIVATE_DIRECTORY_URL=http://localhost:${NGINX_PORT}/simple-directory
+      - SECRET_IDENTITIES=secret-identities
+      - SECRET_EVENTS=secret-events
+      - SECRET_SENDMAILS=secret-sendmails
+      - OBSERVER_ACTIVE=false
+
+  #####
+  # db and search engine
+  #####
+
+  mongo:
+    image: mongo:8.0.17
+    command: ["mongod", "--quiet", "--setParameter", "logComponentVerbosity={\"network\": {\"verbosity\": -1}}"]
+    ports:
+      - ${MONGO_PORT}:27017
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

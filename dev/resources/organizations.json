@@ -1,0 +1,42 @@
+[
+  {
+    "id": "dev1",
+    "name": "Dev Organization",
+    "members": [
+      {
+        "id": "dmeadus0",
+        "role": "admin"
+      },
+      {
+        "id": "albanm",
+        "role": "admin"
+      },
+      {
+        "id": "dev1-contrib1",
+        "role": "contrib"
+      },
+      {
+        "id": "dev1-user1",
+        "role": "user1"
+      }
+    ]
+  },
+  {
+    "id": "test1",
+    "name": "Test Organization 1",
+    "members": [
+      {
+        "id": "test1-admin1",
+        "role": "admin"
+      },
+      {
+        "id": "test1-contrib1",
+        "role": "contrib"
+      },
+      {
+        "id": "test1-user1",
+        "role": "user1"
+      }
+    ]
+  }
+]
