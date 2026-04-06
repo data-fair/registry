@@ -20,13 +20,17 @@
           <v-card-text class="text-center text-body-1">
             A simple registry for the data-fair stack.
           </v-card-text>
-          <v-card-actions
-            v-if="session.state.user?.adminMode"
-            class="justify-center"
-          >
+          <v-card-actions class="justify-center flex-column ga-2">
             <v-btn
               color="primary"
               variant="flat"
+              to="/artefacts"
+            >
+              {{ t('browse') }}
+            </v-btn>
+            <v-btn
+              v-if="session.state.user?.adminMode"
+              variant="tonal"
               to="/admin/artefacts"
             >
               {{ t('admin') }}
@@ -40,8 +44,10 @@
 
 <i18n lang="yaml">
 fr:
+  browse: Parcourir les artefacts
   admin: Administration
 en:
+  browse: Browse artefacts
   admin: Administration
 </i18n>
 
