@@ -9,11 +9,15 @@ const axiosOpts = { baseURL }
 export const axios = (opts = {}) => axiosBuilder({ ...axiosOpts, ...opts })
 export const anonymousAx = axios()
 
-export const axiosAuth = (user: string, opts?: { adminMode?: boolean }) => {
-  return _axiosAuth({ email: user + '@test.com', password: 'passwd', adminMode: opts?.adminMode, axiosOpts, directoryUrl })
+export const axiosAuth = (user: string, opts?: { adminMode?: boolean, org?: string }) => {
+  return _axiosAuth({ email: user + '@test.com', password: 'passwd', adminMode: opts?.adminMode, org: opts?.org, axiosOpts, directoryUrl })
 }
 
 export const superAdmin = axiosAuth('superadmin', { adminMode: true })
+
+export const axiosWithApiKey = (key: string) => axiosBuilder({ ...axiosOpts, headers: { 'x-api-key': key } })
+
+export const axiosInternal = (secret: string) => axiosBuilder({ ...axiosOpts, headers: { 'x-secret-key': secret } })
 
 export const clean = async () => {
   await anonymousAx.delete(`http://localhost:${process.env.DEV_API_PORT}/api/test-env`)

@@ -4,6 +4,11 @@ import express from 'express'
 import helmet from 'helmet'
 import { uiConfig } from './ui-config.ts'
 import adminRouter from './admin/router.ts'
+import artefactsRouter from './artefacts/router.ts'
+import apiKeysRouter from './api-keys/router.ts'
+import accessGrantsRouter from './access-grants/router.ts'
+import mongo from '#mongo'
+import { cleanTarballs } from './storage.ts'
 import config from '#config'
 
 export const app = express()
@@ -25,11 +30,18 @@ app.use(session.middleware())
 app.use(express.json({ limit: '1mb' }))
 
 app.use('/api/admin', adminRouter)
+app.use('/api/v1/artefacts', artefactsRouter)
+app.use('/api/v1/api-keys', apiKeysRouter)
+app.use('/api/v1/access-grants', accessGrantsRouter)
 app.use('/api/ping', (req, res) => res.send('ok'))
 
 if (process.env.NODE_ENV === 'development') {
   app.delete('/api/test-env', async (req, res) => {
-    // cleanup test data - will be expanded in Phase 2
+    await mongo.artefacts.deleteMany({})
+    await mongo.versions.deleteMany({})
+    await mongo.apiKeys.deleteMany({})
+    await mongo.accessGrants.deleteMany({})
+    await cleanTarballs()
     res.send()
   })
 }

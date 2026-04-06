@@ -44,6 +44,9 @@
       "properties": {
         "events": {
           "type": "string"
+        },
+        "internalServices": {
+          "type": "string"
         }
       }
     },

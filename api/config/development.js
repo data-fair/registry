@@ -14,7 +14,8 @@ export default {
     active: false
   },
   secretKeys: {
-    events: 'secret-events'
+    events: 'secret-events',
+    internalServices: 'secret-internal'
   },
   upgradeRoot: '../'
 }

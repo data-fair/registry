@@ -10,7 +10,8 @@ export default {
     port: 9090
   },
   secretKeys: {
-    events: undefined
+    events: undefined,
+    internalServices: undefined
   },
   upgradeRoot: '/app/'
 }

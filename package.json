@@ -41,7 +41,10 @@
     "@reporters/bail": "^1.2.1",
     "@types/config": "^3.3.5",
     "@types/express": "^5.0.6",
+    "@types/busboy": "^1.5.0",
     "@types/node": "^22.12.0",
+    "@types/semver": "^7.5.0",
+    "@types/tar-stream": "^3.1.0",
     "commitlint": "^19.2.2",
     "dotenv": "^17.3.1",
     "dotenv-cli": "^11.0.0",
@@ -57,6 +60,7 @@
     "@data-fair/lib-types-builder": "^1.8.3",
     "@types/debug": "^4.1.12",
     "ajv": "^8.17.1",
+    "form-data": "^4.0.0",
     "tough-cookie": "^5.1.2",
     "ufo": "^1.6.3"
   }

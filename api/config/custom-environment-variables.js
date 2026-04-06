@@ -4,7 +4,8 @@ export default {
   privateDirectoryUrl: 'PRIVATE_DIRECTORY_URL',
   privateEventsUrl: 'PRIVATE_EVENTS_URL',
   secretKeys: {
-    events: 'SECRET_EVENTS'
+    events: 'SECRET_EVENTS',
+    internalServices: 'SECRET_INTERNAL_SERVICES'
   },
   observer: {
     active: 'OBSERVER_ACTIVE',
