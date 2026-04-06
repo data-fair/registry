@@ -20,12 +20,35 @@
           <v-card-text class="text-center text-body-1">
             A simple registry for the data-fair stack.
           </v-card-text>
+          <v-card-actions
+            v-if="session.state.user?.adminMode"
+            class="justify-center"
+          >
+            <v-btn
+              color="primary"
+              variant="flat"
+              to="/admin/artefacts"
+            >
+              {{ t('admin') }}
+            </v-btn>
+          </v-card-actions>
         </v-card>
       </v-col>
     </v-row>
   </v-container>
 </template>
 
+<i18n lang="yaml">
+fr:
+  admin: Administration
+en:
+  admin: Administration
+</i18n>
+
 <script lang="ts" setup>
+import { useI18n } from 'vue-i18n'
 import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
+
+const { t } = useI18n()
+const session = useSession()
 </script>

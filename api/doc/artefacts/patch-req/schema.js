@@ -7,5 +7,5 @@ const schema = jsonSchema(ArtefactSchema)
 
 export default {
   ...schema,
-  'x-exports': ['validate', 'types']
+  'x-exports': ['validate', 'types', 'vjsf']
 }

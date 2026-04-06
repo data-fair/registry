@@ -24,6 +24,15 @@ router.get('/', async (req, res, next) => {
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
     const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { updatedAt: -1 }
 
+    // Text search on name
+    if (req.query.q) {
+      filter.name = { $regex: req.query.q as string, $options: 'i' }
+    }
+    // Category filter
+    if (req.query.category) {
+      filter.category = req.query.category as 'processing' | 'catalog' | 'application' | 'other'
+    }
+
     const [results, count] = await Promise.all([
       mongo.artefacts.find(filter).sort(sort).skip(skip).limit(size).toArray(),
       mongo.artefacts.countDocuments(filter)
