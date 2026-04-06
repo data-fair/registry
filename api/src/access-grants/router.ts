@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { ObjectId } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
+import { reqSessionAuthenticated } from '@data-fair/lib-express/session.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import mongo from '#mongo'
 import * as postReqBody from '#doc/access-grants/post-req/index.ts'
@@ -44,6 +45,19 @@ router.get('/', async (req, res, next) => {
     await session.reqAdminMode(req)
     const results = await mongo.accessGrants.find({}).toArray()
     res.json({ results, count: results.length })
+  } catch (err) { next(err) }
+})
+
+// Check my access grant (authenticated user)
+router.get('/me', async (req, res, next) => {
+  try {
+    const sessionState = reqSessionAuthenticated(req)
+    const grant = await mongo.accessGrants.findOne({
+      'account.type': sessionState.account.type,
+      'account.id': sessionState.account.id
+    })
+    if (!grant) throw httpError(404, 'no access grant for this account')
+    res.json(grant)
   } catch (err) { next(err) }
 })
 
