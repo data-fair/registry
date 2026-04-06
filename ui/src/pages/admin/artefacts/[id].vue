@@ -293,7 +293,7 @@ const hasDiff = computed(() => {
 })
 
 function categoryColor (cat: string) {
-  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', other: 'grey' }
+  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', other: 'grey' }
   return colors[cat] || 'grey'
 }
 

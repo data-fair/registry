@@ -169,11 +169,12 @@ const categoryItems = [
   { title: 'Processing', value: 'processing' },
   { title: 'Catalog', value: 'catalog' },
   { title: 'Application', value: 'application' },
+  { title: 'Tileset', value: 'tileset' },
   { title: 'Other', value: 'other' }
 ]
 
 function categoryColor (cat: string) {
-  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', other: 'grey' }
+  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', other: 'grey' }
   return colors[cat] || 'grey'
 }
 

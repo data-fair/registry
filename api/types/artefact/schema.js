@@ -4,17 +4,18 @@ export default {
   title: 'Artefact',
   type: 'object',
   additionalProperties: false,
-  required: ['_id', 'name', 'majorVersion', 'packageName', 'version', 'category', 'createdAt', 'updatedAt'],
+  required: ['_id', 'name', 'format', 'category', 'createdAt', 'updatedAt'],
   properties: {
     _id: { type: 'string', readOnly: true },
     name: { type: 'string', readOnly: true },
+    format: { type: 'string', enum: ['npm', 'file'], readOnly: true },
     majorVersion: { type: 'integer', readOnly: true },
     packageName: { type: 'string', readOnly: true },
     version: { type: 'string', readOnly: true },
     licence: { type: 'string', readOnly: true },
     category: {
       type: 'string',
-      enum: ['processing', 'catalog', 'application', 'other']
+      enum: ['processing', 'catalog', 'application', 'tileset', 'other']
     },
     title: {
       type: 'object',
@@ -48,6 +49,8 @@ export default {
     },
     processingConfigSchema: { type: 'object' },
     applicationConfigSchema: { type: 'object' },
+    filePath: { type: 'string', readOnly: true },
+    fileName: { type: 'string', readOnly: true },
     createdAt: { type: 'string', format: 'date-time', readOnly: true },
     updatedAt: { type: 'string', format: 'date-time', readOnly: true }
   }

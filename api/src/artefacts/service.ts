@@ -6,7 +6,7 @@ import * as semver from 'semver'
 import type { Filter } from 'mongodb'
 import type { Version } from '#types/version/index.ts'
 import mongo from '#mongo'
-import { deleteTarball } from '../files-storage/index.ts'
+import { deleteFile } from '../files-storage/index.ts'
 
 export interface Manifest {
   name: string
@@ -115,7 +115,7 @@ export const pruneOldVersions = async (artefactId: string, semverMajor: number, 
 
   const toDelete = versions.slice(2)
   for (const version of toDelete) {
-    await deleteTarball(version.tarballPath)
+    await deleteFile(version.tarballPath)
     await mongo.versions.deleteOne({ _id: version._id })
   }
 }

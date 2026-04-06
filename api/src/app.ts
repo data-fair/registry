@@ -8,7 +8,7 @@ import artefactsRouter from './artefacts/router.ts'
 import apiKeysRouter from './api-keys/router.ts'
 import accessGrantsRouter from './access-grants/router.ts'
 import mongo from '#mongo'
-import { cleanTarballs } from './files-storage/index.ts'
+import { cleanFiles } from './files-storage/index.ts'
 import config from '#config'
 
 export const app = express()
@@ -41,7 +41,7 @@ if (process.env.NODE_ENV === 'development') {
     await mongo.versions.deleteMany({})
     await mongo.apiKeys.deleteMany({})
     await mongo.accessGrants.deleteMany({})
-    await cleanTarballs()
+    await cleanFiles()
     res.send()
   })
 }

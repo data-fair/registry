@@ -13,9 +13,30 @@
       <personal-menu dark-mode-switch />
     </v-app-bar>
 
-    <!-- Download latest -->
+    <!-- Download file artefact -->
     <v-card
-      v-if="hasGrant && versions.length > 0"
+      v-if="hasGrant && artefact.format === 'file' && artefact.filePath"
+      class="mb-4"
+    >
+      <v-card-title>{{ t('download') }}</v-card-title>
+      <v-card-text>
+        <div class="d-flex align-center">
+          <span class="text-body-1 mr-4">{{ artefact.fileName || artefact.name }}</span>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :prepend-icon="mdiDownload"
+            :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/download`"
+          >
+            {{ t('download') }}
+          </v-btn>
+        </div>
+      </v-card-text>
+    </v-card>
+
+    <!-- Download latest npm version -->
+    <v-card
+      v-if="hasGrant && artefact.format !== 'file' && versions.length > 0"
       class="mb-4"
     >
       <v-card-title>{{ t('downloadLatest') }}</v-card-title>
@@ -56,6 +77,7 @@
       <v-card-text>
         <v-row>
           <v-col
+            v-if="artefact.format !== 'file'"
             cols="12"
             sm="6"
             md="4"
@@ -66,6 +88,7 @@
             <div>{{ artefact.packageName }}</div>
           </v-col>
           <v-col
+            v-if="artefact.format !== 'file'"
             cols="12"
             sm="6"
             md="4"
@@ -76,6 +99,7 @@
             <div>{{ artefact.version }}</div>
           </v-col>
           <v-col
+            v-if="artefact.format !== 'file'"
             cols="12"
             sm="6"
             md="4"
@@ -113,8 +137,11 @@
       </v-card-text>
     </v-card>
 
-    <!-- Versions table -->
-    <v-card class="mb-4">
+    <!-- Versions table (npm only) -->
+    <v-card
+      v-if="artefact.format !== 'file'"
+      class="mb-4"
+    >
       <v-card-title>
         {{ t('versions') }}
         <span class="text-medium-emphasis text-body-2 ml-2">({{ versions.length }})</span>
@@ -231,7 +258,7 @@ const description = computed(() => {
 })
 
 function categoryColor (cat: string) {
-  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', other: 'grey' }
+  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', other: 'grey' }
   return colors[cat] || 'grey'
 }
 

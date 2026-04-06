@@ -5,11 +5,12 @@ import { ObjectId } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
 import { assertReqInternalSecret } from '@data-fair/lib-express/req-origin.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
+import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
 import config from '#config'
 import { authenticateApiKey } from '../auth.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
-import { writeTarball, readTarball, deleteTarball } from '../files-storage/index.ts'
+import { writeFile, readFile, deleteFile } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 
@@ -30,7 +31,11 @@ router.get('/', async (req, res, next) => {
     }
     // Category filter
     if (req.query.category) {
-      filter.category = req.query.category as 'processing' | 'catalog' | 'application' | 'other'
+      filter.category = req.query.category as Artefact['category']
+    }
+    // Format filter
+    if (req.query.format) {
+      filter.format = req.query.format as 'npm' | 'file'
     }
 
     const [results, count] = await Promise.all([
@@ -48,11 +53,14 @@ router.get('/:id', async (req, res, next) => {
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
-    const versions = await mongo.versions.find({ artefactId: artefact._id })
-      .sort({ semverMajor: -1, semverMinor: -1, semverPatch: -1 })
-      .toArray()
-
-    res.json({ ...artefact, versions })
+    if (artefact.format === 'file') {
+      res.json(artefact)
+    } else {
+      const versions = await mongo.versions.find({ artefactId: artefact._id })
+        .sort({ semverMajor: -1, semverMinor: -1, semverPatch: -1 })
+        .toArray()
+      res.json({ ...artefact, versions })
+    }
   } catch (err) { next(err) }
 })
 
@@ -89,13 +97,15 @@ router.delete('/:id', async (req, res, next) => {
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id })
     if (!artefact) throw httpError(404, 'artefact not found')
 
-    // Delete tarballs
-    const versions = await mongo.versions.find({ artefactId: artefact._id }).toArray()
-    for (const version of versions) {
-      await deleteTarball(version.tarballPath)
+    if (artefact.format === 'file') {
+      if (artefact.filePath) await deleteFile(artefact.filePath)
+    } else {
+      const versions = await mongo.versions.find({ artefactId: artefact._id }).toArray()
+      for (const version of versions) {
+        await deleteFile(version.tarballPath)
+      }
+      await mongo.versions.deleteMany({ artefactId: artefact._id })
     }
-
-    await mongo.versions.deleteMany({ artefactId: artefact._id })
     await mongo.artefacts.deleteOne({ _id: artefact._id })
     res.status(204).send()
   } catch (err) { next(err) }
@@ -132,7 +142,7 @@ router.post('/:name/versions', async (req, res, next) => {
     // Store tarball
     const archSuffix = architecture ? `_${architecture}` : ''
     const tarballPath = `${name}/${majorVersion}/${manifest.version}${archSuffix}.tgz`
-    await writeTarball(Readable.from(tarballBuffer), tarballPath)
+    await writeFile(Readable.from(tarballBuffer), tarballPath)
 
     // Upsert artefact
     const now = new Date().toISOString()
@@ -143,7 +153,7 @@ router.post('/:name/versions', async (req, res, next) => {
           packageName: manifest.name,
           version: manifest.version,
           licence: manifest.licence,
-          category: (manifest.category || 'other') as 'processing' | 'catalog' | 'application' | 'other',
+          category: (manifest.category || 'other') as Artefact['category'],
           ...(manifest.processingConfigSchema ? { processingConfigSchema: manifest.processingConfigSchema } : {}),
           ...(manifest.applicationConfigSchema ? { applicationConfigSchema: manifest.applicationConfigSchema } : {}),
           updatedAt: now
@@ -151,6 +161,7 @@ router.post('/:name/versions', async (req, res, next) => {
         $setOnInsert: {
           _id: artefactId,
           name,
+          format: 'npm' as const,
           majorVersion,
           public: false,
           privateAccess: [],
@@ -218,12 +229,99 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
 
     res.set('Content-Type', 'application/gzip')
     res.set('Content-Disposition', `attachment; filename="${artefact.name}-${version.version}.tgz"`)
-    const stream = await readTarball(version.tarballPath)
+    const stream = await readFile(version.tarballPath)
     stream.pipe(res)
   } catch (err) { next(err) }
 })
 
-// Helper: parse multipart upload
+// Upload raw file (API key auth, multipart)
+router.post('/file/:name', async (req, res, next) => {
+  try {
+    const apiKey = await authenticateApiKey(req)
+    if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload files')
+
+    const name = decodeURIComponent(req.params.name)
+    const artefactId = name
+
+    const { fileStream, fields } = await parseFileUpload(req)
+
+    // Buffer the file
+    const chunks: Buffer[] = []
+    for await (const chunk of fileStream) {
+      chunks.push(chunk as Buffer)
+    }
+    const fileBuffer = Buffer.concat(chunks)
+
+    // Delete previous file if exists
+    const existing = await mongo.artefacts.findOne({ _id: artefactId })
+    if (existing?.filePath) {
+      await deleteFile(existing.filePath)
+    }
+
+    // Store file
+    const fileName = fields.fileName || name
+    const filePath = `files/${name}/${fileName}`
+    await writeFile(Readable.from(fileBuffer), filePath)
+
+    // Upsert artefact
+    const now = new Date().toISOString()
+    await mongo.artefacts.updateOne(
+      { _id: artefactId },
+      {
+        $set: {
+          filePath,
+          fileName,
+          category: (fields.category || 'other') as Artefact['category'],
+          ...(fields.title ? { title: JSON.parse(fields.title) } : {}),
+          ...(fields.description ? { description: JSON.parse(fields.description) } : {}),
+          ...(fields.thumbnail ? { thumbnail: fields.thumbnail } : {}),
+          updatedAt: now
+        },
+        $setOnInsert: {
+          _id: artefactId,
+          name,
+          format: 'file' as const,
+          majorVersion: null as unknown as undefined,
+          public: false,
+          privateAccess: [],
+          createdAt: now
+        }
+      },
+      { upsert: true }
+    )
+
+    const artefact = await mongo.artefacts.findOne({ _id: artefactId })
+    res.status(201).json({ artefact })
+  } catch (err) { next(err) }
+})
+
+// Download raw file
+router.get('/:id/download', async (req, res, next) => {
+  try {
+    let artefact
+
+    const secretKey = req.get('x-secret-key') || (typeof req.query.key === 'string' ? req.query.key : undefined)
+    if (secretKey) {
+      assertReqInternalSecret(req, config.secretKeys.internalServices!)
+      artefact = await mongo.artefacts.findOne({ _id: req.params.id })
+    } else {
+      const filter = await artefactAccessFilter(req)
+      artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+      if (artefact) await assertDownloadAccess(req, artefact)
+    }
+
+    if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.format !== 'file') throw httpError(400, 'this artefact is not a file-format artefact')
+    if (!artefact.filePath) throw httpError(404, 'no file uploaded for this artefact')
+
+    res.set('Content-Type', 'application/octet-stream')
+    res.set('Content-Disposition', `attachment; filename="${artefact.fileName || artefact.name}"`)
+    const stream = await readFile(artefact.filePath)
+    stream.pipe(res)
+  } catch (err) { next(err) }
+})
+
+// Helper: parse multipart upload (npm tarball)
 function parseUpload (req: import('express').Request): Promise<{ fileStream: Readable, architecture?: string }> {
   return new Promise((resolve, reject) => {
     let architecture: string | undefined
@@ -235,6 +333,30 @@ function parseUpload (req: import('express').Request): Promise<{ fileStream: Rea
 
     busboy.on('file', (_name: string, stream: Readable) => {
       resolve({ fileStream: stream, architecture })
+    })
+
+    busboy.on('error', reject)
+    busboy.on('finish', () => {
+      reject(httpError(400, 'no file provided in upload'))
+    })
+
+    req.pipe(busboy)
+  })
+}
+
+// Helper: parse multipart upload (raw file)
+function parseFileUpload (req: import('express').Request): Promise<{ fileStream: Readable, fields: Record<string, string> }> {
+  return new Promise((resolve, reject) => {
+    const fields: Record<string, string> = {}
+    const busboy = Busboy({ headers: req.headers })
+
+    busboy.on('field', (name: string, val: string) => {
+      fields[name] = val
+    })
+
+    busboy.on('file', (_name: string, stream: Readable, info: { filename: string }) => {
+      if (!fields.fileName && info.filename) fields.fileName = info.filename
+      resolve({ fileStream: stream, fields })
     })
 
     busboy.on('error', reject)
