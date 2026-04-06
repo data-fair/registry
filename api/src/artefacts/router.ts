@@ -9,8 +9,8 @@ import mongo from '#mongo'
 import config from '#config'
 import { authenticateApiKey } from '../auth.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
-import { writeTarball, readTarball, deleteTarball } from '../storage.ts'
-import { extractManifest, parseSemver, resolveVersionQuery } from './service.ts'
+import { writeTarball, readTarball, deleteTarball } from '../files-storage/index.ts'
+import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 
 const router = Router()
@@ -163,6 +163,9 @@ router.post('/:name/versions', async (req, res, next) => {
       uploadedAt: now
     })
 
+    // 2-deep retention: keep only the 2 most recent patches per minor branch
+    await pruneOldVersions(artefactId, semverParts.semverMajor, semverParts.semverMinor)
+
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     res.status(201).json({ artefact, version: { _id: versionId, version: manifest.version } })
   } catch (err) { next(err) }
@@ -206,7 +209,7 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
 
     res.set('Content-Type', 'application/gzip')
     res.set('Content-Disposition', `attachment; filename="${artefact.name}-${version.version}.tgz"`)
-    const stream = readTarball(version.tarballPath)
+    const stream = await readTarball(version.tarballPath)
     stream.pipe(res)
   } catch (err) { next(err) }
 })

@@ -61,6 +61,29 @@
         }
       }
     },
+    "filesStorage": {
+      "type": "string",
+      "enum": ["fs", "s3"],
+      "default": "fs"
+    },
+    "s3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "bucket": { "type": "string" },
+        "credentials": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "accessKeyId": { "type": "string" },
+            "secretAccessKey": { "type": "string" }
+          }
+        },
+        "forcePathStyle": { "type": "boolean" }
+      }
+    },
     "upgradeRoot": {
       "type": "string"
     },

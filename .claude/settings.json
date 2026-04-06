@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:vite.dev)",
+      "WebSearch",
+      "mcp__*",
+      "mcp__vuetify__get_v4_breaking_changes",
+      "mcp__vuetify__get_component_api_by_version",
+      "mcp__playwright-test__browser_navigate",
+      "mcp__playwright-test__browser_open",
+      "mcp__playwright-test__generator_setup_page",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs"
+    ],
+    "deny": []
+  },
+  "enabledMcpjsonServers": [
+    "playwright-test"
+  ],
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  }
+}

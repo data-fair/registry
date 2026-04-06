@@ -8,7 +8,7 @@ import artefactsRouter from './artefacts/router.ts'
 import apiKeysRouter from './api-keys/router.ts'
 import accessGrantsRouter from './access-grants/router.ts'
 import mongo from '#mongo'
-import { cleanTarballs } from './storage.ts'
+import { cleanTarballs } from './files-storage/index.ts'
 import config from '#config'
 
 export const app = express()

@@ -5,6 +5,8 @@ import * as tar from 'tar-stream'
 import * as semver from 'semver'
 import type { Filter } from 'mongodb'
 import type { Version } from '#types/version/index.ts'
+import mongo from '#mongo'
+import { deleteTarball } from '../files-storage/index.ts'
 
 export interface Manifest {
   name: string
@@ -95,4 +97,25 @@ export const resolveVersionQuery = (artefactId: string, versionParam: string): {
   }
 
   return { filter, sort }
+}
+
+/**
+ * 2-deep retention: keep only the 2 most recent patch versions per minor branch.
+ * Deletes oldest tarballs and version docs when there are more than 2.
+ */
+export const pruneOldVersions = async (artefactId: string, semverMajor: number, semverMinor: number) => {
+  const versions = await mongo.versions.find({
+    artefactId,
+    semverMajor,
+    semverMinor,
+    semverPrerelease: { $exists: false }
+  }).sort({ semverPatch: -1 }).toArray()
+
+  if (versions.length <= 2) return
+
+  const toDelete = versions.slice(2)
+  for (const version of toDelete) {
+    await deleteTarball(version.tarballPath)
+    await mongo.versions.deleteOne({ _id: version._id })
+  }
 }

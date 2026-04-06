@@ -5,6 +5,17 @@ export default {
   port: 8080,
   tmpDir: '/tmp',
   dataDir: '/data',
+  filesStorage: 'fs',
+  s3: {
+    region: '',
+    endpoint: '',
+    bucket: '',
+    credentials: {
+      accessKeyId: '',
+      secretAccessKey: ''
+    },
+    forcePathStyle: true
+  },
   observer: {
     active: true,
     port: 9090

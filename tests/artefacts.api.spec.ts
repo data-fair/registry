@@ -186,6 +186,52 @@ test.describe('Artefacts', () => {
     })
   })
 
+  test.describe('2-deep retention', () => {
+    test('keeps only 2 most recent patches per minor branch', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const admin = await superAdmin
+
+      // Upload 3 patch versions for minor 1.0
+      for (const v of ['1.0.0', '1.0.1', '1.0.2']) {
+        const tarball = await createTestTarball({ name: '@test/pkg', version: v })
+        const form = new FormData()
+        form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+        await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+      }
+
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+
+      // Should have kept only 1.0.1 and 1.0.2
+      const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg%401')
+      const versions = detail.data.versions.map((v: any) => v.version)
+      expect(versions).toContain('1.0.2')
+      expect(versions).toContain('1.0.1')
+      expect(versions).not.toContain('1.0.0')
+      expect(detail.data.versions).toHaveLength(2)
+    })
+
+    test('does not prune across different minor branches', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const admin = await superAdmin
+
+      for (const v of ['1.0.0', '1.0.1', '1.0.2', '1.1.0', '1.1.1']) {
+        const tarball = await createTestTarball({ name: '@test/pkg', version: v })
+        const form = new FormData()
+        form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+        await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+      }
+
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+
+      const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg%401')
+      const versions = detail.data.versions.map((v: any) => v.version)
+      // 1.0.x: kept 1.0.1, 1.0.2 (pruned 1.0.0)
+      // 1.1.x: kept 1.1.0, 1.1.1
+      expect(versions).toHaveLength(4)
+      expect(versions).not.toContain('1.0.0')
+    })
+  })
+
   test.describe('Tarball download', () => {
     test.beforeEach(async () => {
       const ax = axiosWithApiKey(uploadApiKey)
