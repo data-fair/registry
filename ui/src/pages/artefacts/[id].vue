@@ -247,7 +247,9 @@ async function fetchArtefact () {
 }
 
 onMounted(async () => {
-  if (session.state.account) {
+  if (session.state.user?.adminMode) {
+    hasGrant.value = true
+  } else if (session.state.account) {
     $fetch('/v1/access-grants/me').then(() => { hasGrant.value = true }).catch(() => {})
   }
   await fetchArtefact()
