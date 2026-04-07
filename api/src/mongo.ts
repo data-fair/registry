@@ -38,7 +38,8 @@ export class RegistryMongo {
     await this.connect()
     await mongoLib.configure({
       artefacts: {
-        'name-major': [{ name: 1, majorVersion: 1 }, { unique: true }]
+        'name-major': [{ name: 1, majorVersion: 1 }, { unique: true }],
+        fulltext: { name: 'text' }
       },
       versions: {
         'artefact-version-arch': [{ artefactId: 1, version: 1, architecture: 1 }, { unique: true }]

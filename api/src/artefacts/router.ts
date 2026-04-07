@@ -21,20 +21,28 @@ export default router
 router.get('/', async (req, res, next) => {
   try {
     const filter = await artefactAccessFilter(req)
-    const skip = parseInt(req.query.skip as string) || 0
+    const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
     const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { updatedAt: -1 }
 
     // Text search on name
     if (req.query.q) {
-      filter.name = { $regex: req.query.q as string, $options: 'i' }
+      filter.$text = { $search: req.query.q as string }
     }
     // Category filter
     if (req.query.category) {
+      const allowedCategories = ['processing', 'catalog', 'application', 'tileset', 'other']
+      if (!allowedCategories.includes(req.query.category as string)) {
+        throw httpError(400, `invalid category, must be one of: ${allowedCategories.join(', ')}`)
+      }
       filter.category = req.query.category as Artefact['category']
     }
     // Format filter
     if (req.query.format) {
+      const allowedFormats = ['npm', 'file']
+      if (!allowedFormats.includes(req.query.format as string)) {
+        throw httpError(400, `invalid format, must be one of: ${allowedFormats.join(', ')}`)
+      }
       filter.format = req.query.format as 'npm' | 'file'
     }
 
@@ -211,7 +219,7 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
     let artefact
 
     // Two auth paths: internal secret or session-based
-    const secretKey = req.get('x-secret-key') || (typeof req.query.key === 'string' ? req.query.key : undefined)
+    const secretKey = req.get('x-secret-key')
     if (secretKey) {
       assertReqInternalSecret(req, config.secretKeys.internalServices!)
       artefact = await mongo.artefacts.findOne({ _id: req.params.id })
@@ -300,7 +308,7 @@ router.get('/:id/download', async (req, res, next) => {
   try {
     let artefact
 
-    const secretKey = req.get('x-secret-key') || (typeof req.query.key === 'string' ? req.query.key : undefined)
+    const secretKey = req.get('x-secret-key')
     if (secretKey) {
       assertReqInternalSecret(req, config.secretKeys.internalServices!)
       artefact = await mongo.artefacts.findOne({ _id: req.params.id })

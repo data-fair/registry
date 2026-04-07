@@ -4,6 +4,7 @@ import { createWriteStream } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import * as tar from 'tar-stream'
+import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import type { Readable } from 'node:stream'
 
@@ -96,11 +97,11 @@ async function extractTarball (stream: Readable, destDir: string): Promise<void>
     const entryPath = header.name.replace(/^package\//, '')
 
     if (header.type === 'directory') {
-      entries.push(mkdir(join(destDir, entryPath), { recursive: true }).then(() => {}))
+      entries.push(mkdir(resolvePath(destDir, entryPath), { recursive: true }).then(() => {}))
       entryStream.resume()
       entryStream.on('end', next)
     } else if (header.type === 'file') {
-      const fullPath = join(destDir, entryPath)
+      const fullPath = resolvePath(destDir, entryPath)
       const p = mkdir(dirname(fullPath), { recursive: true }).then(() => {
         return new Promise<void>((resolve, reject) => {
           const ws = createWriteStream(fullPath)

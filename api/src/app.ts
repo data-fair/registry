@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { session, errorHandler, createSiteMiddleware, createSpaMiddleware } from '@data-fair/lib-express/index.js'
+import { assertReqInternal } from '@data-fair/lib-express/req-origin.js'
 import express from 'express'
 import helmet from 'helmet'
 import { uiConfig } from './ui-config.ts'
@@ -37,6 +38,7 @@ app.use('/api/ping', (req, res) => res.send('ok'))
 
 if (process.env.NODE_ENV === 'development') {
   app.delete('/api/test-env', async (req, res) => {
+    assertReqInternal(req)
     await mongo.artefacts.deleteMany({})
     await mongo.versions.deleteMany({})
     await mongo.apiKeys.deleteMany({})
