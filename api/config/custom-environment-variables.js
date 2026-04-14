@@ -13,6 +13,10 @@ export default {
   },
   upgradeRoot: 'UPGRADE_ROOT',
   dataDir: 'DATA_DIR',
+  maxUploadBytes: {
+    __name: 'MAX_UPLOAD_BYTES',
+    __format: 'number'
+  },
   filesStorage: 'FILES_STORAGE',
   s3: {
     region: 'S3_REGION',

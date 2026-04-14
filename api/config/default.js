@@ -5,6 +5,7 @@ export default {
   port: 8080,
   tmpDir: '/tmp',
   dataDir: '/data',
+  maxUploadBytes: 500 * 1024 * 1024,
   filesStorage: 'fs',
   s3: {
     region: '',

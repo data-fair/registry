@@ -1,5 +1,10 @@
 import { Router } from 'express'
-import { Readable } from 'node:stream'
+import { createReadStream, createWriteStream } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { pipeline } from 'node:stream/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import Busboy from 'busboy'
 import { ObjectId } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
@@ -21,6 +26,8 @@ const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
 const allCategories = [...new Set<string>([...npmCategories, ...fileCategories])]
 
+const MAX_UPLOAD_BYTES = config.maxUploadBytes ?? 500 * 1024 * 1024
+
 type Category = Artefact['category']
 const pickCategory = (raw: string | undefined, allowed: readonly string[]): Category => {
   const value = raw || 'other'
@@ -28,6 +35,37 @@ const pickCategory = (raw: string | undefined, allowed: readonly string[]): Cate
     throw httpError(400, `invalid category "${value}", must be one of: ${allowed.join(', ')}`)
   }
   return value as Category
+}
+
+type LocalizedString = { fr?: string, en?: string }
+const parseLocalizedField = (raw: string, field: string): LocalizedString => {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw httpError(400, `invalid JSON in field "${field}"`)
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw httpError(400, `field "${field}" must be an object`)
+  }
+  const obj = parsed as Record<string, unknown>
+  const result: LocalizedString = {}
+  for (const key of ['fr', 'en'] as const) {
+    const value = obj[key]
+    if (value === undefined) continue
+    if (typeof value !== 'string') throw httpError(400, `field "${field}.${key}" must be a string`)
+    if (value.length > 2000) throw httpError(400, `field "${field}.${key}" exceeds 2000 characters`)
+    result[key] = value
+  }
+  return result
+}
+
+const safeDecode = (raw: string): string => {
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    throw httpError(400, 'malformed URL path segment')
+  }
 }
 
 // List artefacts (filtered by access)
@@ -117,40 +155,40 @@ router.delete('/:id', async (req, res, next) => {
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id })
     if (!artefact) throw httpError(404, 'artefact not found')
 
+    // Delete DB state first so concurrent GETs fail cleanly with 404,
+    // then best-effort remove files.
     if (artefact.format === 'file') {
+      await mongo.artefacts.deleteOne({ _id: artefact._id })
       if (artefact.filePath) await deleteFile(artefact.filePath)
     } else {
       const versions = await mongo.versions.find({ artefactId: artefact._id }).toArray()
+      await mongo.versions.deleteMany({ artefactId: artefact._id })
+      await mongo.artefacts.deleteOne({ _id: artefact._id })
       for (const version of versions) {
         await deleteFile(version.tarballPath)
       }
-      await mongo.versions.deleteMany({ artefactId: artefact._id })
     }
-    await mongo.artefacts.deleteOne({ _id: artefact._id })
     res.status(204).send()
   } catch (err) { next(err) }
 })
 
 // Upload version (API key auth, multipart)
 router.post('/:name/versions', async (req, res, next) => {
+  let tmpDir: string | undefined
+  let storedTarballPath: string | undefined
+  let storedOk = false
   try {
     const apiKey = await authenticateApiKey(req)
     if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload versions')
 
-    const name = decodeURIComponent(req.params.name)
+    const name = safeDecode(req.params.name)
 
-    // Parse multipart: expect a single file field
-    const { fileStream, architecture } = await parseUpload(req)
+    tmpDir = await mkdtemp(join(config.tmpDir || tmpdir(), 'registry-upload-'))
+    const tmpTarball = join(tmpDir, 'upload.tgz')
+    const { architecture } = await streamTarballUpload(req, tmpTarball)
 
-    // Buffer the tarball so we can both parse and store it
-    const chunks: Buffer[] = []
-    for await (const chunk of fileStream) {
-      chunks.push(chunk as Buffer)
-    }
-    const tarballBuffer = Buffer.concat(chunks)
-
-    // Extract manifest from tarball
-    const manifest = await extractManifest(Readable.from(tarballBuffer))
+    // Extract manifest from disk (pipeline enforces decompression limits).
+    const manifest = await extractManifest(createReadStream(tmpTarball))
     if (manifest.name !== name) {
       throw httpError(400, `package name mismatch: URL says "${name}" but package.json says "${manifest.name}"`)
     }
@@ -159,10 +197,11 @@ router.post('/:name/versions', async (req, res, next) => {
     const majorVersion = semverParts.semverMajor
     const artefactId = `${name}@${majorVersion}`
 
-    // Store tarball
+    // Store tarball (streamed from disk, no in-memory buffering).
     const archSuffix = architecture ? `_${architecture}` : ''
     const tarballPath = `${name}/${majorVersion}/${manifest.version}${archSuffix}.tgz`
-    await writeFile(Readable.from(tarballBuffer), tarballPath)
+    await writeFile(createReadStream(tmpTarball), tarballPath)
+    storedTarballPath = tarballPath
 
     // Upsert artefact
     const now = new Date().toISOString()
@@ -202,13 +241,22 @@ router.post('/:name/versions', async (req, res, next) => {
       tarballPath,
       uploadedAt: now
     })
+    storedOk = true
 
     // 2-deep retention: keep only the 2 most recent patches per minor branch
     await pruneOldVersions(artefactId, semverParts.semverMajor, semverParts.semverMinor)
 
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     res.status(201).json({ artefact, version: { _id: versionId, version: manifest.version } })
-  } catch (err) { next(err) }
+  } catch (err) {
+    // If we wrote the file but failed to commit the DB row, clean it up.
+    if (storedTarballPath && !storedOk) {
+      await deleteFile(storedTarballPath).catch(() => {})
+    }
+    next(err)
+  } finally {
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  }
 })
 
 // Resolve version
@@ -251,40 +299,42 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
     res.set('Content-Disposition', `attachment; filename="${artefact.name}-${version.version}.tgz"`)
     const { body, size } = await readFile(version.tarballPath)
     res.set('Content-Length', String(size))
-    body.pipe(res)
+    await pipeline(body, res).catch((err) => {
+      if (!res.headersSent) next(err)
+    })
   } catch (err) { next(err) }
 })
 
 // Upload raw file (API key auth, multipart)
 router.post('/file/:name', async (req, res, next) => {
+  let tmpDir: string | undefined
+  let newFilePath: string | undefined
+  let storedOk = false
   try {
     const apiKey = await authenticateApiKey(req)
     if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload files')
 
-    const name = decodeURIComponent(req.params.name)
+    const name = safeDecode(req.params.name)
     const artefactId = name
 
-    const { fileStream, fields } = await parseFileUpload(req)
+    tmpDir = await mkdtemp(join(config.tmpDir || tmpdir(), 'registry-upload-'))
+    const tmpFile = join(tmpDir, 'upload.bin')
+    const fields = await streamFileUpload(req, tmpFile)
 
-    // Buffer the file
-    const chunks: Buffer[] = []
-    for await (const chunk of fileStream) {
-      chunks.push(chunk as Buffer)
-    }
-    const fileBuffer = Buffer.concat(chunks)
+    // Parse optional JSON fields with explicit 400 on malformed input.
+    const title = fields.title ? parseLocalizedField(fields.title, 'title') : undefined
+    const description = fields.description ? parseLocalizedField(fields.description, 'description') : undefined
 
-    // Delete previous file if exists
+    // Store NEW file first, then DB commit, then delete OLD — avoids a
+    // window where the artefact row points at a missing file.
     const existing = await mongo.artefacts.findOne({ _id: artefactId })
-    if (existing?.filePath) {
-      await deleteFile(existing.filePath)
-    }
-
-    // Store file
     const fileName = fields.fileName || name
-    const filePath = `files/${name}/${fileName}`
-    await writeFile(Readable.from(fileBuffer), filePath)
+    // Namespace new writes with a random suffix so a failed delete of the
+    // old file doesn't clobber the fresh one.
+    const filePath = `files/${name}/${randomUUID()}-${fileName}`
+    await writeFile(createReadStream(tmpFile), filePath)
+    newFilePath = filePath
 
-    // Upsert artefact
     const now = new Date().toISOString()
     await mongo.artefacts.updateOne(
       { _id: artefactId },
@@ -293,8 +343,8 @@ router.post('/file/:name', async (req, res, next) => {
           filePath,
           fileName,
           category: pickCategory(fields.category, fileCategories),
-          ...(fields.title ? { title: JSON.parse(fields.title) } : {}),
-          ...(fields.description ? { description: JSON.parse(fields.description) } : {}),
+          ...(title !== undefined ? { title } : {}),
+          ...(description !== undefined ? { description } : {}),
           ...(fields.thumbnail ? { thumbnail: fields.thumbnail } : {}),
           updatedAt: now
         },
@@ -302,7 +352,6 @@ router.post('/file/:name', async (req, res, next) => {
           _id: artefactId,
           name,
           format: 'file' as const,
-          majorVersion: null as unknown as undefined,
           public: false,
           privateAccess: [],
           createdAt: now
@@ -310,10 +359,22 @@ router.post('/file/:name', async (req, res, next) => {
       },
       { upsert: true }
     )
+    storedOk = true
+
+    if (existing?.filePath && existing.filePath !== filePath) {
+      await deleteFile(existing.filePath).catch(() => {})
+    }
 
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     res.status(201).json({ artefact })
-  } catch (err) { next(err) }
+  } catch (err) {
+    if (newFilePath && !storedOk) {
+      await deleteFile(newFilePath).catch(() => {})
+    }
+    next(err)
+  } finally {
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  }
 })
 
 // Download raw file
@@ -340,53 +401,141 @@ router.get('/:id/download', async (req, res, next) => {
     const { body, size, lastModified } = await readFile(artefact.filePath, req.get('If-Modified-Since'))
     res.set('Last-Modified', lastModified.toUTCString())
     res.set('Content-Length', String(size))
-    body.pipe(res)
+    await pipeline(body, res).catch((err) => {
+      if (!res.headersSent) next(err)
+    })
   } catch (err) { next(err) }
 })
 
-// Helper: parse multipart upload (npm tarball)
-function parseUpload (req: import('express').Request): Promise<{ fileStream: Readable, architecture?: string }> {
+// Helper: stream a multipart upload containing a tarball to disk, collecting
+// `architecture` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.
+function streamTarballUpload (req: import('express').Request, destPath: string): Promise<{ architecture?: string }> {
   return new Promise((resolve, reject) => {
-    let architecture: string | undefined
-    const busboy = Busboy({ headers: req.headers })
+    let settled = false
+    const settle = (err: Error | null, result?: { architecture?: string }) => {
+      if (settled) return
+      settled = true
+      if (err) reject(err)
+      else resolve(result!)
+    }
 
-    busboy.on('field', (name: string, val: string) => {
+    let architecture: string | undefined
+    let fileSeen = false
+    let pendingWrite: Promise<void> | null = null
+
+    const busboy = Busboy({
+      headers: req.headers,
+      limits: {
+        fileSize: MAX_UPLOAD_BYTES,
+        files: 1,
+        fields: 20,
+        fieldSize: 64 * 1024,
+        fieldNameSize: 200
+      }
+    })
+
+    busboy.on('field', (name, val) => {
       if (name === 'architecture') architecture = val
     })
 
-    busboy.on('file', (_name: string, stream: Readable) => {
-      resolve({ fileStream: stream, architecture })
+    busboy.on('file', (_name, stream) => {
+      if (fileSeen) {
+        stream.resume()
+        return
+      }
+      fileSeen = true
+
+      stream.on('limit', () => {
+        settle(httpError(413, `upload exceeds ${MAX_UPLOAD_BYTES} bytes`))
+        stream.unpipe()
+        req.unpipe(busboy)
+      })
+
+      pendingWrite = pipeline(stream, createWriteStream(destPath)).catch((err) => {
+        settle(err)
+      })
     })
 
-    busboy.on('error', reject)
-    busboy.on('finish', () => {
-      reject(httpError(400, 'no file provided in upload'))
+    busboy.on('error', (err) => settle(err as Error))
+    busboy.on('finish', async () => {
+      if (!fileSeen) return settle(httpError(400, 'no file provided in upload'))
+      try {
+        if (pendingWrite) await pendingWrite
+      } catch (err) {
+        return settle(err as Error)
+      }
+      if (settled) return
+      settle(null, { architecture })
     })
 
+    req.on('aborted', () => settle(httpError(400, 'upload aborted')))
     req.pipe(busboy)
   })
 }
 
-// Helper: parse multipart upload (raw file)
-function parseFileUpload (req: import('express').Request): Promise<{ fileStream: Readable, fields: Record<string, string> }> {
+// Helper: stream a multipart upload containing a raw file to disk,
+// collecting all text fields. Enforces MAX_UPLOAD_BYTES.
+function streamFileUpload (req: import('express').Request, destPath: string): Promise<Record<string, string>> {
   return new Promise((resolve, reject) => {
-    const fields: Record<string, string> = {}
-    const busboy = Busboy({ headers: req.headers })
+    let settled = false
+    const settle = (err: Error | null, result?: Record<string, string>) => {
+      if (settled) return
+      settled = true
+      if (err) reject(err)
+      else resolve(result!)
+    }
 
-    busboy.on('field', (name: string, val: string) => {
+    const fields: Record<string, string> = {}
+    let fileSeen = false
+    let pendingWrite: Promise<void> | null = null
+
+    const busboy = Busboy({
+      headers: req.headers,
+      limits: {
+        fileSize: MAX_UPLOAD_BYTES,
+        files: 1,
+        fields: 20,
+        fieldSize: 64 * 1024,
+        fieldNameSize: 200
+      }
+    })
+
+    busboy.on('field', (name, val) => {
       fields[name] = val
     })
 
-    busboy.on('file', (_name: string, stream: Readable, info: { filename: string }) => {
+    busboy.on('file', (_name, stream, info) => {
+      if (fileSeen) {
+        stream.resume()
+        return
+      }
+      fileSeen = true
       if (!fields.fileName && info.filename) fields.fileName = info.filename
-      resolve({ fileStream: stream, fields })
+
+      stream.on('limit', () => {
+        settle(httpError(413, `upload exceeds ${MAX_UPLOAD_BYTES} bytes`))
+        stream.unpipe()
+        req.unpipe(busboy)
+      })
+
+      pendingWrite = pipeline(stream, createWriteStream(destPath)).catch((err) => {
+        settle(err)
+      })
     })
 
-    busboy.on('error', reject)
-    busboy.on('finish', () => {
-      reject(httpError(400, 'no file provided in upload'))
+    busboy.on('error', (err) => settle(err as Error))
+    busboy.on('finish', async () => {
+      if (!fileSeen) return settle(httpError(400, 'no file provided in upload'))
+      try {
+        if (pendingWrite) await pendingWrite
+      } catch (err) {
+        return settle(err as Error)
+      }
+      if (settled) return
+      settle(null, fields)
     })
 
+    req.on('aborted', () => settle(httpError(400, 'upload aborted')))
     req.pipe(busboy)
   })
 }
