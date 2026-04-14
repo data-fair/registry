@@ -15,7 +15,7 @@ export default {
     licence: { type: 'string', readOnly: true },
     category: {
       type: 'string',
-      enum: ['processing', 'catalog', 'application', 'tileset', 'other']
+      enum: ['processing', 'catalog', 'application', 'tileset', 'maplibre-style', 'other']
     },
     title: {
       type: 'object',

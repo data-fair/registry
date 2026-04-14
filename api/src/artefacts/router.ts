@@ -17,6 +17,19 @@ import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 const router = Router()
 export default router
 
+const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
+const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
+const allCategories = [...new Set<string>([...npmCategories, ...fileCategories])]
+
+type Category = Artefact['category']
+const pickCategory = (raw: string | undefined, allowed: readonly string[]): Category => {
+  const value = raw || 'other'
+  if (!allowed.includes(value)) {
+    throw httpError(400, `invalid category "${value}", must be one of: ${allowed.join(', ')}`)
+  }
+  return value as Category
+}
+
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
@@ -31,11 +44,10 @@ router.get('/', async (req, res, next) => {
     }
     // Category filter
     if (req.query.category) {
-      const allowedCategories = ['processing', 'catalog', 'application', 'tileset', 'other']
-      if (!allowedCategories.includes(req.query.category as string)) {
-        throw httpError(400, `invalid category, must be one of: ${allowedCategories.join(', ')}`)
+      if (!allCategories.includes(req.query.category as string)) {
+        throw httpError(400, `invalid category, must be one of: ${allCategories.join(', ')}`)
       }
-      filter.category = req.query.category as Artefact['category']
+      filter.category = req.query.category as Category
     }
     // Format filter
     if (req.query.format) {
@@ -161,7 +173,7 @@ router.post('/:name/versions', async (req, res, next) => {
           packageName: manifest.name,
           version: manifest.version,
           licence: manifest.licence,
-          category: (manifest.category || 'other') as Artefact['category'],
+          category: pickCategory(manifest.category, npmCategories),
           ...(manifest.processingConfigSchema ? { processingConfigSchema: manifest.processingConfigSchema } : {}),
           ...(manifest.applicationConfigSchema ? { applicationConfigSchema: manifest.applicationConfigSchema } : {}),
           updatedAt: now
@@ -237,8 +249,9 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
 
     res.set('Content-Type', 'application/gzip')
     res.set('Content-Disposition', `attachment; filename="${artefact.name}-${version.version}.tgz"`)
-    const stream = await readFile(version.tarballPath)
-    stream.pipe(res)
+    const { body, size } = await readFile(version.tarballPath)
+    res.set('Content-Length', String(size))
+    body.pipe(res)
   } catch (err) { next(err) }
 })
 
@@ -279,7 +292,7 @@ router.post('/file/:name', async (req, res, next) => {
         $set: {
           filePath,
           fileName,
-          category: (fields.category || 'other') as Artefact['category'],
+          category: pickCategory(fields.category, fileCategories),
           ...(fields.title ? { title: JSON.parse(fields.title) } : {}),
           ...(fields.description ? { description: JSON.parse(fields.description) } : {}),
           ...(fields.thumbnail ? { thumbnail: fields.thumbnail } : {}),
@@ -324,8 +337,10 @@ router.get('/:id/download', async (req, res, next) => {
 
     res.set('Content-Type', 'application/octet-stream')
     res.set('Content-Disposition', `attachment; filename="${artefact.fileName || artefact.name}"`)
-    const stream = await readFile(artefact.filePath)
-    stream.pipe(res)
+    const { body, size, lastModified } = await readFile(artefact.filePath, req.get('If-Modified-Since'))
+    res.set('Last-Modified', lastModified.toUTCString())
+    res.set('Content-Length', String(size))
+    body.pipe(res)
   } catch (err) { next(err) }
 })
 

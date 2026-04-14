@@ -174,7 +174,7 @@ const categoryItems = [
 ]
 
 function categoryColor (cat: string) {
-  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', other: 'grey' }
+  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', 'maplibre-style': 'orange', other: 'grey' }
   return colors[cat] || 'grey'
 }
 

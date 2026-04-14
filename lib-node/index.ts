@@ -1,7 +1,7 @@
 import { createGunzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
-import { mkdir, readFile, writeFile, rm, rename } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, rm, rename, stat, utimes } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
@@ -85,6 +85,68 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   await writeFile(metaPath, JSON.stringify({ version: resolvedVersion } satisfies CacheMeta))
 
   return { path: extractDir, version: resolvedVersion, downloaded: true }
+}
+
+export interface EnsureArtefactFileOpts {
+  registryUrl: string
+  secretKey: string
+  artefactId: string
+  cacheDir: string
+  /** defaults to artefactId */
+  fileName?: string
+}
+
+export interface EnsureArtefactFileResult {
+  path: string
+  downloaded: boolean
+}
+
+export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise<EnsureArtefactFileResult> {
+  const ax = axiosBuilder({
+    baseURL: opts.registryUrl,
+    headers: { 'x-secret-key': opts.secretKey }
+  })
+
+  const destPath = join(opts.cacheDir, opts.fileName ?? opts.artefactId)
+
+  let prevMtime: Date | undefined
+  try {
+    const st = await stat(destPath)
+    prevMtime = st.mtime
+  } catch { /* cold cache */ }
+
+  const headers: Record<string, string> = {}
+  if (prevMtime) headers['if-modified-since'] = prevMtime.toUTCString()
+
+  const res = await ax.get(
+    `/api/v1/artefacts/${encodeURIComponent(opts.artefactId)}/download`,
+    { responseType: 'stream', headers, validateStatus: s => s === 200 || s === 304 }
+  )
+
+  if (res.status === 304) {
+    return { path: destPath, downloaded: false }
+  }
+
+  await mkdir(dirname(destPath), { recursive: true })
+  const tmpPath = `${destPath}.tmp.${process.pid}`
+  await rm(tmpPath, { force: true })
+  try {
+    await pipeline(res.data as Readable, createWriteStream(tmpPath))
+  } catch (err) {
+    await rm(tmpPath, { force: true })
+    throw err
+  }
+  await rename(tmpPath, destPath)
+
+  const lastModified = res.headers['last-modified']
+  if (lastModified) {
+    const mtime = new Date(lastModified)
+    if (!isNaN(mtime.getTime())) {
+      await utimes(destPath, new Date(), mtime)
+    }
+  }
+
+  return { path: destPath, downloaded: true }
 }
 
 async function extractTarball (stream: Readable, destDir: string): Promise<void> {
