@@ -1,0 +1,35 @@
+name: Quality checks
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout git repository
+      uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 24
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Lint and type-check
+      run: npm run lint && npm run build-types && npm run check-types
+
+    - name: Init env
+      run: bash dev/init-env.sh
+
+    - name: Start dev dependencies
+      run: docker compose up -d --wait
+
+    - name: Start dev API
+      run: NODE_ENV=development node api/index.ts &
+
+    - name: Run tests
+      run: npm run test
