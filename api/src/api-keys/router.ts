@@ -18,6 +18,9 @@ router.post('/', async (req, res, next) => {
     if (body.type === 'upload') {
       await session.reqAdminMode(req)
     } else if (body.type === 'federation') {
+      if (body.allowedNames && body.allowedNames.length > 0) {
+        throw httpError(400, 'allowedNames is only valid for upload keys')
+      }
       const sessionState = reqSessionAuthenticated(req)
       if (!body.owner) throw httpError(400, 'owner is required for federation keys')
       // Check that the account has a grant
@@ -45,7 +48,8 @@ router.post('/', async (req, res, next) => {
         name: sessionState.user.name
       },
       createdAt: now,
-      ...(body.owner ? { owner: body.owner } : {})
+      ...(body.owner ? { owner: body.owner } : {}),
+      ...(body.allowedNames && body.allowedNames.length > 0 ? { allowedNames: body.allowedNames } : {})
     }
 
     await mongo.apiKeys.insertOne(apiKeyDoc)

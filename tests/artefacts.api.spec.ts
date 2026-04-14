@@ -67,6 +67,77 @@ test.describe('Artefacts', () => {
       }
     })
 
+    test('scoped upload key accepts matching name', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'scoped',
+        allowedNames: ['@koumoul/*', 'terrain-france']
+      })
+      const scopedKey = keyRes.data.key
+      expect(keyRes.data.allowedNames).toEqual(['@koumoul/*', 'terrain-france'])
+
+      const upload = axiosWithApiKey(scopedKey)
+
+      // Prefix match
+      const tarball1 = await createTestTarball({ name: '@koumoul/processing-x', version: '1.0.0' })
+      const form1 = new FormData()
+      form1.append('file', tarball1, { filename: 'p.tgz', contentType: 'application/gzip' })
+      const res1 = await upload.post('/api/v1/artefacts/%40koumoul%2Fprocessing-x/versions', form1, { headers: form1.getHeaders() })
+      expect(res1.status).toBe(201)
+
+      // Exact match for a file artefact
+      const fileForm = new FormData()
+      fileForm.append('file', Buffer.from('x'), { filename: 'terrain.mbtiles', contentType: 'application/octet-stream' })
+      fileForm.append('category', 'tileset')
+      const res2 = await upload.post('/api/v1/artefacts/file/terrain-france', fileForm, { headers: fileForm.getHeaders() })
+      expect(res2.status).toBe(201)
+    })
+
+    test('scoped upload key rejects non-matching name', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'scoped',
+        allowedNames: ['terrain-*']
+      })
+      const scopedKey = keyRes.data.key
+      const upload = axiosWithApiKey(scopedKey)
+
+      // Reject npm upload outside the scope
+      const tarball = await createTestTarball({ name: '@evil/payload', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      try {
+        await upload.post('/api/v1/artefacts/%40evil%2Fpayload/versions', form, { headers: form.getHeaders() })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+
+      // Reject file upload outside the scope
+      const fileForm = new FormData()
+      fileForm.append('file', Buffer.from('x'), { filename: 'basemap.mbtiles', contentType: 'application/octet-stream' })
+      fileForm.append('category', 'tileset')
+      try {
+        await upload.post('/api/v1/artefacts/file/basemap-world', fileForm, { headers: fileForm.getHeaders() })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('unscoped upload key still accepts any name', async () => {
+      // The default key created in beforeEach has no allowedNames — it should
+      // behave as unrestricted (backwards compatible).
+      const upload = axiosWithApiKey(uploadApiKey)
+      const tarball = await createTestTarball({ name: '@anywhere/pkg', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      const res = await upload.post('/api/v1/artefacts/%40anywhere%2Fpkg/versions', form, { headers: form.getHeaders() })
+      expect(res.status).toBe(201)
+    })
+
     test('upload second version updates artefact', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
 

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,6 +14,7 @@ import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
 import config from '#config'
 import { authenticateApiKey } from '../auth.ts'
+import { matchArtefactName } from '../api-keys/match.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { writeFile, readFile, deleteFile } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
@@ -27,6 +28,12 @@ const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
 const allCategories = [...new Set<string>([...npmCategories, ...fileCategories])]
 
 const MAX_UPLOAD_BYTES = config.maxUploadBytes ?? 500 * 1024 * 1024
+
+const createUploadTmpDir = async () => {
+  const base = config.tmpDir || tmpdir()
+  await mkdir(base, { recursive: true })
+  return mkdtemp(join(base, 'registry-upload-'))
+}
 
 type Category = Artefact['category']
 const pickCategory = (raw: string | undefined, allowed: readonly string[]): Category => {
@@ -182,8 +189,11 @@ router.post('/:name/versions', async (req, res, next) => {
     if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload versions')
 
     const name = safeDecode(req.params.name)
+    if (!matchArtefactName(name, apiKey.allowedNames)) {
+      throw httpError(403, `this API key is not allowed to upload "${name}"`)
+    }
 
-    tmpDir = await mkdtemp(join(config.tmpDir || tmpdir(), 'registry-upload-'))
+    tmpDir = await createUploadTmpDir()
     const tmpTarball = join(tmpDir, 'upload.tgz')
     const { architecture } = await streamTarballUpload(req, tmpTarball)
 
@@ -315,9 +325,12 @@ router.post('/file/:name', async (req, res, next) => {
     if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload files')
 
     const name = safeDecode(req.params.name)
+    if (!matchArtefactName(name, apiKey.allowedNames)) {
+      throw httpError(403, `this API key is not allowed to upload "${name}"`)
+    }
     const artefactId = name
 
-    tmpDir = await mkdtemp(join(config.tmpDir || tmpdir(), 'registry-upload-'))
+    tmpDir = await createUploadTmpDir()
     const tmpFile = join(tmpDir, 'upload.bin')
     const fields = await streamFileUpload(req, tmpFile)
 

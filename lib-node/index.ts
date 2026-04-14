@@ -149,7 +149,7 @@ export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise
   return { path: destPath, downloaded: true }
 }
 
-async function extractTarball (stream: Readable, destDir: string): Promise<void> {
+export async function extractTarball (stream: Readable, destDir: string): Promise<void> {
   const extract = tar.extract()
 
   const entries: Promise<void>[] = []

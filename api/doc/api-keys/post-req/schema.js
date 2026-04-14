@@ -16,6 +16,15 @@ export default {
         type: { type: 'string', enum: ['user', 'organization'] },
         id: { type: 'string' }
       }
+    },
+    allowedNames: {
+      type: 'array',
+      description: 'Restricts which artefact names an upload key may target. Each entry is an exact name or a prefix ending in "*". Only valid for upload keys. Empty/missing means unrestricted.',
+      items: {
+        type: 'string',
+        minLength: 1,
+        pattern: '^[^*]+\\*?$'
+      }
     }
   }
 }

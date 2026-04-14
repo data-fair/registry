@@ -51,4 +51,44 @@ test.describe('API Keys', () => {
       expect(err.status).toBe(403)
     }
   })
+
+  test('superadmin can create an upload key with allowedNames scope', async () => {
+    const ax = await superAdmin
+    const res = await ax.post('/api/v1/api-keys', {
+      type: 'upload',
+      name: 'scoped',
+      allowedNames: ['@koumoul/*', 'terrain-france']
+    })
+    expect(res.status).toBe(201)
+    expect(res.data.allowedNames).toEqual(['@koumoul/*', 'terrain-france'])
+  })
+
+  test('rejects allowedNames with mid-string wildcard', async () => {
+    const ax = await superAdmin
+    try {
+      await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'bad',
+        allowedNames: ['foo*bar']
+      })
+      expect(true).toBe(false)
+    } catch (err: any) {
+      expect(err.status).toBe(400)
+    }
+  })
+
+  test('rejects allowedNames on federation keys', async () => {
+    const ax = await superAdmin
+    try {
+      await ax.post('/api/v1/api-keys', {
+        type: 'federation',
+        name: 'bad',
+        owner: { type: 'organization', id: 'test1' },
+        allowedNames: ['anything-*']
+      })
+      expect(true).toBe(false)
+    } catch (err: any) {
+      expect(err.status).toBe(400)
+    }
+  })
 })
