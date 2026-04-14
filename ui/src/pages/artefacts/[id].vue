@@ -237,7 +237,7 @@ import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
 import type { Artefact, Version } from '#api/types'
 
 const { t, locale } = useI18n()
-const route = useRoute()
+const route = useRoute('/artefacts/[id]')
 const session = useSession()
 const { dayjs } = useLocaleDayjs()
 

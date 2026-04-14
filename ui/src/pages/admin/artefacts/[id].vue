@@ -270,7 +270,7 @@ import type { Artefact, Version } from '#api/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
-const route = useRoute()
+const route = useRoute('/admin/artefacts/[id]')
 const session = useSession()
 const { dayjs } = useLocaleDayjs()
 
