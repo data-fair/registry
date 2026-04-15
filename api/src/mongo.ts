@@ -1,9 +1,21 @@
 import mongoLib from '@data-fair/lib-node/mongo.js'
+import type { Binary } from 'mongodb'
 import config from '#config'
 import type { Artefact } from '#types/artefact/index.ts'
 import type { Version } from '#types/version/index.ts'
 import type { ApiKey } from '#types/api-key/index.ts'
 import type { AccessGrant } from '#types/access-grant/index.ts'
+
+export type Thumbnail = {
+  _id: string
+  artefactId: string
+  data: Binary
+  mimeType: 'image/webp'
+  width: number
+  height: number
+  byteSize: number
+  createdAt: string
+}
 
 export class RegistryMongo {
   get client () {
@@ -30,6 +42,10 @@ export class RegistryMongo {
     return mongoLib.db.collection<AccessGrant>('access-grants')
   }
 
+  get thumbnails () {
+    return mongoLib.db.collection<Thumbnail>('thumbnails')
+  }
+
   async connect () {
     await mongoLib.connect(config.mongoUrl)
   }
@@ -49,8 +65,16 @@ export class RegistryMongo {
       },
       'access-grants': {
         account: [{ 'account.type': 1, 'account.id': 1 }, { unique: true }]
+      },
+      thumbnails: {
+        artefact: [{ artefactId: 1 }, { unique: true }]
       }
     })
+    // Drop legacy string thumbnail URLs left over from the old schema.
+    await this.artefacts.updateMany(
+      { thumbnail: { $type: 'string' } },
+      { $unset: { thumbnail: '' } }
+    )
   }
 }
 

@@ -12,5 +12,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     VjsfPatchReq: typeof import('./src/components/vjsf/vjsf-patch-req.vue')['default']
+    VjsfPatchReqEn: typeof import('./src/components/vjsf/vjsf-patch-req-en.vue')['default']
+    VjsfPatchReqFr: typeof import('./src/components/vjsf/vjsf-patch-req-fr.vue')['default']
   }
 }

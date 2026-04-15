@@ -332,7 +332,7 @@ const createdKey = ref<string | null>(null)
 const deletingKeyId = ref<string | null>(null)
 
 const keysFetch = useFetch<{ results: any[], count: number }>(
-  `${$apiPath}/v1/api-keys`
+  () => hasGrant.value ? `${$apiPath}/v1/api-keys` : null
 )
 
 const createAction = useAsyncAction(

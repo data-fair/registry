@@ -416,12 +416,10 @@ test.describe('File artefacts', () => {
       form.append('category', 'tileset')
       form.append('title', JSON.stringify({ fr: 'Terrain France', en: 'France Terrain' }))
       form.append('description', JSON.stringify({ fr: 'Un tileset', en: 'A tileset' }))
-      form.append('thumbnail', 'https://example.com/thumb.png')
 
       const res = await ax.post('/api/v1/artefacts/file/terrain', form, { headers: form.getHeaders() })
       expect(res.data.artefact.title.fr).toBe('Terrain France')
       expect(res.data.artefact.description.en).toBe('A tileset')
-      expect(res.data.artefact.thumbnail).toBe('https://example.com/thumb.png')
     })
   })
 

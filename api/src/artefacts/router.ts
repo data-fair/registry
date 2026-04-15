@@ -19,9 +19,12 @@ import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { writeFile, readFile, deleteFile } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
+import { artefactThumbnailRouter } from '../thumbnails/router.ts'
 
 const router = Router()
 export default router
+
+router.use('/:id/thumbnail', artefactThumbnailRouter)
 
 const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
@@ -175,6 +178,7 @@ router.delete('/:id', async (req, res, next) => {
         await deleteFile(version.tarballPath)
       }
     }
+    await mongo.thumbnails.deleteMany({ artefactId: artefact._id })
     res.status(204).send()
   } catch (err) { next(err) }
 })
@@ -358,7 +362,6 @@ router.post('/file/:name', async (req, res, next) => {
           category: pickCategory(fields.category, fileCategories),
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
-          ...(fields.thumbnail ? { thumbnail: fields.thumbnail } : {}),
           updatedAt: now
         },
         $setOnInsert: {

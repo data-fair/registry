@@ -15,7 +15,14 @@ dotenv.config({ path: import.meta.resolve('../.env').replace('file://', '') })
 
 export default defineConfig({
   base: '/registry',
-  optimizeDeps: { include: [...commonjsDeps] },
+  optimizeDeps: {
+    noDiscovery: true,
+    include: [
+      ...commonjsDeps,
+      'ajv-i18n/localize/en/index.js',
+      'ajv-i18n/localize/fr/index.js',
+    ]
+  },
   resolve: {
     alias: {
       '~': path.resolve(__dirname, 'src/')

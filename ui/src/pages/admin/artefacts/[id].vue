@@ -87,6 +87,55 @@
       </v-card-text>
     </v-card>
 
+    <!-- Thumbnail -->
+    <v-card class="mb-4">
+      <v-card-title>{{ t('thumbnail') }}</v-card-title>
+      <v-card-text>
+        <div
+          v-if="artefact.thumbnail"
+          class="mb-3"
+        >
+          <img
+            :src="thumbnailUrl!"
+            :width="artefact.thumbnail.width"
+            :height="artefact.thumbnail.height"
+            :style="{ maxWidth: '100%', height: 'auto', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px' }"
+            alt=""
+          >
+        </div>
+        <v-file-input
+          v-model="thumbnailFile"
+          accept="image/*"
+          :label="artefact.thumbnail ? t('replaceFile') : t('pickFile')"
+          density="compact"
+          hide-details
+          variant="outlined"
+          class="mb-3"
+          :prepend-icon="mdiImage"
+        />
+        <div class="d-flex ga-2">
+          <v-btn
+            color="primary"
+            variant="flat"
+            :disabled="!thumbnailFile"
+            :loading="thumbnailUploadAction.loading.value"
+            @click="thumbnailUploadAction.execute()"
+          >
+            {{ artefact.thumbnail ? t('replace') : t('upload') }}
+          </v-btn>
+          <v-btn
+            v-if="artefact.thumbnail"
+            color="error"
+            variant="text"
+            :loading="thumbnailDeleteAction.loading.value"
+            @click="thumbnailDeleteAction.execute()"
+          >
+            {{ t('remove') }}
+          </v-btn>
+        </div>
+      </v-card-text>
+    </v-card>
+
     <!-- Editable metadata (VJSF) -->
     <v-card class="mb-4">
       <v-card-title>{{ t('editableMetadata') }}</v-card-title>
@@ -94,6 +143,7 @@
         <v-form v-model="valid">
           <vjsf-patch-req
             v-model="editData"
+            :locale="locale"
             :options="vjsfOptions"
           />
         </v-form>
@@ -110,19 +160,6 @@
           {{ t('save') }}
         </v-btn>
       </v-card-actions>
-    </v-card>
-
-    <!-- Access control -->
-    <v-card class="mb-4">
-      <v-card-title>{{ t('access') }}</v-card-title>
-      <v-card-text>
-        <private-access
-          :public="artefact.public"
-          :private-access="artefact.privateAccess"
-          @update:public="onAccessChange('public', $event)"
-          @update:private-access="onAccessChange('privateAccess', $event)"
-        />
-      </v-card-text>
     </v-card>
 
     <!-- Version list -->
@@ -212,6 +249,12 @@
 
 <i18n lang="yaml">
 fr:
+  thumbnail: Vignette
+  pickFile: Choisir une image
+  replaceFile: Choisir une nouvelle image
+  upload: Téléverser
+  replace: Remplacer
+  remove: Retirer
   manifest: Métadonnées du manifeste
   packageName: Nom du paquet
   latestVersion: Dernière version
@@ -221,7 +264,6 @@ fr:
   updated: Mis à jour le
   editableMetadata: Métadonnées éditables
   save: Enregistrer
-  access: Contrôle d'accès
   versions: Versions
   version: Version
   architecture: Architecture
@@ -235,6 +277,12 @@ fr:
   deleted: Artefact supprimé
   saved: Modifications enregistrées
 en:
+  thumbnail: Thumbnail
+  pickFile: Pick an image
+  replaceFile: Pick a replacement image
+  upload: Upload
+  replace: Replace
+  remove: Remove
   manifest: Manifest Metadata
   packageName: Package Name
   latestVersion: Latest Version
@@ -244,7 +292,6 @@ en:
   updated: Updated
   editableMetadata: Editable Metadata
   save: Save
-  access: Access Control
   versions: Versions
   version: Version
   architecture: Architecture
@@ -263,7 +310,7 @@ en:
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
-import { mdiArrowLeft } from '@mdi/js'
+import { mdiArrowLeft, mdiImage } from '@mdi/js'
 import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
 import type { Artefact, Version } from '#api/types'
@@ -316,8 +363,8 @@ async function fetchArtefact () {
     editData.value = {
       title: data.title || {},
       description: data.description || {},
-      thumbnail: data.thumbnail || undefined,
-      category: data.category
+      public: data.public ?? false,
+      privateAccess: data.privateAccess ? [...data.privateAccess] : []
     }
     originalEditData.value = JSON.stringify(editData.value)
   } finally {
@@ -332,7 +379,7 @@ const patchAction = useAsyncAction(
     const body = { ...editData.value }
     if (body.title && !body.title.fr && !body.title.en) body.title = null
     if (body.description && !body.description.fr && !body.description.en) body.description = null
-    if (!body.thumbnail) body.thumbnail = null
+    if (body.privateAccess && body.privateAccess.length === 0) body.privateAccess = null
 
     await $fetch(`/v1/artefacts/${encodeURIComponent(artefactId.value)}`, {
       method: 'PATCH',
@@ -343,15 +390,37 @@ const patchAction = useAsyncAction(
   { success: t('saved') }
 )
 
-async function onAccessChange (field: string, value: any) {
-  const body: Record<string, any> = {}
-  body[field] = value
-  await $fetch(`/v1/artefacts/${encodeURIComponent(artefactId.value)}`, {
-    method: 'PATCH',
-    body
-  })
-  await fetchArtefact()
-}
+const thumbnailFile = ref<File | null>(null)
+const thumbnailUrl = computed(() => {
+  return artefact.value?.thumbnail
+    ? `${$apiPath}/v1/thumbnails/${artefact.value.thumbnail.id}/data`
+    : null
+})
+
+const thumbnailUploadAction = useAsyncAction(
+  async () => {
+    if (!thumbnailFile.value) return
+    const form = new FormData()
+    form.append('file', thumbnailFile.value)
+    await $fetch(`/v1/artefacts/${encodeURIComponent(artefactId.value)}/thumbnail`, {
+      method: 'POST',
+      body: form
+    })
+    thumbnailFile.value = null
+    await fetchArtefact()
+  },
+  { success: t('saved') }
+)
+
+const thumbnailDeleteAction = useAsyncAction(
+  async () => {
+    await $fetch(`/v1/artefacts/${encodeURIComponent(artefactId.value)}/thumbnail`, {
+      method: 'DELETE'
+    })
+    await fetchArtefact()
+  },
+  { success: t('saved') }
+)
 
 const deleteAction = useAsyncAction(
   async () => {
