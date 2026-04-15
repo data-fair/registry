@@ -12,6 +12,12 @@ declare global {
   const $sitePath: typeof import('~/context')['$sitePath']
   const $uiConfig: typeof import('~/context')['$uiConfig']
   const EffectScope: typeof import('vue')['EffectScope']
+  const categoryColor: typeof import('../src/utils/categories')['categoryColor']
+  const categoryColors: typeof import('../src/utils/categories')['categoryColors']
+  const categoryItems: typeof import('../src/utils/categories')['categoryItems']
+  const categoryLabel: typeof import('../src/utils/categories')['categoryLabel']
+  const categoryLabels: typeof import('../src/utils/categories')['categoryLabels']
+  const categoryValues: typeof import('../src/utils/categories')['categoryValues']
   const computed: typeof import('vue')['computed']
   const computedDeepDiff: typeof import('@data-fair/lib-vue/deep-diff.js')['computedDeepDiff']
   const createApp: typeof import('vue')['createApp']
@@ -118,6 +124,12 @@ declare module 'vue' {
     readonly $sitePath: UnwrapRef<typeof import('~/context')['$sitePath']>
     readonly $uiConfig: UnwrapRef<typeof import('~/context')['$uiConfig']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly categoryColor: UnwrapRef<typeof import('../src/utils/categories')['categoryColor']>
+    readonly categoryColors: UnwrapRef<typeof import('../src/utils/categories')['categoryColors']>
+    readonly categoryItems: UnwrapRef<typeof import('../src/utils/categories')['categoryItems']>
+    readonly categoryLabel: UnwrapRef<typeof import('../src/utils/categories')['categoryLabel']>
+    readonly categoryLabels: UnwrapRef<typeof import('../src/utils/categories')['categoryLabels']>
+    readonly categoryValues: UnwrapRef<typeof import('../src/utils/categories')['categoryValues']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedDeepDiff: UnwrapRef<typeof import('@data-fair/lib-vue/deep-diff.js')['computedDeepDiff']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>

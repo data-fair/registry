@@ -60,7 +60,7 @@
               size="small"
               :color="categoryColor(artefact.category)"
             >
-              {{ artefact.category }}
+              {{ categoryLabel(artefact.category, locale) }}
             </v-chip>
           </v-col>
           <v-col
@@ -338,11 +338,6 @@ const fetchLoading = ref(true)
 const hasDiff = computed(() => {
   return JSON.stringify(editData.value) !== originalEditData.value
 })
-
-function categoryColor (cat: string) {
-  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', 'maplibre-style': 'orange', other: 'grey' }
-  return colors[cat] || 'grey'
-}
 
 const vjsfOptions = computed<Partial<VjsfOptions>>(() => ({
   validateOn: 'input',

@@ -31,7 +31,7 @@
       >
         <v-select
           v-model="category"
-          :items="categoryItems"
+          :items="categoryOptions"
           clearable
           density="compact"
           hide-details
@@ -91,7 +91,7 @@
                 size="small"
                 :color="categoryColor(artefact.category)"
               >
-                {{ artefact.category }}
+                {{ categoryLabel(artefact.category, locale) }}
               </v-chip>
             </td>
             <td>{{ artefact.version }}</td>
@@ -165,18 +165,7 @@ const sort = ref('updatedAt')
 const pageSize = 20
 const page = ref(1)
 
-const categoryItems = [
-  { title: 'Processing', value: 'processing' },
-  { title: 'Catalog', value: 'catalog' },
-  { title: 'Application', value: 'application' },
-  { title: 'Tileset', value: 'tileset' },
-  { title: 'Other', value: 'other' }
-]
-
-function categoryColor (cat: string) {
-  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', 'maplibre-style': 'orange', other: 'grey' }
-  return colors[cat] || 'grey'
-}
+const categoryOptions = computed(() => categoryItems(locale.value))
 
 const fetchParams = computed(() => ({
   size: pageSize,

@@ -121,7 +121,7 @@
               size="small"
               :color="categoryColor(artefact.category)"
             >
-              {{ artefact.category }}
+              {{ categoryLabel(artefact.category, locale) }}
             </v-chip>
           </v-col>
           <v-col
@@ -256,11 +256,6 @@ const description = computed(() => {
   if (!desc) return null
   return desc[locale.value] || desc.fr || desc.en || null
 })
-
-function categoryColor (cat: string) {
-  const colors: Record<string, string> = { processing: 'blue', catalog: 'green', application: 'purple', tileset: 'teal', 'maplibre-style': 'orange', other: 'grey' }
-  return colors[cat] || 'grey'
-}
 
 async function fetchArtefact () {
   fetchLoading.value = true

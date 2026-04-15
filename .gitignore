@@ -16,5 +16,6 @@ coverage/
 .playwright-cli/
 test-results
 dev/logs/
+dev/fixtures-output.json
 tmp/
 data/
