@@ -1,10 +1,5 @@
 <template>
   <v-container data-iframe-height>
-    <v-app-bar density="comfortable">
-      <v-spacer />
-      <personal-menu dark-mode-switch />
-    </v-app-bar>
-
     <admin-nav />
 
     <v-row class="mb-4">
@@ -123,6 +118,8 @@
 
 <i18n lang="yaml">
 fr:
+  admin: Administration
+  artefacts: Artefacts
   search: Rechercher
   category: Catégorie
   recent: Récents
@@ -132,6 +129,8 @@ fr:
   updatedAt: Mis à jour
   total: artefact(s)
 en:
+  admin: Administration
+  artefacts: Artefacts
   search: Search
   category: Category
   recent: Recent
@@ -147,7 +146,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { mdiMagnify, mdiEye, mdiEyeOff } from '@mdi/js'
-import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
+import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
@@ -158,6 +157,11 @@ const { dayjs } = useLocaleDayjs()
 if (!session.state.user?.adminMode) {
   throw new Error('Admin mode required')
 }
+
+useBreadcrumbs().setForPage(() => [
+  { title: t('admin'), disabled: true },
+  { title: t('artefacts'), disabled: true }
+])
 
 const q = useStringSearchParam('q')
 const category = useStringSearchParam('category')

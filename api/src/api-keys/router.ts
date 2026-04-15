@@ -17,12 +17,15 @@ router.post('/', async (req, res, next) => {
 
     if (body.type === 'upload') {
       await session.reqAdminMode(req)
-    } else if (body.type === 'federation') {
-      if (body.allowedNames && body.allowedNames.length > 0) {
-        throw httpError(400, 'allowedNames is only valid for upload keys')
+    } else if (body.type === 'read') {
+      if (body.allowedName) {
+        throw httpError(400, 'allowedName is only valid for upload keys')
+      }
+      if (body.allowedCategory) {
+        throw httpError(400, 'allowedCategory is only valid for upload keys')
       }
       const sessionState = reqSessionAuthenticated(req)
-      if (!body.owner) throw httpError(400, 'owner is required for federation keys')
+      if (!body.owner) throw httpError(400, 'owner is required for read keys')
       // Check that the account has a grant
       const grant = await mongo.accessGrants.findOne({
         'account.type': body.owner.type,
@@ -49,7 +52,8 @@ router.post('/', async (req, res, next) => {
       },
       createdAt: now,
       ...(body.owner ? { owner: body.owner } : {}),
-      ...(body.allowedNames && body.allowedNames.length > 0 ? { allowedNames: body.allowedNames } : {})
+      ...(body.allowedName ? { allowedName: body.allowedName } : {}),
+      ...(body.allowedCategory ? { allowedCategory: body.allowedCategory } : {})
     }
 
     await mongo.apiKeys.insertOne(apiKeyDoc)
@@ -64,15 +68,23 @@ router.post('/', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const sessionState = reqSession(req)
-    let filter = {}
+    const filter: Record<string, unknown> = {}
 
     if (sessionState.user?.adminMode) {
       // superadmin sees all
     } else if (sessionState.account) {
-      // federation key owners see their own
-      filter = { 'owner.type': sessionState.account.type, 'owner.id': sessionState.account.id }
+      // read key owners see their own
+      filter['owner.type'] = sessionState.account.type
+      filter['owner.id'] = sessionState.account.id
     } else {
       throw httpError(401, 'authentication required')
+    }
+
+    if (req.query.type) {
+      if (req.query.type !== 'upload' && req.query.type !== 'read') {
+        throw httpError(400, 'invalid type filter')
+      }
+      filter.type = req.query.type
     }
 
     const results = await mongo.apiKeys.find(filter, { projection: { hashedKey: 0 } }).toArray()
@@ -88,8 +100,8 @@ router.delete('/:id', async (req, res, next) => {
     if (!apiKey) throw httpError(404, 'API key not found')
 
     if (!sessionState.user.adminMode) {
-      // Non-admin can only delete their own federation keys
-      if (apiKey.type !== 'federation' || !apiKey.owner ||
+      // Non-admin can only delete their own read keys
+      if (apiKey.type !== 'read' || !apiKey.owner ||
           apiKey.owner.type !== sessionState.account.type ||
           apiKey.owner.id !== sessionState.account.id) {
         throw httpError(403, 'not authorized to delete this key')

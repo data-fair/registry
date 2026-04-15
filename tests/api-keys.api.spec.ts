@@ -52,24 +52,50 @@ test.describe('API Keys', () => {
     }
   })
 
-  test('superadmin can create an upload key with allowedNames scope', async () => {
+  test('superadmin can create an upload key with allowedName scope', async () => {
     const ax = await superAdmin
     const res = await ax.post('/api/v1/api-keys', {
       type: 'upload',
       name: 'scoped',
-      allowedNames: ['@koumoul/*', 'terrain-france']
+      allowedName: 'terrain-france'
     })
     expect(res.status).toBe(201)
-    expect(res.data.allowedNames).toEqual(['@koumoul/*', 'terrain-france'])
+    expect(res.data.allowedName).toBe('terrain-france')
   })
 
-  test('rejects allowedNames with mid-string wildcard', async () => {
+  test('rejects allowedName on read keys', async () => {
+    const ax = await superAdmin
+    try {
+      await ax.post('/api/v1/api-keys', {
+        type: 'read',
+        name: 'bad',
+        owner: { type: 'organization', id: 'test1' },
+        allowedName: 'anything'
+      })
+      expect(true).toBe(false)
+    } catch (err: any) {
+      expect(err.status).toBe(400)
+    }
+  })
+
+  test('superadmin can create an upload key with allowedCategory', async () => {
+    const ax = await superAdmin
+    const res = await ax.post('/api/v1/api-keys', {
+      type: 'upload',
+      name: 'tileset-only',
+      allowedCategory: 'tileset'
+    })
+    expect(res.status).toBe(201)
+    expect(res.data.allowedCategory).toBe('tileset')
+  })
+
+  test('rejects invalid allowedCategory', async () => {
     const ax = await superAdmin
     try {
       await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'bad',
-        allowedNames: ['foo*bar']
+        allowedCategory: 'not-a-category'
       })
       expect(true).toBe(false)
     } catch (err: any) {
@@ -77,18 +103,28 @@ test.describe('API Keys', () => {
     }
   })
 
-  test('rejects allowedNames on federation keys', async () => {
+  test('rejects allowedCategory on read keys', async () => {
     const ax = await superAdmin
     try {
       await ax.post('/api/v1/api-keys', {
-        type: 'federation',
+        type: 'read',
         name: 'bad',
         owner: { type: 'organization', id: 'test1' },
-        allowedNames: ['anything-*']
+        allowedCategory: 'tileset'
       })
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(400)
     }
+  })
+
+  test('list filter ?type=upload', async () => {
+    const ax = await superAdmin
+    await ax.post('/api/v1/api-keys', { type: 'upload', name: 'up1' })
+    await ax.post('/api/v1/api-keys', { type: 'read', name: 'rd1', owner: { type: 'organization', id: 'test1' } })
+
+    const res = await ax.get('/api/v1/api-keys?type=upload')
+    expect(res.data.results).toHaveLength(1)
+    expect(res.data.results[0].type).toBe('upload')
   })
 })

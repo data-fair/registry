@@ -1,8 +1,4 @@
 <template>
-  <v-app-bar density="comfortable">
-    <v-spacer />
-    <personal-menu dark-mode-switch />
-  </v-app-bar>
   <v-container class="fill-height">
     <v-row
       align="center"
@@ -53,7 +49,6 @@ en:
 
 <script lang="ts" setup>
 import { useI18n } from 'vue-i18n'
-import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
 
 const { t } = useI18n()
 const session = useSession()

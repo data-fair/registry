@@ -1,15 +1,5 @@
 <template>
   <v-container data-iframe-height>
-    <v-app-bar density="comfortable">
-      <v-btn
-        :icon="mdiArrowLeft"
-        to="/"
-      />
-      <v-toolbar-title>{{ t('artefacts') }}</v-toolbar-title>
-      <v-spacer />
-      <personal-menu dark-mode-switch />
-    </v-app-bar>
-
     <v-tabs
       v-if="hasGrant"
       v-model="tab"
@@ -130,7 +120,7 @@
 
     <!-- API Keys tab -->
     <template v-if="tab === 'keys' && hasGrant">
-      <!-- Create new federation key -->
+      <!-- Create new read key -->
       <v-card class="mb-4">
         <v-card-title>{{ t('createKey') }}</v-card-title>
         <v-card-text>
@@ -238,7 +228,7 @@ fr:
   version: Version
   updatedAt: "Mis \xE0 jour"
   total: artefact(s)
-  createKey: "Cr\xE9er une cl\xE9 de f\xE9d\xE9ration"
+  createKey: "Cr\xE9er une cl\xE9 de lecture"
   keyName: "Nom de la cl\xE9"
   create: "Cr\xE9er"
   keyCreated: "Cl\xE9 cr\xE9\xE9e avec succ\xE8s. Copiez-la maintenant :"
@@ -256,7 +246,7 @@ en:
   version: Version
   updatedAt: Updated
   total: artefact(s)
-  createKey: Create federation key
+  createKey: Create read key
   keyName: Key name
   create: Create
   keyCreated: "Key created successfully. Copy it now:"
@@ -269,14 +259,16 @@ en:
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { mdiMagnify, mdiDelete, mdiArrowLeft } from '@mdi/js'
-import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
+import { mdiMagnify, mdiDelete } from '@mdi/js'
+import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const session = useSession()
 const { dayjs } = useLocaleDayjs()
+
+useBreadcrumbs().setForPage(() => [{ title: t('artefacts'), disabled: true }])
 
 // --- Grant check ---
 const hasGrant = ref(false)
@@ -328,7 +320,7 @@ const createAction = useAsyncAction(
   async () => {
     const res = await $fetch('/v1/api-keys', {
       method: 'POST',
-      body: { type: 'federation', name: newKeyName.value, owner: session.state.account }
+      body: { type: 'read', name: newKeyName.value, owner: session.state.account }
     })
     createdKey.value = res.key
     newKeyName.value = ''

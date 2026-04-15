@@ -75,6 +75,11 @@ export class RegistryMongo {
       { thumbnail: { $type: 'string' } },
       { $unset: { thumbnail: '' } }
     )
+    // Rename legacy 'federation' api-key type to 'read'.
+    await mongoLib.db.collection('api-keys').updateMany(
+      { type: 'federation' },
+      { $set: { type: 'read' } }
+    )
   }
 }
 

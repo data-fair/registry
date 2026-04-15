@@ -1,30 +1,12 @@
 <template>
   <v-container data-iframe-height>
-    <v-app-bar density="comfortable">
-      <v-spacer />
-      <personal-menu dark-mode-switch />
-    </v-app-bar>
-
     <admin-nav />
 
-    <!-- Create new key -->
+    <!-- Create new upload key -->
     <v-card class="mb-4">
       <v-card-title>{{ t('createKey') }}</v-card-title>
       <v-card-text>
         <v-row>
-          <v-col
-            cols="12"
-            sm="4"
-          >
-            <v-select
-              v-model="newKey.type"
-              :items="keyTypes"
-              :label="t('type')"
-              density="compact"
-              hide-details
-              variant="outlined"
-            />
-          </v-col>
           <v-col
             cols="12"
             sm="4"
@@ -38,13 +20,40 @@
             />
           </v-col>
           <v-col
+            cols="12"
+            sm="4"
+          >
+            <v-select
+              v-model="newKey.allowedCategory"
+              :items="categoryItems"
+              :label="t('allowedCategory')"
+              density="compact"
+              hide-details
+              variant="outlined"
+              clearable
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="4"
+          >
+            <v-text-field
+              v-model="newKey.allowedName"
+              :label="t('allowedName')"
+              density="compact"
+              hide-details
+              variant="outlined"
+              clearable
+            />
+          </v-col>
+          <v-col
             cols="auto"
             class="d-flex align-center"
           >
             <v-btn
               color="primary"
               variant="flat"
-              :disabled="!newKey.name || !newKey.type"
+              :disabled="!newKey.name"
               :loading="createAction.loading.value"
               @click="createAction.execute()"
             >
@@ -87,7 +96,8 @@
         <thead>
           <tr>
             <th>{{ t('name') }}</th>
-            <th>{{ t('type') }}</th>
+            <th>{{ t('allowedCategory') }}</th>
+            <th>{{ t('allowedName') }}</th>
             <th>{{ t('createdBy') }}</th>
             <th>{{ t('createdAt') }}</th>
             <th />
@@ -99,14 +109,8 @@
             :key="key._id"
           >
             <td>{{ key.name }}</td>
-            <td>
-              <v-chip
-                size="small"
-                :color="key.type === 'upload' ? 'blue' : 'green'"
-              >
-                {{ key.type }}
-              </v-chip>
-            </td>
+            <td>{{ key.allowedCategory || '—' }}</td>
+            <td>{{ key.allowedName || '—' }}</td>
             <td>{{ key.createdBy.name || key.createdBy.id }}</td>
             <td>{{ dayjs(key.createdAt).format('L LT') }}</td>
             <td class="text-right">
@@ -128,9 +132,12 @@
 
 <i18n lang="yaml">
 fr:
-  createKey: Créer une clé API
-  type: Type
+  admin: Administration
+  apiKeys: Clés API
+  createKey: Créer une clé d'upload
   name: Nom
+  allowedCategory: Catégorie autorisée
+  allowedName: Nom autorisé
   create: Créer
   keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
   keyWarning: Cette clé ne sera plus affichée après fermeture.
@@ -139,9 +146,12 @@ fr:
   createdAt: Créé le
   deleted: Clé supprimée
 en:
-  createKey: Create API Key
-  type: Type
+  admin: Administration
+  apiKeys: API Keys
+  createKey: Create upload key
   name: Name
+  allowedCategory: Allowed category
+  allowedName: Allowed name
   create: Create
   keyCreated: "Key created successfully. Copy it now:"
   keyWarning: This key will not be shown again after you close this.
@@ -155,7 +165,7 @@ en:
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
-import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
+import { useBreadcrumbs } from '~/composables/breadcrumbs'
 
 const { t } = useI18n()
 const session = useSession()
@@ -165,27 +175,44 @@ if (!session.state.user?.adminMode) {
   throw new Error('Admin mode required')
 }
 
-const keyTypes = [
-  { title: 'Upload', value: 'upload' },
-  { title: 'Federation', value: 'federation' }
+useBreadcrumbs().setForPage(() => [
+  { title: t('admin'), disabled: true },
+  { title: t('apiKeys'), disabled: true }
+])
+
+const categoryItems = [
+  'processing',
+  'catalog',
+  'application',
+  'other',
+  'tileset',
+  'maplibre-style'
 ]
 
-const newKey = ref({ type: 'upload', name: '' })
+type NewKey = {
+  name: string
+  allowedCategory: string | null
+  allowedName: string | null
+}
+const newKey = ref<NewKey>({ name: '', allowedCategory: null, allowedName: null })
 const createdKey = ref<string | null>(null)
 const deletingKeyId = ref<string | null>(null)
 
 const keysFetch = useFetch<{ results: any[], count: number }>(
-  `${$apiPath}/v1/api-keys`
+  `${$apiPath}/v1/api-keys?type=upload`
 )
 
 const createAction = useAsyncAction(
   async () => {
-    const res = await $fetch('/v1/api-keys', {
-      method: 'POST',
-      body: newKey.value
-    })
+    const body: Record<string, unknown> = {
+      type: 'upload',
+      name: newKey.value.name
+    }
+    if (newKey.value.allowedCategory) body.allowedCategory = newKey.value.allowedCategory
+    if (newKey.value.allowedName) body.allowedName = newKey.value.allowedName
+    const res = await $fetch('/v1/api-keys', { method: 'POST', body })
     createdKey.value = res.key
-    newKey.value = { type: 'upload', name: '' }
+    newKey.value = { name: '', allowedCategory: null, allowedName: null }
     keysFetch.refresh()
   }
 )

@@ -1,16 +1,14 @@
 <template>
   <v-container data-iframe-height>
-    <v-app-bar density="comfortable">
-      <v-spacer />
-      <personal-menu dark-mode-switch />
-    </v-app-bar>
-
     <admin-nav />
 
     <!-- Grant access -->
     <v-card class="mb-4">
       <v-card-title>{{ t('grantAccess') }}</v-card-title>
       <v-card-text>
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          {{ t('grantAccessHelp') }}
+        </p>
         <v-row>
           <v-col
             cols="12"
@@ -110,7 +108,10 @@
 
 <i18n lang="yaml">
 fr:
+  admin: Administration
+  accessGrants: Accès accordés
   grantAccess: Accorder l'accès
+  grantAccessHelp: Autoriser des comptes à télécharger les ressources du registre qui leur sont visibles. La visibilité est contrôlée séparément sur chaque artefact (public ou restreint) ; un accès accordé ici permet ensuite le téléchargement effectif des artefacts auxquels le compte a accès.
   accountType: Type de compte
   accountId: Identifiant du compte
   grant: Accorder
@@ -119,7 +120,10 @@ fr:
   grantedBy: Accordé par
   grantedAt: Accordé le
 en:
+  admin: Administration
+  accessGrants: Access Grants
   grantAccess: Grant Access
+  grantAccessHelp: Authorize accounts to download registry resources visible to them. Visibility is controlled separately on each artefact (public or restricted); a grant here enables the actual download of the artefacts the account can see.
   accountType: Account Type
   accountId: Account ID
   grant: Grant
@@ -133,7 +137,7 @@ en:
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
-import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
+import { useBreadcrumbs } from '~/composables/breadcrumbs'
 
 const { t } = useI18n()
 const session = useSession()
@@ -142,6 +146,11 @@ const { dayjs } = useLocaleDayjs()
 if (!session.state.user?.adminMode) {
   throw new Error('Admin mode required')
 }
+
+useBreadcrumbs().setForPage(() => [
+  { title: t('admin'), disabled: true },
+  { title: t('accessGrants'), disabled: true }
+])
 
 const accountTypes = [
   { title: 'Organization', value: 'organization' },

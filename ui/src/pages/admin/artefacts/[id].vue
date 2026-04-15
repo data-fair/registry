@@ -3,16 +3,6 @@
     v-if="artefact"
     data-iframe-height
   >
-    <v-app-bar density="comfortable">
-      <v-btn
-        :icon="mdiArrowLeft"
-        @click="router.push('/admin/artefacts')"
-      />
-      <v-toolbar-title>{{ (artefact.title as any)?.[locale] || artefact.name }}</v-toolbar-title>
-      <v-spacer />
-      <personal-menu dark-mode-switch />
-    </v-app-bar>
-
     <!-- Manifest metadata (read-only) -->
     <v-card class="mb-4">
       <v-card-title>{{ t('manifest') }}</v-card-title>
@@ -249,6 +239,8 @@
 
 <i18n lang="yaml">
 fr:
+  admin: Administration
+  artefacts: Artefacts
   thumbnail: Vignette
   pickFile: Choisir une image
   replaceFile: Choisir une nouvelle image
@@ -277,6 +269,8 @@ fr:
   deleted: Artefact supprimé
   saved: Modifications enregistrées
 en:
+  admin: Administration
+  artefacts: Artefacts
   thumbnail: Thumbnail
   pickFile: Pick an image
   replaceFile: Pick a replacement image
@@ -310,8 +304,8 @@ en:
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
-import { mdiArrowLeft, mdiImage } from '@mdi/js'
-import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
+import { mdiImage } from '@mdi/js'
+import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
 import type { Artefact, Version } from '#api/types'
 
@@ -329,6 +323,12 @@ const artefactId = computed(() => decodeURIComponent(route.params.id as string))
 
 const artefact = ref<Artefact | null>(null)
 const versions = ref<Version[]>([])
+
+useBreadcrumbs().setForPage(() => [
+  { title: t('admin'), disabled: true },
+  { title: t('artefacts'), to: '/admin/artefacts' },
+  { title: (artefact.value?.title as any)?.[locale.value] || artefact.value?.name || artefactId.value, disabled: true }
+])
 const editData = ref<Record<string, any>>({})
 const originalEditData = ref<string>('')
 const valid = ref(true)

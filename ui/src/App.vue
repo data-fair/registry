@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <v-main>
-      <RouterView />
+      <default-layout />
       <ui-notif />
     </v-main>
   </v-app>

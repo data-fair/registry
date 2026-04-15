@@ -14,7 +14,6 @@ import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
 import config from '#config'
 import { authenticateApiKey } from '../auth.ts'
-import { matchArtefactName } from '../api-keys/match.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { writeFile, readFile, deleteFile } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
@@ -193,7 +192,7 @@ router.post('/:name/versions', async (req, res, next) => {
     if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload versions')
 
     const name = safeDecode(req.params.name)
-    if (!matchArtefactName(name, apiKey.allowedNames)) {
+    if (apiKey.allowedName && apiKey.allowedName !== name) {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
 
@@ -205,6 +204,11 @@ router.post('/:name/versions', async (req, res, next) => {
     const manifest = await extractManifest(createReadStream(tmpTarball))
     if (manifest.name !== name) {
       throw httpError(400, `package name mismatch: URL says "${name}" but package.json says "${manifest.name}"`)
+    }
+
+    const category = pickCategory(manifest.category, npmCategories)
+    if (apiKey.allowedCategory && apiKey.allowedCategory !== category) {
+      throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
     }
 
     const semverParts = parseSemver(manifest.version)
@@ -226,7 +230,7 @@ router.post('/:name/versions', async (req, res, next) => {
           packageName: manifest.name,
           version: manifest.version,
           licence: manifest.licence,
-          category: pickCategory(manifest.category, npmCategories),
+          category,
           ...(manifest.processingConfigSchema ? { processingConfigSchema: manifest.processingConfigSchema } : {}),
           ...(manifest.applicationConfigSchema ? { applicationConfigSchema: manifest.applicationConfigSchema } : {}),
           updatedAt: now
@@ -329,7 +333,7 @@ router.post('/file/:name', async (req, res, next) => {
     if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload files')
 
     const name = safeDecode(req.params.name)
-    if (!matchArtefactName(name, apiKey.allowedNames)) {
+    if (apiKey.allowedName && apiKey.allowedName !== name) {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
     const artefactId = name
@@ -341,6 +345,11 @@ router.post('/file/:name', async (req, res, next) => {
     // Parse optional JSON fields with explicit 400 on malformed input.
     const title = fields.title ? parseLocalizedField(fields.title, 'title') : undefined
     const description = fields.description ? parseLocalizedField(fields.description, 'description') : undefined
+
+    const category = pickCategory(fields.category, fileCategories)
+    if (apiKey.allowedCategory && apiKey.allowedCategory !== category) {
+      throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
+    }
 
     // Store NEW file first, then DB commit, then delete OLD — avoids a
     // window where the artefact row points at a missing file.
@@ -359,7 +368,7 @@ router.post('/file/:name', async (req, res, next) => {
         $set: {
           filePath,
           fileName,
-          category: pickCategory(fields.category, fileCategories),
+          category,
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
           updatedAt: now

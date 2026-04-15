@@ -72,26 +72,18 @@ test.describe('Artefacts', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'scoped',
-        allowedNames: ['@koumoul/*', 'terrain-france']
+        allowedName: 'terrain-france'
       })
       const scopedKey = keyRes.data.key
-      expect(keyRes.data.allowedNames).toEqual(['@koumoul/*', 'terrain-france'])
+      expect(keyRes.data.allowedName).toBe('terrain-france')
 
       const upload = axiosWithApiKey(scopedKey)
 
-      // Prefix match
-      const tarball1 = await createTestTarball({ name: '@koumoul/processing-x', version: '1.0.0' })
-      const form1 = new FormData()
-      form1.append('file', tarball1, { filename: 'p.tgz', contentType: 'application/gzip' })
-      const res1 = await upload.post('/api/v1/artefacts/%40koumoul%2Fprocessing-x/versions', form1, { headers: form1.getHeaders() })
-      expect(res1.status).toBe(201)
-
-      // Exact match for a file artefact
       const fileForm = new FormData()
       fileForm.append('file', Buffer.from('x'), { filename: 'terrain.mbtiles', contentType: 'application/octet-stream' })
       fileForm.append('category', 'tileset')
-      const res2 = await upload.post('/api/v1/artefacts/file/terrain-france', fileForm, { headers: fileForm.getHeaders() })
-      expect(res2.status).toBe(201)
+      const res = await upload.post('/api/v1/artefacts/file/terrain-france', fileForm, { headers: fileForm.getHeaders() })
+      expect(res.status).toBe(201)
     })
 
     test('scoped upload key rejects non-matching name', async () => {
@@ -99,7 +91,7 @@ test.describe('Artefacts', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'scoped',
-        allowedNames: ['terrain-*']
+        allowedName: 'terrain-france'
       })
       const scopedKey = keyRes.data.key
       const upload = axiosWithApiKey(scopedKey)
@@ -127,9 +119,93 @@ test.describe('Artefacts', () => {
       }
     })
 
+    test('category-scoped upload key accepts matching category', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'tileset-only',
+        allowedCategory: 'tileset'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+
+      const fileForm = new FormData()
+      fileForm.append('file', Buffer.from('x'), { filename: 'a.mbtiles', contentType: 'application/octet-stream' })
+      fileForm.append('category', 'tileset')
+      const res = await upload.post('/api/v1/artefacts/file/terrain-a', fileForm, { headers: fileForm.getHeaders() })
+      expect(res.status).toBe(201)
+    })
+
+    test('category-scoped upload key rejects mismatched file category', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'tileset-only',
+        allowedCategory: 'tileset'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+
+      const fileForm = new FormData()
+      fileForm.append('file', Buffer.from('x'), { filename: 'a.json', contentType: 'application/octet-stream' })
+      fileForm.append('category', 'maplibre-style')
+      try {
+        await upload.post('/api/v1/artefacts/file/style-a', fileForm, { headers: fileForm.getHeaders() })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('category-scoped upload key rejects mismatched npm manifest category', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'processing-only',
+        allowedCategory: 'processing'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+
+      const tarball = await createTestTarball({ name: '@test/cat-pkg', version: '1.0.0', category: 'catalog' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      try {
+        await upload.post('/api/v1/artefacts/%40test%2Fcat-pkg/versions', form, { headers: form.getHeaders() })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('upload key with both name and category scopes requires both to match', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'terrain-tileset',
+        allowedName: 'terrain-france',
+        allowedCategory: 'tileset'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+
+      // Matches both — accepted
+      const okForm = new FormData()
+      okForm.append('file', Buffer.from('x'), { filename: 'a.mbtiles', contentType: 'application/octet-stream' })
+      okForm.append('category', 'tileset')
+      const ok = await upload.post('/api/v1/artefacts/file/terrain-france', okForm, { headers: okForm.getHeaders() })
+      expect(ok.status).toBe(201)
+
+      // Name matches, category doesn't — rejected
+      const badCatForm = new FormData()
+      badCatForm.append('file', Buffer.from('x'), { filename: 'a.json', contentType: 'application/octet-stream' })
+      badCatForm.append('category', 'maplibre-style')
+      try {
+        await upload.post('/api/v1/artefacts/file/terrain-france', badCatForm, { headers: badCatForm.getHeaders() })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
     test('unscoped upload key still accepts any name', async () => {
-      // The default key created in beforeEach has no allowedNames — it should
-      // behave as unrestricted (backwards compatible).
+      // The default key created in beforeEach has no allowedName — unrestricted.
       const upload = axiosWithApiKey(uploadApiKey)
       const tarball = await createTestTarball({ name: '@anywhere/pkg', version: '1.0.0' })
       const form = new FormData()

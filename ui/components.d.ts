@@ -8,7 +8,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminNav: typeof import('./src/components/admin-nav.vue')['default']
-    PrivateAccess: typeof import('./src/components/private-access.vue')['default']
+    DefaultLayout: typeof import('./src/components/default-layout.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     VjsfPatchReq: typeof import('./src/components/vjsf/vjsf-patch-req.vue')['default']

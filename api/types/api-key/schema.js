@@ -7,7 +7,7 @@ export default {
   required: ['_id', 'type', 'name', 'hashedKey', 'createdBy', 'createdAt'],
   properties: {
     _id: { type: 'string', readOnly: true },
-    type: { type: 'string', enum: ['upload', 'federation'] },
+    type: { type: 'string', enum: ['upload', 'read'] },
     name: { type: 'string' },
     hashedKey: { type: 'string', readOnly: true },
     createdBy: {
@@ -31,14 +31,15 @@ export default {
         id: { type: 'string' }
       }
     },
-    allowedNames: {
-      type: 'array',
-      description: 'Restricts which artefact names an upload key may target. Each entry is an exact name or a prefix ending in "*". An empty or missing list means unrestricted.',
-      items: {
-        type: 'string',
-        minLength: 1,
-        pattern: '^[^*]+\\*?$'
-      }
+    allowedName: {
+      type: 'string',
+      description: 'Restricts an upload key to a single artefact name (exact match). Missing means unrestricted.',
+      minLength: 1
+    },
+    allowedCategory: {
+      type: 'string',
+      description: 'Restricts an upload key to a single artefact category. Missing means unrestricted.',
+      enum: ['processing', 'catalog', 'application', 'other', 'tileset', 'maplibre-style']
     }
   }
 }

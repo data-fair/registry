@@ -70,11 +70,11 @@ test.describe('Account-facing access patterns', () => {
     expect(res.status).toBe(200)
   })
 
-  test('user with grant can create and list federation keys', async () => {
+  test('user with grant can create and list read keys', async () => {
     const ax = await axiosAuth('test1-admin1', { org: 'test1' })
     const createRes = await ax.post('/api/v1/api-keys', {
-      type: 'federation',
-      name: 'my-fed-key',
+      type: 'read',
+      name: 'my-read-key',
       owner: { type: 'organization', id: 'test1' }
     })
     expect(createRes.status).toBe(201)
@@ -82,14 +82,14 @@ test.describe('Account-facing access patterns', () => {
 
     const listRes = await ax.get('/api/v1/api-keys')
     expect(listRes.data.count).toBe(1)
-    expect(listRes.data.results[0].name).toBe('my-fed-key')
-    expect(listRes.data.results[0].type).toBe('federation')
+    expect(listRes.data.results[0].name).toBe('my-read-key')
+    expect(listRes.data.results[0].type).toBe('read')
   })
 
-  test('user with grant can delete own federation key', async () => {
+  test('user with grant can delete own read key', async () => {
     const ax = await axiosAuth('test1-admin1', { org: 'test1' })
     const createRes = await ax.post('/api/v1/api-keys', {
-      type: 'federation',
+      type: 'read',
       name: 'to-delete',
       owner: { type: 'organization', id: 'test1' }
     })

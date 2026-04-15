@@ -3,16 +3,6 @@
     v-if="artefact"
     data-iframe-height
   >
-    <v-app-bar density="comfortable">
-      <v-btn
-        :icon="mdiArrowLeft"
-        to="/artefacts"
-      />
-      <v-toolbar-title>{{ (artefact.title as any)?.[locale] || artefact.name }}</v-toolbar-title>
-      <v-spacer />
-      <personal-menu dark-mode-switch />
-    </v-app-bar>
-
     <!-- Download file artefact -->
     <v-card
       v-if="hasGrant && artefact.format === 'file' && artefact.filePath"
@@ -197,6 +187,7 @@
 
 <i18n lang="yaml">
 fr:
+  artefacts: Artefacts
   metadata: "M\xE9tadonn\xE9es"
   packageName: Nom du paquet
   latestVersion: "Derni\xE8re version"
@@ -212,6 +203,7 @@ fr:
   noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
   loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
 en:
+  artefacts: Artefacts
   metadata: Metadata
   packageName: Package Name
   latestVersion: Latest Version
@@ -232,8 +224,8 @@ en:
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { mdiArrowLeft, mdiDownload } from '@mdi/js'
-import personalMenu from '@data-fair/lib-vuetify/personal-menu.vue'
+import { mdiDownload } from '@mdi/js'
+import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { Artefact, Version } from '#api/types'
 
 const { t, locale } = useI18n()
@@ -244,6 +236,11 @@ const { dayjs } = useLocaleDayjs()
 const artefactId = computed(() => decodeURIComponent(route.params.id as string))
 
 const artefact = ref<Artefact | null>(null)
+
+useBreadcrumbs().setForPage(() => [
+  { title: t('artefacts'), to: '/artefacts' },
+  { title: (artefact.value?.title as any)?.[locale.value] || artefact.value?.name || artefactId.value, disabled: true }
+])
 const versions = ref<Version[]>([])
 const fetchLoading = ref(true)
 const hasGrant = ref(false)
