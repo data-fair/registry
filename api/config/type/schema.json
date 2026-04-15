@@ -86,7 +86,13 @@
             "secretAccessKey": { "type": "string" }
           }
         },
-        "forcePathStyle": { "type": "boolean" }
+        "forcePathStyle": { "type": "boolean" },
+        "downloadUrlExpirySeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "default": 900,
+          "description": "Expiry in seconds for S3 presigned download URLs issued by the /download and /tarball routes."
+        }
       }
     },
     "upgradeRoot": {

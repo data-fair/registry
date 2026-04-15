@@ -7,6 +7,7 @@ import {
   type S3ClientConfig
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { NodeHttpHandler } from '@smithy/node-http-handler'
 import { HttpAgent, HttpsAgent } from 'agentkeepalive'
 import type { Readable } from 'node:stream'
@@ -73,6 +74,19 @@ export class S3Backend implements FileBackend {
       }
       throw err
     }
+  }
+
+  async getDownloadUrl (path: string, opts: { filename: string }) {
+    const safeFilename = opts.filename.replace(/[\\"\r\n]/g, '_')
+    const asciiFilename = safeFilename.replace(/[^\x20-\x7e]/g, '_')
+    const encodedFilename = encodeURIComponent(safeFilename)
+    const contentDisposition = `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`
+    const command = new GetObjectCommand({
+      Bucket: config.s3!.bucket,
+      Key: path,
+      ResponseContentDisposition: contentDisposition
+    })
+    return getSignedUrl(this.dataClient, command, { expiresIn: config.s3?.downloadUrlExpirySeconds ?? 900 })
   }
 
   async delete (path: string) {

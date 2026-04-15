@@ -15,7 +15,7 @@ import mongo from '#mongo'
 import config from '#config'
 import { authenticateApiKey } from '../auth.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
-import { writeFile, readFile, deleteFile } from '../files-storage/index.ts'
+import { writeFile, readFile, getDownloadUrl, deleteFile } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
@@ -313,8 +313,15 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
     const version = await mongo.versions.findOne(vFilter, { sort })
     if (!version) throw httpError(404, 'version not found')
 
+    const filename = `${artefact.name}-${version.version}.tgz`
+    const signedUrl = await getDownloadUrl(version.tarballPath, { filename })
+    if (signedUrl) {
+      res.redirect(302, signedUrl)
+      return
+    }
+
     res.set('Content-Type', 'application/gzip')
-    res.set('Content-Disposition', `attachment; filename="${artefact.name}-${version.version}.tgz"`)
+    res.set('Content-Disposition', `attachment; filename="${filename}"`)
     const { body, size } = await readFile(version.tarballPath)
     res.set('Content-Length', String(size))
     await pipeline(body, res).catch((err) => {
@@ -421,8 +428,15 @@ router.get('/:id/download', async (req, res, next) => {
     if (artefact.format !== 'file') throw httpError(400, 'this artefact is not a file-format artefact')
     if (!artefact.filePath) throw httpError(404, 'no file uploaded for this artefact')
 
+    const filename = artefact.fileName || artefact.name
+    const signedUrl = await getDownloadUrl(artefact.filePath, { filename })
+    if (signedUrl) {
+      res.redirect(302, signedUrl)
+      return
+    }
+
     res.set('Content-Type', 'application/octet-stream')
-    res.set('Content-Disposition', `attachment; filename="${artefact.fileName || artefact.name}"`)
+    res.set('Content-Disposition', `attachment; filename="${filename}"`)
     const { body, size, lastModified } = await readFile(artefact.filePath, req.get('If-Modified-Since'))
     res.set('Last-Modified', lastModified.toUTCString())
     res.set('Content-Length', String(size))

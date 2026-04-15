@@ -8,6 +8,7 @@ export const filesStorage: FileBackend = config.filesStorage === 's3' ? new S3Ba
 
 export const writeFile = (stream: Readable, path: string) => filesStorage.writeStream(stream, path)
 export const readFile = (path: string, ifModifiedSince?: string) => filesStorage.readStream(path, ifModifiedSince)
+export const getDownloadUrl = (path: string, opts: { filename: string }) => filesStorage.getDownloadUrl(path, opts)
 export const deleteFile = (path: string) => filesStorage.delete(path)
 export const fileExists = (path: string) => filesStorage.exists(path)
 export const cleanFiles = () => filesStorage.clean()

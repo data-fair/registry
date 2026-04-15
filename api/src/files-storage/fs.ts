@@ -29,6 +29,10 @@ export class FsBackend implements FileBackend {
     return { body: createReadStream(fullPath), size: stats.size, lastModified: stats.mtime }
   }
 
+  async getDownloadUrl () {
+    return null
+  }
+
   async delete (path: string) {
     await unlink(resolvePath(basePath(), path)).catch(() => {})
   }
