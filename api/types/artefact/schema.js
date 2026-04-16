@@ -156,7 +156,8 @@ export default {
       properties: {
         apiKeyId: { type: 'string' },
         apiKeyName: { type: 'string' },
-        shortId: { type: 'string' }
+        shortId: { type: 'string' },
+        internal: { type: 'boolean' }
       }
     },
     createdAt: { type: 'string', format: 'date-time', readOnly: true },

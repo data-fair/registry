@@ -23,7 +23,8 @@ export default {
       properties: {
         apiKeyId: { type: 'string' },
         apiKeyName: { type: 'string' },
-        shortId: { type: 'string' }
+        shortId: { type: 'string' },
+        internal: { type: 'boolean' }
       }
     }
   }

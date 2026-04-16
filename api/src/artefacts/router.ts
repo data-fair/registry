@@ -220,17 +220,24 @@ router.delete('/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// Upload version (API key auth, multipart)
+// Upload version (API key or internal secret auth, multipart)
+// TEMPORARY: internal secret is accepted for uploads to help manage the transition —
+// services that previously managed their plugins locally can upload to the registry
+// to switch to the new centralized mode.
 router.post('/:name/versions', async (req, res, next) => {
   let tmpDir: string | undefined
   let storedTarballPath: string | undefined
   let storedOk = false
   try {
-    const apiKey = await authenticateApiKey(req)
-    if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload versions')
+    const isInternal = tryInternalSecret(req)
+    let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
+    if (!isInternal) {
+      apiKey = await authenticateApiKey(req)
+      if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload versions')
+    }
 
     const name = safeDecode(req.params.name)
-    if (apiKey.allowedName && apiKey.allowedName !== name) {
+    if (apiKey?.allowedName && apiKey.allowedName !== name) {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
 
@@ -245,7 +252,7 @@ router.post('/:name/versions', async (req, res, next) => {
     }
 
     const category = pickCategory(manifest.category, npmCategories)
-    if (apiKey.allowedCategory && apiKey.allowedCategory !== category) {
+    if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
       throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
     }
 
@@ -301,7 +308,9 @@ router.post('/:name/versions', async (req, res, next) => {
       ...semverParts,
       tarballPath,
       uploadedAt: now,
-      uploadedBy: { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+      uploadedBy: apiKey
+        ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+        : { internal: true }
     })
     storedOk = true
 
@@ -389,17 +398,24 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// Upload raw file (API key auth, multipart)
+// Upload raw file (API key or internal secret auth, multipart)
+// TEMPORARY: internal secret is accepted for uploads to help manage the transition —
+// services that previously managed their plugins locally can upload to the registry
+// to switch to the new centralized mode.
 router.post('/file/:name', async (req, res, next) => {
   let tmpDir: string | undefined
   let newFilePath: string | undefined
   let storedOk = false
   try {
-    const apiKey = await authenticateApiKey(req)
-    if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload files')
+    const isInternal = tryInternalSecret(req)
+    let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
+    if (!isInternal) {
+      apiKey = await authenticateApiKey(req)
+      if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload files')
+    }
 
     const name = safeDecode(req.params.name)
-    if (apiKey.allowedName && apiKey.allowedName !== name) {
+    if (apiKey?.allowedName && apiKey.allowedName !== name) {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
     const artefactId = name
@@ -418,7 +434,7 @@ router.post('/file/:name', async (req, res, next) => {
     const description = fields.description ? parseLocalizedField(fields.description, 'description') : undefined
 
     const category = pickCategory(fields.category, fileCategories)
-    if (apiKey.allowedCategory && apiKey.allowedCategory !== category) {
+    if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
       throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
     }
 
@@ -442,7 +458,9 @@ router.post('/file/:name', async (req, res, next) => {
           category,
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
-          uploadedBy: { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId },
+          uploadedBy: apiKey
+            ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+            : { internal: true },
           updatedAt: now
         },
         $setOnInsert: {

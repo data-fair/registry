@@ -221,6 +221,31 @@ test.describe('Artefacts', () => {
       expect(res.status).toBe(201)
     })
 
+    test('internal secret can upload npm version', async () => {
+      const ax = axiosInternal('secret-internal')
+      const tarball = await createTestTarball({ name: '@test/internal-pkg', version: '1.0.0', category: 'processing' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+      const res = await ax.post('/api/v1/artefacts/%40test%2Finternal-pkg/versions', form, { headers: form.getHeaders() })
+      expect(res.status).toBe(201)
+      expect(res.data.artefact.name).toBe('@test/internal-pkg')
+
+      const admin = await superAdmin
+      const detail = await admin.get(`/api/v1/artefacts/${encodeURIComponent(res.data.artefact._id)}/versions/1.0.0`)
+      expect(detail.data.uploadedBy.internal).toBe(true)
+    })
+
+    test('internal secret can upload raw file', async () => {
+      const ax = axiosInternal('secret-internal')
+      const form = new FormData()
+      form.append('file', Buffer.from('internal-content'), { filename: 'terrain.mbtiles', contentType: 'application/octet-stream' })
+      form.append('category', 'tileset')
+      const res = await ax.post('/api/v1/artefacts/file/terrain-internal', form, { headers: form.getHeaders() })
+      expect(res.status).toBe(201)
+      expect(res.data.artefact.name).toBe('terrain-internal')
+      expect(res.data.artefact.uploadedBy.internal).toBe(true)
+    })
+
     test('upload second version updates artefact', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
 
