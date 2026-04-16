@@ -276,6 +276,24 @@ test.describe('Artefacts', () => {
       expect(res.data.versions).toHaveLength(1)
       expect(res.data.versions[0].version).toBe('1.0.0')
     })
+
+    test('internal secret sees all artefacts in list', async () => {
+      const ax = axiosInternal('secret-internal')
+      const res = await ax.get('/api/v1/artefacts')
+      expect(res.data.count).toBe(2)
+    })
+
+    test('internal secret can get private artefact detail', async () => {
+      const ax = axiosInternal('secret-internal')
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg%402')
+      expect(res.data.name).toBe('@test/private-pkg')
+    })
+
+    test('internal secret can resolve version on private artefact', async () => {
+      const ax = axiosInternal('secret-internal')
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg%402/versions/2.0.0')
+      expect(res.data.version).toBe('2.0.0')
+    })
   })
 
   test.describe('PATCH & DELETE', () => {

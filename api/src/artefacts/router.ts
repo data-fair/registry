@@ -4,11 +4,11 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
 import Busboy from 'busboy'
-import { ObjectId } from 'mongodb'
+import { ObjectId, type Filter } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
-import { assertReqInternalSecret } from '@data-fair/lib-express/req-origin.js'
+import { assertReqInternalSecret, reqIsInternal } from '@data-fair/lib-express/req-origin.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
@@ -77,13 +77,28 @@ const safeDecode = (raw: string): string => {
   }
 }
 
+const tryInternalSecret = (req: import('express').Request): boolean => {
+  if (!reqIsInternal(req)) return false
+  const secretKey = req.get('x-secret-key')
+  if (!secretKey || !config.secretKeys.internalServices) return false
+  const received = Buffer.from(secretKey, 'utf-8')
+  const expected = Buffer.from(config.secretKeys.internalServices, 'utf-8')
+  if (received.length !== expected.length) return false
+  return timingSafeEqual(received, expected)
+}
+
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
-    const readAuth = await tryAuthenticateReadKey(req)
-    const filter = readAuth
-      ? await artefactAccessFilterForAccount(readAuth.owner)
-      : await artefactAccessFilter(req)
+    let filter: Filter<Artefact>
+    if (tryInternalSecret(req)) {
+      filter = {}
+    } else {
+      const readAuth = await tryAuthenticateReadKey(req)
+      filter = readAuth
+        ? await artefactAccessFilterForAccount(readAuth.owner)
+        : await artefactAccessFilter(req)
+    }
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
     const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { updatedAt: -1 }
@@ -119,10 +134,15 @@ router.get('/', async (req, res, next) => {
 // Get artefact detail + versions
 router.get('/:id', async (req, res, next) => {
   try {
-    const readAuth = await tryAuthenticateReadKey(req)
-    const filter = readAuth
-      ? await artefactAccessFilterForAccount(readAuth.owner)
-      : await artefactAccessFilter(req)
+    let filter: Filter<Artefact>
+    if (tryInternalSecret(req)) {
+      filter = {}
+    } else {
+      const readAuth = await tryAuthenticateReadKey(req)
+      filter = readAuth
+        ? await artefactAccessFilterForAccount(readAuth.owner)
+        : await artefactAccessFilter(req)
+    }
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
@@ -304,10 +324,15 @@ router.post('/:name/versions', async (req, res, next) => {
 // Resolve version
 router.get('/:id/versions/:version', async (req, res, next) => {
   try {
-    const readAuth = await tryAuthenticateReadKey(req)
-    const filter = readAuth
-      ? await artefactAccessFilterForAccount(readAuth.owner)
-      : await artefactAccessFilter(req)
+    let filter: Filter<Artefact>
+    if (tryInternalSecret(req)) {
+      filter = {}
+    } else {
+      const readAuth = await tryAuthenticateReadKey(req)
+      filter = readAuth
+        ? await artefactAccessFilterForAccount(readAuth.owner)
+        : await artefactAccessFilter(req)
+    }
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
