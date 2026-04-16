@@ -24,12 +24,14 @@ test.describe('API Keys', () => {
     expect(res.data.hashedKey).toBeUndefined()
   })
 
-  test('superadmin can list API keys without hashedKey', async () => {
+  test('list API keys without hashedKey', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/api-keys', { type: 'upload', name: 'key1' })
-    await ax.post('/api/v1/api-keys', { type: 'upload', name: 'key2' })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key1', owner: { type: 'organization', id: 'test1' } })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key2', owner: { type: 'organization', id: 'test1' } })
 
-    const res = await ax.get('/api/v1/api-keys')
+    const res = await orgAx.get('/api/v1/api-keys')
     expect(res.data.results).toHaveLength(2)
     for (const key of res.data.results) {
       expect(key.hashedKey).toBeUndefined()
@@ -42,9 +44,6 @@ test.describe('API Keys', () => {
 
     const deleteRes = await ax.delete(`/api/v1/api-keys/${created.data._id}`)
     expect(deleteRes.status).toBe(204)
-
-    const listRes = await ax.get('/api/v1/api-keys')
-    expect(listRes.data.results).toHaveLength(0)
   })
 
   test('non-admin cannot create upload keys', async () => {
@@ -123,20 +122,29 @@ test.describe('API Keys', () => {
     }
   })
 
-  test('list filter ?type=upload', async () => {
+  test('list filter ?type=read', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/api-keys', { type: 'upload', name: 'up1' })
-    await ax.post('/api/v1/api-keys', { type: 'read', name: 'rd1', owner: { type: 'organization', id: 'test1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'rd1', owner: { type: 'organization', id: 'test1' } })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'rd2', owner: { type: 'organization', id: 'test1' } })
 
-    const res = await ax.get('/api/v1/api-keys?type=upload')
-    expect(res.data.results).toHaveLength(1)
-    expect(res.data.results[0].type).toBe('upload')
+    const all = await orgAx.get('/api/v1/api-keys')
+    expect(all.data.results).toHaveLength(2)
+
+    const filtered = await orgAx.get('/api/v1/api-keys?type=read')
+    expect(filtered.data.results).toHaveLength(2)
+    for (const key of filtered.data.results) {
+      expect(key.type).toBe('read')
+    }
   })
 
   test('shortId visible in key list', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/api-keys', { type: 'upload', name: 'key1' })
-    const res = await ax.get('/api/v1/api-keys')
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key1', owner: { type: 'organization', id: 'test1' } })
+    const res = await orgAx.get('/api/v1/api-keys')
     expect(res.data.results[0].shortId).toBeTruthy()
     expect(res.data.results[0].shortId).toHaveLength(8)
   })
@@ -164,18 +172,27 @@ test.describe('API Keys', () => {
 
   test('lastUsedAt updated after key usage', async () => {
     const ax = await superAdmin
-    const keyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'tracked-key' })
-    const upload = axiosWithApiKey(keyRes.data.key)
 
+    // Upload a public artefact so the read key can access it
+    const uploadKeyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'uploader' })
+    const upload = axiosWithApiKey(uploadKeyRes.data.key)
     const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+    await ax.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true, privateAccess: [{ type: 'organization', id: 'test1' }] })
+
+    // Create a read key and use it
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+    const readKeyRes = await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'tracked-key', owner: { type: 'organization', id: 'test1' } })
+    const reader = axiosWithApiKey(readKeyRes.data.key)
+    await reader.get('/api/v1/artefacts')
 
     // Small delay for the fire-and-forget update
     await new Promise(resolve => setTimeout(resolve, 200))
 
-    const listRes = await ax.get('/api/v1/api-keys')
+    const listRes = await orgAx.get('/api/v1/api-keys')
     const key = listRes.data.results.find((k: any) => k.name === 'tracked-key')
     expect(key.lastUsedAt).toBeTruthy()
     const lastUsed = new Date(key.lastUsedAt).getTime()

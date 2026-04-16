@@ -9,7 +9,7 @@
         <v-row>
           <v-col
             cols="12"
-            sm="4"
+            sm="3"
           >
             <v-text-field
               v-model="newKey.name"
@@ -21,7 +21,7 @@
           </v-col>
           <v-col
             cols="12"
-            sm="4"
+            sm="3"
           >
             <v-select
               v-model="newKey.allowedCategory"
@@ -35,7 +35,7 @@
           </v-col>
           <v-col
             cols="12"
-            sm="4"
+            sm="3"
           >
             <v-text-field
               v-model="newKey.allowedName"
@@ -48,7 +48,7 @@
           </v-col>
           <v-col
             cols="12"
-            sm="4"
+            sm="3"
           >
             <v-date-input
               v-model="newKey.expiresAt"

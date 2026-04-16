@@ -24,14 +24,14 @@ router.post('/', async (req, res, next) => {
       if (body.allowedCategory) {
         throw httpError(400, 'allowedCategory is only valid for upload keys')
       }
-      const sessionState = reqSessionAuthenticated(req)
+      reqSessionAuthenticated(req)
       if (!body.owner) throw httpError(400, 'owner is required for read keys')
       // Check that the account has a grant
       const grant = await mongo.accessGrants.findOne({
         'account.type': body.owner.type,
         'account.id': body.owner.id
       })
-      if (!grant && !sessionState.user.adminMode) {
+      if (!grant) {
         throw httpError(403, 'account does not have granted access')
       }
     }
@@ -71,15 +71,11 @@ router.get('/', async (req, res, next) => {
     const sessionState = reqSession(req)
     const filter: Record<string, unknown> = {}
 
-    if (sessionState.user?.adminMode) {
-      // superadmin sees all
-    } else if (sessionState.account) {
-      // read key owners see their own
-      filter['owner.type'] = sessionState.account.type
-      filter['owner.id'] = sessionState.account.id
-    } else {
+    if (!sessionState.account) {
       throw httpError(401, 'authentication required')
     }
+    filter['owner.type'] = sessionState.account.type
+    filter['owner.id'] = sessionState.account.id
 
     if (req.query.type) {
       if (req.query.type !== 'upload' && req.query.type !== 'read') {

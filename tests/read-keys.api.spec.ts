@@ -144,12 +144,16 @@ test.describe('Read API key access', () => {
   test.describe('No grant', () => {
     test('read key for account without grant gets 403', async () => {
       const admin = await superAdmin
-      // Create a read key for dev1 org (which has no grant)
+      // Grant access to dev1, create a read key, then revoke the grant
+      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'dev1' } })
       const keyRes = await admin.post('/api/v1/api-keys', {
         type: 'read',
         name: 'no-grant-key',
         owner: { type: 'organization', id: 'dev1' }
       })
+      const grants = await admin.get('/api/v1/access-grants')
+      const dev1Grant = grants.data.results.find((g: any) => g.account.id === 'dev1')
+      await admin.delete(`/api/v1/access-grants/${dev1Grant._id}`)
       const ax = axiosWithApiKey(keyRes.data.key)
       try {
         await ax.get('/api/v1/artefacts')

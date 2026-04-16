@@ -138,6 +138,20 @@
               />
             </v-col>
             <v-col
+              cols="12"
+              sm="6"
+            >
+              <v-date-input
+                v-model="newKeyExpiresAt"
+                :label="t('expiresAt')"
+                density="compact"
+                hide-details
+                variant="outlined"
+                clearable
+                prepend-icon=""
+              />
+            </v-col>
+            <v-col
               cols="auto"
               class="d-flex align-center"
             >
@@ -188,6 +202,7 @@
             <tr>
               <th>{{ t('keyName') }}</th>
               <th>{{ t('createdAt') }}</th>
+              <th>{{ t('expiresAt') }}</th>
               <th />
             </tr>
           </thead>
@@ -195,9 +210,11 @@
             <tr
               v-for="key in keysFetch.data.value.results"
               :key="key._id"
+              :class="{ 'text-error': key.expiresAt && dayjs(key.expiresAt).isBefore(dayjs()) }"
             >
               <td>{{ key.name }}</td>
               <td>{{ dayjs(key.createdAt).format('L LT') }}</td>
+              <td>{{ key.expiresAt ? dayjs(key.expiresAt).format('L LT') : '—' }}</td>
               <td class="text-right">
                 <v-btn
                   :icon="mdiDelete"
@@ -235,6 +252,7 @@ fr:
   keyWarning: "Cette cl\xE9 ne sera plus affich\xE9e apr\xE8s fermeture."
   existingKeys: "Cl\xE9s existantes"
   createdAt: "Cr\xE9\xE9 le"
+  expiresAt: Expiration
 en:
   artefacts: Artefacts
   browse: Browse
@@ -253,6 +271,7 @@ en:
   keyWarning: This key will not be shown again after you close this.
   existingKeys: Existing keys
   createdAt: Created
+  expiresAt: Expires
 </i18n>
 
 <script setup lang="ts">
@@ -260,6 +279,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { mdiMagnify, mdiDelete } from '@mdi/js'
+import { VDateInput } from 'vuetify/labs/VDateInput'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { Artefact } from '#api/types'
 
@@ -272,9 +292,7 @@ useBreadcrumbs().setForPage(() => [{ title: t('artefacts'), disabled: true }])
 
 // --- Grant check ---
 const hasGrant = ref(false)
-if (session.state.user?.adminMode) {
-  hasGrant.value = true
-} else if (session.state.account) {
+if (session.state.account) {
   $fetch('/v1/access-grants/me').then(() => { hasGrant.value = true }).catch(() => {})
 }
 
@@ -309,6 +327,7 @@ const nbPages = computed(() => {
 
 // --- API Keys tab state ---
 const newKeyName = ref('')
+const newKeyExpiresAt = ref<Date | null>(null)
 const createdKey = ref<string | null>(null)
 const deletingKeyId = ref<string | null>(null)
 
@@ -318,12 +337,20 @@ const keysFetch = useFetch<{ results: any[], count: number }>(
 
 const createAction = useAsyncAction(
   async () => {
-    const res = await $fetch('/v1/api-keys', {
-      method: 'POST',
-      body: { type: 'read', name: newKeyName.value, owner: session.state.account }
-    })
+    const body: Record<string, unknown> = {
+      type: 'read',
+      name: newKeyName.value,
+      owner: session.state.account
+    }
+    if (newKeyExpiresAt.value) {
+      const d = new Date(newKeyExpiresAt.value)
+      d.setHours(23, 59, 59)
+      body.expiresAt = d.toISOString()
+    }
+    const res = await $fetch('/v1/api-keys', { method: 'POST', body })
     createdKey.value = res.key
     newKeyName.value = ''
+    newKeyExpiresAt.value = null
     keysFetch.refresh()
   }
 )
