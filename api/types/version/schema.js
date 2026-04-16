@@ -15,6 +15,16 @@ export default {
     semverPatch: { type: 'integer', readOnly: true },
     semverPrerelease: { type: 'string', readOnly: true },
     tarballPath: { type: 'string', readOnly: true },
-    uploadedAt: { type: 'string', format: 'date-time', readOnly: true }
+    uploadedAt: { type: 'string', format: 'date-time', readOnly: true },
+    uploadedBy: {
+      type: 'object',
+      readOnly: true,
+      additionalProperties: false,
+      properties: {
+        apiKeyId: { type: 'string' },
+        apiKeyName: { type: 'string' },
+        shortId: { type: 'string' }
+      }
+    }
   }
 }

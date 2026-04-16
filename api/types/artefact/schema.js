@@ -148,6 +148,16 @@ export default {
     applicationConfigSchema: { type: 'object', layout: { comp: 'none' } },
     filePath: { type: 'string', readOnly: true },
     fileName: { type: 'string', readOnly: true },
+    uploadedBy: {
+      type: 'object',
+      readOnly: true,
+      additionalProperties: false,
+      properties: {
+        apiKeyId: { type: 'string' },
+        apiKeyName: { type: 'string' },
+        shortId: { type: 'string' }
+      }
+    },
     createdAt: { type: 'string', format: 'date-time', readOnly: true },
     updatedAt: { type: 'string', format: 'date-time', readOnly: true }
   }

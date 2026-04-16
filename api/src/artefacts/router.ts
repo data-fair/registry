@@ -257,7 +257,8 @@ router.post('/:name/versions', async (req, res, next) => {
       ...(architecture ? { architecture } : {}),
       ...semverParts,
       tarballPath,
-      uploadedAt: now
+      uploadedAt: now,
+      uploadedBy: { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
     })
     storedOk = true
 
@@ -378,6 +379,7 @@ router.post('/file/:name', async (req, res, next) => {
           category,
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
+          uploadedBy: { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId },
           updatedAt: now
         },
         $setOnInsert: {

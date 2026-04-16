@@ -61,7 +61,8 @@ export class RegistryMongo {
         'artefact-version-arch': [{ artefactId: 1, version: 1, architecture: 1 }, { unique: true }]
       },
       'api-keys': {
-        'hashed-key': [{ hashedKey: 1 }, { unique: true }]
+        'hashed-key': [{ hashedKey: 1 }, { unique: true }],
+        'short-id': [{ shortId: 1 }, { unique: true, sparse: true }]
       },
       'access-grants': {
         account: [{ 'account.type': 1, 'account.id': 1 }, { unique: true }]
@@ -80,6 +81,12 @@ export class RegistryMongo {
       { type: 'federation' },
       { $set: { type: 'read' } }
     )
+    // Remove legacy API keys that lack a shortId — they use the old hash
+    // format and are no longer authenticatable after the HMAC migration.
+    const { deletedCount } = await mongoLib.db.collection('api-keys').deleteMany({ shortId: { $exists: false } })
+    if (deletedCount) {
+      console.warn(`[migration] Deleted ${deletedCount} legacy API key(s) (old hash format, no longer valid)`)
+    }
   }
 }
 

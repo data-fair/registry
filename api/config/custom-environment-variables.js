@@ -5,7 +5,8 @@ export default {
   privateEventsUrl: 'PRIVATE_EVENTS_URL',
   secretKeys: {
     events: 'SECRET_EVENTS',
-    internalServices: 'SECRET_INTERNAL_SERVICES'
+    internalServices: 'SECRET_INTERNAL_SERVICES',
+    apiKeysSalt: 'API_KEYS_SALT'
   },
   observer: {
     active: 'OBSERVER_ACTIVE',

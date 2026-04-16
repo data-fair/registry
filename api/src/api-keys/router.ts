@@ -36,7 +36,7 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const rawKey = generateApiKey()
+    const { rawKey, shortId } = generateApiKey()
     const sessionState = reqSessionAuthenticated(req)
     const now = new Date().toISOString()
 
@@ -44,6 +44,7 @@ router.post('/', async (req, res, next) => {
       _id: new ObjectId().toString(),
       type: body.type,
       name: body.name,
+      shortId,
       hashedKey: hashApiKey(rawKey),
       createdBy: {
         type: sessionState.account.type,
@@ -53,12 +54,12 @@ router.post('/', async (req, res, next) => {
       createdAt: now,
       ...(body.owner ? { owner: body.owner } : {}),
       ...(body.allowedName ? { allowedName: body.allowedName } : {}),
-      ...(body.allowedCategory ? { allowedCategory: body.allowedCategory } : {})
+      ...(body.allowedCategory ? { allowedCategory: body.allowedCategory } : {}),
+      ...(body.expiresAt ? { expiresAt: body.expiresAt } : {})
     }
 
     await mongo.apiKeys.insertOne(apiKeyDoc)
 
-    // Return the raw key only once — it's never stored
     const { hashedKey, ...response } = apiKeyDoc
     res.status(201).json({ ...response, key: rawKey })
   } catch (err) { next(err) }

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { superAdmin, axiosAuth, clean } from './support/axios.ts'
+import FormData from 'form-data'
+import { superAdmin, axiosAuth, axiosWithApiKey, clean } from './support/axios.ts'
+import { createTestTarball } from './support/test-tarball.ts'
 
 test.describe('API Keys', () => {
   test.beforeEach(async () => {
@@ -14,6 +16,9 @@ test.describe('API Keys', () => {
     })
     expect(res.status).toBe(201)
     expect(res.data.key).toBeTruthy()
+    expect(res.data.key).toMatch(/^reg_[a-zA-Z0-9_-]{8}_[0-9a-f]{64}$/)
+    expect(res.data.shortId).toBeTruthy()
+    expect(res.data.shortId).toHaveLength(8)
     expect(res.data.name).toBe('CI pipeline')
     expect(res.data.type).toBe('upload')
     expect(res.data.hashedKey).toBeUndefined()
@@ -126,5 +131,54 @@ test.describe('API Keys', () => {
     const res = await ax.get('/api/v1/api-keys?type=upload')
     expect(res.data.results).toHaveLength(1)
     expect(res.data.results[0].type).toBe('upload')
+  })
+
+  test('shortId visible in key list', async () => {
+    const ax = await superAdmin
+    await ax.post('/api/v1/api-keys', { type: 'upload', name: 'key1' })
+    const res = await ax.get('/api/v1/api-keys')
+    expect(res.data.results[0].shortId).toBeTruthy()
+    expect(res.data.results[0].shortId).toHaveLength(8)
+  })
+
+  test('expired key is rejected on authentication', async () => {
+    const ax = await superAdmin
+    const past = new Date(Date.now() - 1000).toISOString()
+    const keyRes = await ax.post('/api/v1/api-keys', {
+      type: 'upload',
+      name: 'expired-key',
+      expiresAt: past
+    })
+    const upload = axiosWithApiKey(keyRes.data.key)
+
+    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+    const form = new FormData()
+    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+    try {
+      await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+      expect(true).toBe(false)
+    } catch (err: any) {
+      expect(err.status).toBe(401)
+    }
+  })
+
+  test('lastUsedAt updated after key usage', async () => {
+    const ax = await superAdmin
+    const keyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'tracked-key' })
+    const upload = axiosWithApiKey(keyRes.data.key)
+
+    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+    const form = new FormData()
+    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+    await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+
+    // Small delay for the fire-and-forget update
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    const listRes = await ax.get('/api/v1/api-keys')
+    const key = listRes.data.results.find((k: any) => k.name === 'tracked-key')
+    expect(key.lastUsedAt).toBeTruthy()
+    const lastUsed = new Date(key.lastUsedAt).getTime()
+    expect(Date.now() - lastUsed).toBeLessThan(5000)
   })
 })

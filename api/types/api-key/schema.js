@@ -4,7 +4,7 @@ export default {
   title: 'ApiKey',
   type: 'object',
   additionalProperties: false,
-  required: ['_id', 'type', 'name', 'hashedKey', 'createdBy', 'createdAt'],
+  required: ['_id', 'type', 'name', 'hashedKey', 'shortId', 'createdBy', 'createdAt'],
   properties: {
     _id: { type: 'string', readOnly: true },
     type: { type: 'string', enum: ['upload', 'read'] },
@@ -40,6 +40,9 @@ export default {
       type: 'string',
       description: 'Restricts an upload key to a single artefact category. Missing means unrestricted.',
       enum: ['processing', 'catalog', 'application', 'other', 'tileset', 'maplibre-style']
-    }
+    },
+    shortId: { type: 'string', readOnly: true },
+    expiresAt: { type: 'string', format: 'date-time' },
+    lastUsedAt: { type: 'string', format: 'date-time', readOnly: true }
   }
 }

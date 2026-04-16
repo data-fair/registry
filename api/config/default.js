@@ -23,7 +23,8 @@ export default {
   },
   secretKeys: {
     events: undefined,
-    internalServices: undefined
+    internalServices: undefined,
+    apiKeysSalt: undefined
   },
   upgradeRoot: '/app/'
 }

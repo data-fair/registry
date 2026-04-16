@@ -34,6 +34,13 @@ test.describe('Artefacts', () => {
       expect(res.data.artefact.name).toBe('@test/processing-hello')
       expect(res.data.artefact.category).toBe('processing')
       expect(res.data.version.version).toBe('1.0.0')
+
+      // Audit trail: version detail carries uploadedBy
+      const admin = await superAdmin
+      const detail = await admin.get(`/api/v1/artefacts/${encodeURIComponent(res.data.artefact._id)}/versions/1.0.0`)
+      expect(detail.data.uploadedBy).toBeTruthy()
+      expect(detail.data.uploadedBy.shortId).toBeTruthy()
+      expect(detail.data.uploadedBy.apiKeyName).toBe('test-upload')
     })
 
     test('upload without API key returns 401', async () => {
@@ -451,6 +458,9 @@ test.describe('File artefacts', () => {
       expect(res.data.artefact.category).toBe('tileset')
       expect(res.data.artefact.filePath).toBeTruthy()
       expect(res.data.artefact.fileName).toBe('terrain.mbtiles')
+      expect(res.data.artefact.uploadedBy).toBeTruthy()
+      expect(res.data.artefact.uploadedBy.shortId).toBeTruthy()
+      expect(res.data.artefact.uploadedBy.apiKeyName).toBe('test-upload')
     })
 
     test('upload without API key returns 401', async () => {

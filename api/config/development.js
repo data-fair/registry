@@ -15,7 +15,8 @@ export default {
   },
   secretKeys: {
     events: 'secret-events',
-    internalServices: 'secret-internal'
+    internalServices: 'secret-internal',
+    apiKeysSalt: 'dev-api-keys-salt-minimum-32-chars!'
   },
   upgradeRoot: '../'
 }

@@ -95,11 +95,14 @@
       <v-table density="comfortable">
         <thead>
           <tr>
+            <th>{{ t('prefix') }}</th>
             <th>{{ t('name') }}</th>
             <th>{{ t('allowedCategory') }}</th>
             <th>{{ t('allowedName') }}</th>
             <th>{{ t('createdBy') }}</th>
             <th>{{ t('createdAt') }}</th>
+            <th>{{ t('expiresAt') }}</th>
+            <th>{{ t('lastUsedAt') }}</th>
             <th />
           </tr>
         </thead>
@@ -107,12 +110,16 @@
           <tr
             v-for="key in keysFetch.data.value.results"
             :key="key._id"
+            :class="{ 'text-error': key.expiresAt && dayjs(key.expiresAt).isBefore(dayjs()) }"
           >
+            <td><code>reg_{{ key.shortId }}</code></td>
             <td>{{ key.name }}</td>
             <td>{{ key.allowedCategory || '—' }}</td>
             <td>{{ key.allowedName || '—' }}</td>
             <td>{{ key.createdBy.name || key.createdBy.id }}</td>
             <td>{{ dayjs(key.createdAt).format('L LT') }}</td>
+            <td>{{ key.expiresAt ? dayjs(key.expiresAt).format('L LT') : '—' }}</td>
+            <td>{{ key.lastUsedAt ? dayjs(key.lastUsedAt).format('L LT') : t('never') }}</td>
             <td class="text-right">
               <v-btn
                 :icon="mdiDelete"
@@ -142,8 +149,12 @@ fr:
   keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
   keyWarning: Cette clé ne sera plus affichée après fermeture.
   existingKeys: Clés existantes
+  prefix: Préfixe
   createdBy: Créé par
   createdAt: Créé le
+  expiresAt: Expiration
+  lastUsedAt: Dernière utilisation
+  never: Jamais
   deleted: Clé supprimée
 en:
   admin: Administration
@@ -156,8 +167,12 @@ en:
   keyCreated: "Key created successfully. Copy it now:"
   keyWarning: This key will not be shown again after you close this.
   existingKeys: Existing Keys
+  prefix: Prefix
   createdBy: Created by
   createdAt: Created
+  expiresAt: Expires
+  lastUsedAt: Last used
+  never: Never
   deleted: Key deleted
 </i18n>
 

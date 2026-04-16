@@ -46,12 +46,17 @@
     "secretKeys": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["apiKeysSalt"],
       "properties": {
         "events": {
           "type": "string"
         },
         "internalServices": {
           "type": "string"
+        },
+        "apiKeysSalt": {
+          "type": "string",
+          "minLength": 32
         }
       }
     },
