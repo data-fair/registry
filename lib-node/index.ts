@@ -124,6 +124,7 @@ export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise
   )
 
   if (res.status === 304) {
+    ;(res.data as Readable).destroy()
     return { path: destPath, downloaded: false }
   }
 
