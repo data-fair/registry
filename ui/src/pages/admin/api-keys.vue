@@ -47,6 +47,20 @@
             />
           </v-col>
           <v-col
+            cols="12"
+            sm="4"
+          >
+            <v-date-input
+              v-model="newKey.expiresAt"
+              :label="t('expiresAt')"
+              density="compact"
+              hide-details
+              variant="outlined"
+              clearable
+              prepend-icon=""
+            />
+          </v-col>
+          <v-col
             cols="auto"
             class="d-flex align-center"
           >
@@ -180,6 +194,7 @@ en:
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
+import { VDateInput } from 'vuetify/labs/VDateInput'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 
 const { t } = useI18n()
@@ -208,8 +223,9 @@ type NewKey = {
   name: string
   allowedCategory: string | null
   allowedName: string | null
+  expiresAt: Date | null
 }
-const newKey = ref<NewKey>({ name: '', allowedCategory: null, allowedName: null })
+const newKey = ref<NewKey>({ name: '', allowedCategory: null, allowedName: null, expiresAt: null })
 const createdKey = ref<string | null>(null)
 const deletingKeyId = ref<string | null>(null)
 
@@ -225,9 +241,14 @@ const createAction = useAsyncAction(
     }
     if (newKey.value.allowedCategory) body.allowedCategory = newKey.value.allowedCategory
     if (newKey.value.allowedName) body.allowedName = newKey.value.allowedName
+    if (newKey.value.expiresAt) {
+      const d = new Date(newKey.value.expiresAt)
+      d.setHours(23, 59, 59)
+      body.expiresAt = d.toISOString()
+    }
     const res = await $fetch('/v1/api-keys', { method: 'POST', body })
     createdKey.value = res.key
-    newKey.value = { name: '', allowedCategory: null, allowedName: null }
+    newKey.value = { name: '', allowedCategory: null, allowedName: null, expiresAt: null }
     keysFetch.refresh()
   }
 )
