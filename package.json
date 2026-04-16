@@ -1,6 +1,6 @@
 {
   "name": "registry",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A simple registry for the data-fair stack containing plugin definitions and hosting archives of versions.",
   "type": "module",
   "scripts": {
