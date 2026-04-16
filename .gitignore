@@ -19,3 +19,6 @@ dev/logs/
 dev/fixtures-output.json
 tmp/
 data/
+lib-node/**/*.js
+lib-node/**/*.d.ts
+lib-node/**/*.js.map

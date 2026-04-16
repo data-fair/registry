@@ -4,12 +4,19 @@
   "description": "Node.js client library for the data-fair registry service.",
   "type": "module",
   "license": "MIT",
+  "main": "index.js",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.js"
   },
   "files": [
-    "*.ts"
+    "**/*.js",
+    "**/*.js.map",
+    "**/*.d.ts"
   ],
+  "scripts": {
+    "prepublishOnly": "cd .. && npm run build-lib-node",
+    "build": "cd .. && npm run build-lib-node"
+  },
   "peerDependencies": {
     "@data-fair/lib-node": ">=2.8.0"
   },

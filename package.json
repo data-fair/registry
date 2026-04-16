@@ -12,6 +12,7 @@
     "dev-deps": "mkdir -p dev/logs && docker compose up 2>&1 | tee dev/logs/docker-compose.log",
     "dev-zellij": "dotenv -- zellij --layout .zellij.kdl",
     "dev:fixtures": "dotenv -- node --experimental-strip-types --no-warnings=ExperimentalWarning dev/fixtures.ts",
+    "build-lib-node": "tsc -p tsconfig.build.json",
     "build-types": "mkdir -p ui/src/components/vjsf && df-build-types . --vjsf-dir ui/src/components/vjsf",
     "prepare": "husky || true",
     "check-types": "tsc && npm -w ui run check-types",
