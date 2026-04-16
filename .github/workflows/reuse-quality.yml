@@ -25,6 +25,9 @@ jobs:
     - name: Init env
       run: bash dev/init-env.sh
 
+    - name: Build UI
+      run: NODE_CONFIG_DIR=$PWD/api/config/ npm -w ui run build
+
     - name: Start dev dependencies
       run: docker compose up -d --wait
 
