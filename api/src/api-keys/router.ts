@@ -74,8 +74,15 @@ router.get('/', async (req, res, next) => {
     if (!sessionState.account) {
       throw httpError(401, 'authentication required')
     }
-    filter['owner.type'] = sessionState.account.type
-    filter['owner.id'] = sessionState.account.id
+
+    if (req.query.type === 'upload') {
+      if (!sessionState.user?.adminMode) {
+        throw httpError(403, 'super admin only')
+      }
+    } else {
+      filter['owner.type'] = sessionState.account.type
+      filter['owner.id'] = sessionState.account.id
+    }
 
     if (req.query.type) {
       if (req.query.type !== 'upload' && req.query.type !== 'read') {
