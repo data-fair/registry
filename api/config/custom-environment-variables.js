@@ -6,7 +6,8 @@ export default {
   secretKeys: {
     events: 'SECRET_EVENTS',
     internalServices: 'SECRET_INTERNAL_SERVICES',
-    apiKeysSalt: 'API_KEYS_SALT'
+    apiKeysSalt: 'API_KEYS_SALT',
+    cipherPassword: 'CIPHER_PASSWORD'
   },
   observer: {
     active: 'OBSERVER_ACTIVE',

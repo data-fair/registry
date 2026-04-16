@@ -23,6 +23,12 @@
     >
       {{ t('accessGrants') }}
     </v-tab>
+    <v-tab
+      :to="{ path: '/admin/remote-registries' }"
+      :value="'/admin/remote-registries'"
+    >
+      {{ t('remoteRegistries') }}
+    </v-tab>
   </v-tabs>
 </template>
 
@@ -31,10 +37,12 @@ fr:
   artefacts: Artefacts
   apiKeys: Clés API
   accessGrants: Accès accordés
+  remoteRegistries: Registres distants
 en:
   artefacts: Artefacts
   apiKeys: API Keys
   accessGrants: Access Grants
+  remoteRegistries: Remote Registries
 </i18n>
 
 <script setup lang="ts">

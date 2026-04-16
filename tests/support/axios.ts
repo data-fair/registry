@@ -22,3 +22,7 @@ export const axiosInternal = (secret: string) => axiosBuilder({ ...axiosOpts, he
 export const clean = async () => {
   await anonymousAx.delete(`http://localhost:${process.env.DEV_API_PORT}/api/test-env`)
 }
+
+export const setArtefactOrigin = async (artefactId: string, origin: string) => {
+  await anonymousAx.put(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/artefacts/${encodeURIComponent(artefactId)}/origin`, { origin })
+}

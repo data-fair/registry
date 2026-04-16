@@ -78,6 +78,14 @@
           >
             <td>
               <strong>{{ (artefact.title as any)?.[locale] || artefact.name }}</strong>
+              <v-chip
+                v-if="artefact.origin"
+                size="x-small"
+                color="info"
+                class="ml-2"
+              >
+                {{ t('mirror') }}
+              </v-chip>
               <br>
               <span class="text-medium-emphasis text-body-2">{{ artefact._id }}</span>
             </td>
@@ -128,6 +136,7 @@ fr:
   visibility: Visibilité
   updatedAt: Mis à jour
   total: artefact(s)
+  mirror: miroir
 en:
   admin: Administration
   artefacts: Artefacts
@@ -139,6 +148,7 @@ en:
   visibility: Visibility
   updatedAt: Updated
   total: artefact(s)
+  mirror: mirror
 </i18n>
 
 <script setup lang="ts">

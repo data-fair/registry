@@ -5,7 +5,7 @@ export default {
   port: 8080,
   tmpDir: '/tmp',
   dataDir: '/data',
-  maxUploadBytes: 500 * 1024 * 1024,
+  maxUploadBytes: 200 * 1024 * 1024 * 1024,
   filesStorage: 'fs',
   s3: {
     region: '',
@@ -24,7 +24,8 @@ export default {
   secretKeys: {
     events: undefined,
     internalServices: undefined,
-    apiKeysSalt: undefined
+    apiKeysSalt: undefined,
+    cipherPassword: undefined
   },
   upgradeRoot: '/app/'
 }

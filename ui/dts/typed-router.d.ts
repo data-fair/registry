@@ -23,6 +23,8 @@ declare module 'vue-router/auto-routes' {
     '/admin/api-keys': RouteRecordInfo<'/admin/api-keys', '/admin/api-keys', Record<never, never>, Record<never, never>>,
     '/admin/artefacts/': RouteRecordInfo<'/admin/artefacts/', '/admin/artefacts', Record<never, never>, Record<never, never>>,
     '/admin/artefacts/[id]': RouteRecordInfo<'/admin/artefacts/[id]', '/admin/artefacts/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/admin/remote-registries': RouteRecordInfo<'/admin/remote-registries', '/admin/remote-registries', Record<never, never>, Record<never, never>, '/admin/remote-registries/[id]'>,
+    '/admin/remote-registries/[id]': RouteRecordInfo<'/admin/remote-registries/[id]', '/admin/remote-registries/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     '/artefacts/': RouteRecordInfo<'/artefacts/', '/artefacts', Record<never, never>, Record<never, never>>,
     '/artefacts/[id]': RouteRecordInfo<'/artefacts/[id]', '/artefacts/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
   }

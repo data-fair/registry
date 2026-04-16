@@ -3,6 +3,16 @@
     v-if="artefact"
     data-iframe-height
   >
+    <!-- Mirror banner -->
+    <v-alert
+      v-if="artefact.origin"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+    >
+      {{ t('mirroredFrom', { origin: artefact.origin }) }}
+    </v-alert>
+
     <!-- Manifest metadata (read-only) -->
     <v-card class="mb-4">
       <v-card-title>{{ t('manifest') }}</v-card-title>
@@ -78,7 +88,10 @@
     </v-card>
 
     <!-- Thumbnail -->
-    <v-card class="mb-4">
+    <v-card
+      v-if="!artefact.origin"
+      class="mb-4"
+    >
       <v-card-title>{{ t('thumbnail') }}</v-card-title>
       <v-card-text>
         <div
@@ -191,6 +204,7 @@
 
     <!-- Delete -->
     <v-card
+      v-if="!artefact.origin"
       color="error"
       variant="outlined"
     >
@@ -268,6 +282,7 @@ fr:
   delete: Supprimer
   deleted: Artefact supprimé
   saved: Modifications enregistrées
+  mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
 en:
   admin: Administration
   artefacts: Artefacts
@@ -298,6 +313,7 @@ en:
   delete: Delete
   deleted: Artefact deleted
   saved: Changes saved
+  mirroredFrom: "This artefact is mirrored from remote registry: {origin}"
 </i18n>
 
 <script setup lang="ts">

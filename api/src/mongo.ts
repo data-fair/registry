@@ -5,6 +5,7 @@ import type { Artefact } from '#types/artefact/index.ts'
 import type { Version } from '#types/version/index.ts'
 import type { ApiKey } from '#types/api-key/index.ts'
 import type { AccessGrant } from '#types/access-grant/index.ts'
+import type { RemoteRegistry } from '#types/remote-registry/index.ts'
 
 export type Thumbnail = {
   _id: string
@@ -44,6 +45,10 @@ export class RegistryMongo {
 
   get thumbnails () {
     return mongoLib.db.collection<Thumbnail>('thumbnails')
+  }
+
+  get remoteRegistries () {
+    return mongoLib.db.collection<RemoteRegistry>('remote-registries')
   }
 
   async connect () {

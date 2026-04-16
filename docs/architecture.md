@@ -8,7 +8,8 @@ The registry is a centralized store for plugins and file artefacts used by servi
 - Raw file storage for binary artefacts (tilesets)
 - A client library (`lib-node`) for services to download and cache artefacts at runtime
 - Access control with public/private visibility and per-account grants
-- Federation support for sharing artefacts across registry instances
+- One-way mirroring from upstream registries (remote registries)
+- Federation support via read API keys for downstream consumers
 
 ## Artefact formats
 
@@ -60,16 +61,42 @@ curl -X POST "https://registry.example.com/api/v1/artefacts/file/terrain" \
   -F "category=tileset"
 ```
 
-## Registry federation
+## Remote registries
 
-Federation allows a downstream registry to pull artefacts from an upstream registry on behalf of its accounts.
+Remote registries allow a local registry instance to mirror selected artefacts from upstream registries. This is a one-way pull: the local instance downloads artefacts from the remote and keeps them in sync.
 
-API keys have two types:
+### Configuration
 
-- **upload** -- Used by CI pipelines to push artefacts. Created by superadmins.
-- **federation** -- Used by downstream registries. Scoped to an account (the `owner` field) and can only be created by accounts that have been granted access.
+Each remote registry is stored with:
 
-A downstream registry authenticates to the upstream using a federation key, then proxies artefact downloads to its own consumers.
+- **URL** (used as `_id`) -- The base URL of the upstream registry.
+- **Name** -- A human-readable label for the admin UI.
+- **Encrypted API key** -- A read API key issued by the upstream, encrypted at rest with AES-256-CBC (see [Encryption](#encryption) below).
+
+Admins configure remote registries, browse available artefacts on the upstream, and select which ones to mirror locally.
+
+### Sync behavior
+
+Mirrored artefacts carry an `origin` field set to the remote registry URL. Sync works differently by format:
+
+- **npm artefacts** -- Versions are compared by `version:architecture` key. Missing versions are downloaded; versions pruned upstream are deleted locally.
+- **file artefacts** -- The file is re-downloaded when the remote's `updatedAt` is more recent than the local copy.
+
+Sync runs automatically once per day and can be triggered on-demand via `POST /api/v1/remote-registries/:id/sync` (returns 202). A distributed lock (`@data-fair/lib-node/locks`) prevents concurrent syncs of the same remote.
+
+### Integration protections
+
+Mirrored artefacts are read-only with respect to uploads and most metadata:
+
+- Uploading a new version to a mirrored npm artefact returns **409**.
+- Deleting a mirrored artefact returns **403** (unselect the mirror instead).
+- PATCH only allows `public` and `privateAccess` on mirrored artefacts; other fields return **403**.
+
+Unselecting an artefact or deleting the remote registry removes the `origin` field, unlocking the artefact for local management.
+
+### Read API keys
+
+Read API keys are the authentication mechanism that remote registries use to access the upstream. They are scoped to an account (`owner` field) and can only be created by accounts that have been granted access. The upstream filters artefact visibility based on the key owner's `privateAccess` grants.
 
 ## Access model
 
@@ -93,6 +120,10 @@ Seeing an artefact in the list doesn't grant download access. Downloads require 
 ### API keys
 
 API keys are hashed with SHA-512 before storage. The cleartext key is returned only once at creation time. Keys can be listed and revoked but never re-read.
+
+### Encryption
+
+Remote registry API keys are stored encrypted rather than hashed, because they must be decrypted at sync time to authenticate against the upstream. The scheme uses AES-256-CBC with a random 16-byte IV per value and a key derived from `SHA-256(config.secretKeys.cipherPassword)`. The encrypted payload is stored as `{ iv, alg, data }` in MongoDB.
 
 ## Storage backends
 

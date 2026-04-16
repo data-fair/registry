@@ -8,12 +8,14 @@ import { createHttpTerminator } from 'http-terminator'
 import { app } from './app.ts'
 import config from '#config'
 import mongo from '#mongo'
+import { syncAllRemoteRegistries } from './remote-registries/sync.ts'
 
 const server = createServer(app)
 const httpTerminator = createHttpTerminator({ server })
 
 server.keepAliveTimeout = (60 * 1000) + 1000
 server.headersTimeout = (60 * 1000) + 2000
+let syncTimer: ReturnType<typeof setInterval> | undefined
 
 export const start = async () => {
   if (config.observer?.active) await startObserver(config.observer.port)
@@ -32,10 +34,18 @@ export const start = async () => {
   server.listen(config.port)
   await eventPromise(server, 'listening')
 
+  // Daily sync of all remote registries
+  syncTimer = setInterval(() => {
+    syncAllRemoteRegistries().catch(err => {
+      console.error('[sync] Daily sync error:', err.message || err)
+    })
+  }, 24 * 60 * 60 * 1000)
+
   console.log(`API server listening on port ${config.port}`)
 }
 
 export const stop = async () => {
+  if (syncTimer) clearInterval(syncTimer)
   await httpTerminator.terminate()
   if (config.observer?.active) await stopObserver()
   await locks.stop()

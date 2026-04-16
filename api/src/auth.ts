@@ -32,3 +32,26 @@ export const authenticateApiKey = async (req: Request) => {
 
   return apiKey
 }
+
+export const tryAuthenticateReadKey = async (req: Request) => {
+  const key = req.get('x-api-key')
+  if (!key) return null
+
+  const hashedKey = hashApiKey(key)
+  const apiKey = await mongo.apiKeys.findOne({ hashedKey })
+  if (!apiKey) throw httpError(401, 'invalid API key')
+
+  if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
+    throw httpError(401, 'API key has expired')
+  }
+
+  if (apiKey.type !== 'read') return null
+  if (!apiKey.owner) throw httpError(400, 'read key missing owner')
+
+  mongo.apiKeys.updateOne(
+    { _id: apiKey._id },
+    { $set: { lastUsedAt: new Date().toISOString() } }
+  ).catch(() => {})
+
+  return { apiKey, owner: apiKey.owner }
+}

@@ -13,8 +13,8 @@ import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
 import config from '#config'
-import { authenticateApiKey } from '../auth.ts'
-import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
+import { authenticateApiKey, tryAuthenticateReadKey } from '../auth.ts'
+import { artefactAccessFilter, artefactAccessFilterForAccount, assertDownloadAccess, assertDownloadAccessForAccount } from '../access.ts'
 import { writeFile, readFile, getDownloadUrl, deleteFile } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
@@ -80,7 +80,10 @@ const safeDecode = (raw: string): string => {
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
-    const filter = await artefactAccessFilter(req)
+    const readAuth = await tryAuthenticateReadKey(req)
+    const filter = readAuth
+      ? await artefactAccessFilterForAccount(readAuth.owner)
+      : await artefactAccessFilter(req)
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
     const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { updatedAt: -1 }
@@ -116,7 +119,10 @@ router.get('/', async (req, res, next) => {
 // Get artefact detail + versions
 router.get('/:id', async (req, res, next) => {
   try {
-    const filter = await artefactAccessFilter(req)
+    const readAuth = await tryAuthenticateReadKey(req)
+    const filter = readAuth
+      ? await artefactAccessFilterForAccount(readAuth.owner)
+      : await artefactAccessFilter(req)
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
@@ -136,6 +142,17 @@ router.patch('/:id', async (req, res, next) => {
   try {
     await session.reqAdminMode(req)
     const body = patchReqBody.returnValid(req.body, { name: 'body' })
+
+    const existing = await mongo.artefacts.findOne({ _id: req.params.id })
+    if (!existing) throw httpError(404, 'artefact not found')
+
+    if (existing.origin) {
+      const allowed = new Set(['public', 'privateAccess'])
+      const forbidden = Object.keys(body).filter(k => !allowed.has(k))
+      if (forbidden.length > 0) {
+        throw httpError(403, 'mirrored artefact: only public and privateAccess can be edited locally')
+      }
+    }
 
     // Remove null values (PATCH null = unset the field)
     const $set: Record<string, unknown> = { updatedAt: new Date().toISOString() }
@@ -163,6 +180,7 @@ router.delete('/:id', async (req, res, next) => {
     await session.reqAdminMode(req)
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id })
     if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.origin) throw httpError(403, 'mirrored artefact: unselect the mirror instead of deleting')
 
     // Delete DB state first so concurrent GETs fail cleanly with 404,
     // then best-effort remove files.
@@ -214,6 +232,11 @@ router.post('/:name/versions', async (req, res, next) => {
     const semverParts = parseSemver(manifest.version)
     const majorVersion = semverParts.semverMajor
     const artefactId = `${name}@${majorVersion}`
+
+    const existingArtefact = await mongo.artefacts.findOne({ _id: artefactId })
+    if (existingArtefact?.origin) {
+      throw httpError(409, 'this artefact is managed by a remote registry')
+    }
 
     // Store tarball (streamed from disk, no in-memory buffering).
     const archSuffix = architecture ? `_${architecture}` : ''
@@ -281,7 +304,10 @@ router.post('/:name/versions', async (req, res, next) => {
 // Resolve version
 router.get('/:id/versions/:version', async (req, res, next) => {
   try {
-    const filter = await artefactAccessFilter(req)
+    const readAuth = await tryAuthenticateReadKey(req)
+    const filter = readAuth
+      ? await artefactAccessFilterForAccount(readAuth.owner)
+      : await artefactAccessFilter(req)
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
@@ -297,15 +323,22 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
   try {
     let artefact
 
-    // Two auth paths: internal secret or session-based
+    // Three auth paths: internal secret, read API key, or session-based
     const secretKey = req.get('x-secret-key')
     if (secretKey) {
       assertReqInternalSecret(req, config.secretKeys.internalServices!)
       artefact = await mongo.artefacts.findOne({ _id: req.params.id })
     } else {
-      const filter = await artefactAccessFilter(req)
-      artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-      if (artefact) await assertDownloadAccess(req, artefact)
+      const readAuth = await tryAuthenticateReadKey(req)
+      if (readAuth) {
+        const filter = await artefactAccessFilterForAccount(readAuth.owner)
+        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+        if (artefact) await assertDownloadAccessForAccount(readAuth.owner, artefact)
+      } else {
+        const filter = await artefactAccessFilter(req)
+        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+        if (artefact) await assertDownloadAccess(req, artefact)
+      }
     }
 
     if (!artefact) throw httpError(404, 'artefact not found')
@@ -345,6 +378,11 @@ router.post('/file/:name', async (req, res, next) => {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
     const artefactId = name
+
+    const existingFileArtefact = await mongo.artefacts.findOne({ _id: artefactId })
+    if (existingFileArtefact?.origin) {
+      throw httpError(409, 'this artefact is managed by a remote registry')
+    }
 
     tmpDir = await createUploadTmpDir()
     const tmpFile = join(tmpDir, 'upload.bin')
@@ -421,9 +459,16 @@ router.get('/:id/download', async (req, res, next) => {
       assertReqInternalSecret(req, config.secretKeys.internalServices!)
       artefact = await mongo.artefacts.findOne({ _id: req.params.id })
     } else {
-      const filter = await artefactAccessFilter(req)
-      artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-      if (artefact) await assertDownloadAccess(req, artefact)
+      const readAuth = await tryAuthenticateReadKey(req)
+      if (readAuth) {
+        const filter = await artefactAccessFilterForAccount(readAuth.owner)
+        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+        if (artefact) await assertDownloadAccessForAccount(readAuth.owner, artefact)
+      } else {
+        const filter = await artefactAccessFilter(req)
+        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+        if (artefact) await assertDownloadAccess(req, artefact)
+      }
     }
 
     if (!artefact) throw httpError(404, 'artefact not found')

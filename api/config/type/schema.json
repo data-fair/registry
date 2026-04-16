@@ -46,7 +46,7 @@
     "secretKeys": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["apiKeysSalt"],
+      "required": ["apiKeysSalt", "cipherPassword"],
       "properties": {
         "events": {
           "type": "string"
@@ -55,6 +55,10 @@
           "type": "string"
         },
         "apiKeysSalt": {
+          "type": "string",
+          "minLength": 32
+        },
+        "cipherPassword": {
           "type": "string",
           "minLength": 32
         }

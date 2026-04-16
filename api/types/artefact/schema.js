@@ -146,6 +146,7 @@ export default {
     },
     processingConfigSchema: { type: 'object', layout: { comp: 'none' } },
     applicationConfigSchema: { type: 'object', layout: { comp: 'none' } },
+    origin: { type: 'string', readOnly: true },
     filePath: { type: 'string', readOnly: true },
     fileName: { type: 'string', readOnly: true },
     uploadedBy: {
