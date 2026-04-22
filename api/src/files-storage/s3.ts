@@ -43,8 +43,12 @@ export class S3Backend implements FileBackend {
   }
 
   async writeStream (stream: Readable, path: string) {
+    // S3 caps multipart uploads at 10,000 parts. The SDK default part size
+    // is 5 MB (50 GB ceiling) — too low for planet-scale tilesets. 32 MB
+    // parts lift the ceiling to ~320 GB, above the 200 GB maxUploadBytes.
     const upload = new Upload({
       client: this.dataClient,
+      partSize: 32 * 1024 * 1024,
       params: {
         Bucket: config.s3!.bucket,
         Key: path,
