@@ -15,6 +15,11 @@ const httpTerminator = createHttpTerminator({ server })
 
 server.keepAliveTimeout = (60 * 1000) + 1000
 server.headersTimeout = (60 * 1000) + 2000
+// Large artefact uploads (tilesets, etc.) can easily exceed Node's 5 min default.
+server.requestTimeout = 60 * 60 * 1000
+
+server.on('timeout', () => internalError('http-timeout', 'http socket timeout'))
+server.on('clientError', (err) => internalError('http-client-error', err))
 let syncTimer: ReturnType<typeof setInterval> | undefined
 
 export const start = async () => {
