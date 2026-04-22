@@ -3,6 +3,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  CopyObjectCommand,
   paginateListObjectsV2,
   type S3ClientConfig
 } from '@aws-sdk/client-s3'
@@ -106,6 +107,18 @@ export class S3Backend implements FileBackend {
     } catch {
       return false
     }
+  }
+
+  async move (srcPath: string, dstPath: string) {
+    await this.dataClient.send(new CopyObjectCommand({
+      Bucket: config.s3!.bucket,
+      CopySource: `${config.s3!.bucket}/${encodeURI(srcPath)}`,
+      Key: dstPath
+    }))
+    await this.metadataClient.send(new DeleteObjectCommand({
+      Bucket: config.s3!.bucket,
+      Key: srcPath
+    }))
   }
 
   async clean () {

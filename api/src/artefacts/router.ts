@@ -1,9 +1,6 @@
 import { Router } from 'express'
-import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import type { Readable } from 'node:stream'
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import Busboy from 'busboy'
 import { ObjectId, type Filter } from 'mongodb'
@@ -15,7 +12,7 @@ import mongo from '#mongo'
 import config from '#config'
 import { authenticateApiKey, tryAuthenticateReadKey } from '../auth.ts'
 import { artefactAccessFilter, artefactAccessFilterForAccount, assertDownloadAccess, assertDownloadAccessForAccount } from '../access.ts'
-import { writeFile, readFile, getDownloadUrl, deleteFile } from '../files-storage/index.ts'
+import { writeFile, readFile, getDownloadUrl, deleteFile, moveFile } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
@@ -30,12 +27,6 @@ const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
 const allCategories = [...new Set<string>([...npmCategories, ...fileCategories])]
 
 const MAX_UPLOAD_BYTES = config.maxUploadBytes ?? 500 * 1024 * 1024
-
-const createUploadTmpDir = async () => {
-  const base = config.tmpDir || tmpdir()
-  await mkdir(base, { recursive: true })
-  return mkdtemp(join(base, 'registry-upload-'))
-}
 
 type Category = Artefact['category']
 const pickCategory = (raw: string | undefined, allowed: readonly string[]): Category => {
@@ -225,8 +216,9 @@ router.delete('/:id', async (req, res, next) => {
 // services that previously managed their plugins locally can upload to the registry
 // to switch to the new centralized mode.
 router.post('/:name/versions', async (req, res, next) => {
-  let tmpDir: string | undefined
-  let storedTarballPath: string | undefined
+  const stagingPath = `_staging/${randomUUID()}.tgz`
+  let stagingStored = false
+  let finalTarballPath: string | undefined
   let storedOk = false
   try {
     const isInternal = tryInternalSecret(req)
@@ -241,12 +233,14 @@ router.post('/:name/versions', async (req, res, next) => {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
 
-    tmpDir = await createUploadTmpDir()
-    const tmpTarball = join(tmpDir, 'upload.tgz')
-    const { architecture } = await streamTarballUpload(req, tmpTarball)
+    // Stream the multipart file straight into the configured storage at a
+    // staging path — no local fs tmp needed even for the S3 backend.
+    const { architecture } = await streamTarballUpload(req, (stream) => writeFile(stream, stagingPath))
+    stagingStored = true
 
-    // Extract manifest from disk (pipeline enforces decompression limits).
-    const manifest = await extractManifest(createReadStream(tmpTarball))
+    // Extract manifest by reading the staged object back (pipeline enforces decompression limits).
+    const { body: manifestStream } = await readFile(stagingPath)
+    const manifest = await extractManifest(manifestStream)
     if (manifest.name !== name) {
       throw httpError(400, `package name mismatch: URL says "${name}" but package.json says "${manifest.name}"`)
     }
@@ -265,11 +259,12 @@ router.post('/:name/versions', async (req, res, next) => {
       throw httpError(409, 'this artefact is managed by a remote registry')
     }
 
-    // Store tarball (streamed from disk, no in-memory buffering).
+    // Promote staging to final path (server-side copy on S3, rename on fs).
     const archSuffix = architecture ? `_${architecture}` : ''
     const tarballPath = `${name}/${majorVersion}/${manifest.version}${archSuffix}.tgz`
-    await writeFile(createReadStream(tmpTarball), tarballPath)
-    storedTarballPath = tarballPath
+    await moveFile(stagingPath, tarballPath)
+    stagingStored = false
+    finalTarballPath = tarballPath
 
     // Upsert artefact
     const now = new Date().toISOString()
@@ -320,13 +315,10 @@ router.post('/:name/versions', async (req, res, next) => {
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     res.status(201).json({ artefact, version: { _id: versionId, version: manifest.version } })
   } catch (err) {
-    // If we wrote the file but failed to commit the DB row, clean it up.
-    if (storedTarballPath && !storedOk) {
-      await deleteFile(storedTarballPath).catch(() => {})
-    }
+    // Clean up any stored object depending on which step failed.
+    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
+    if (finalTarballPath && !storedOk) await deleteFile(finalTarballPath).catch(() => {})
     next(err)
-  } finally {
-    if (tmpDir) await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
   }
 })
 
@@ -403,7 +395,8 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
 // services that previously managed their plugins locally can upload to the registry
 // to switch to the new centralized mode.
 router.post('/file/:name', async (req, res, next) => {
-  let tmpDir: string | undefined
+  const stagingPath = `_staging/${randomUUID()}.bin`
+  let stagingStored = false
   let newFilePath: string | undefined
   let storedOk = false
   try {
@@ -425,9 +418,10 @@ router.post('/file/:name', async (req, res, next) => {
       throw httpError(409, 'this artefact is managed by a remote registry')
     }
 
-    tmpDir = await createUploadTmpDir()
-    const tmpFile = join(tmpDir, 'upload.bin')
-    const fields = await streamFileUpload(req, tmpFile)
+    // Stream the multipart file straight into the configured storage at a
+    // staging path — no local fs tmp needed even for the S3 backend.
+    const fields = await streamFileUpload(req, (stream) => writeFile(stream, stagingPath))
+    stagingStored = true
 
     // Parse optional JSON fields with explicit 400 on malformed input.
     const title = fields.title ? parseLocalizedField(fields.title, 'title') : undefined
@@ -445,7 +439,8 @@ router.post('/file/:name', async (req, res, next) => {
     // Namespace new writes with a random suffix so a failed delete of the
     // old file doesn't clobber the fresh one.
     const filePath = `files/${name}/${randomUUID()}-${fileName}`
-    await writeFile(createReadStream(tmpFile), filePath)
+    await moveFile(stagingPath, filePath)
+    stagingStored = false
     newFilePath = filePath
 
     const now = new Date().toISOString()
@@ -483,12 +478,9 @@ router.post('/file/:name', async (req, res, next) => {
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     res.status(201).json({ artefact })
   } catch (err) {
-    if (newFilePath && !storedOk) {
-      await deleteFile(newFilePath).catch(() => {})
-    }
+    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
+    if (newFilePath && !storedOk) await deleteFile(newFilePath).catch(() => {})
     next(err)
-  } finally {
-    if (tmpDir) await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
   }
 })
 
@@ -536,9 +528,12 @@ router.get('/:id/download', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// Helper: stream a multipart upload containing a tarball to disk, collecting
+// Helper: stream a multipart upload containing a tarball to a caller-provided
+// sink (typically the configured files-storage backend), collecting the
 // `architecture` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.
-function streamTarballUpload (req: import('express').Request, destPath: string): Promise<{ architecture?: string }> {
+type StreamWriter = (stream: Readable) => Promise<void>
+
+function streamTarballUpload (req: import('express').Request, writer: StreamWriter): Promise<{ architecture?: string }> {
   return new Promise((resolve, reject) => {
     let settled = false
     const settle = (err: Error | null, result?: { architecture?: string }) => {
@@ -575,12 +570,12 @@ function streamTarballUpload (req: import('express').Request, destPath: string):
       fileSeen = true
 
       stream.on('limit', () => {
-        settle(httpError(413, `upload exceeds ${MAX_UPLOAD_BYTES} bytes`))
-        stream.unpipe()
+        // Destroy the source so the backend upload fails and aborts cleanly.
+        stream.destroy(httpError(413, `upload exceeds ${MAX_UPLOAD_BYTES} bytes`))
         req.unpipe(busboy)
       })
 
-      pendingWrite = pipeline(stream, createWriteStream(destPath)).catch((err) => {
+      pendingWrite = writer(stream).catch((err) => {
         settle(err)
       })
     })
@@ -602,9 +597,9 @@ function streamTarballUpload (req: import('express').Request, destPath: string):
   })
 }
 
-// Helper: stream a multipart upload containing a raw file to disk,
-// collecting all text fields. Enforces MAX_UPLOAD_BYTES.
-function streamFileUpload (req: import('express').Request, destPath: string): Promise<Record<string, string>> {
+// Helper: stream a multipart upload containing a raw file to a caller-provided
+// sink, collecting all text fields. Enforces MAX_UPLOAD_BYTES.
+function streamFileUpload (req: import('express').Request, writer: StreamWriter): Promise<Record<string, string>> {
   return new Promise((resolve, reject) => {
     let settled = false
     const settle = (err: Error | null, result?: Record<string, string>) => {
@@ -642,12 +637,11 @@ function streamFileUpload (req: import('express').Request, destPath: string): Pr
       if (!fields.fileName && info.filename) fields.fileName = info.filename
 
       stream.on('limit', () => {
-        settle(httpError(413, `upload exceeds ${MAX_UPLOAD_BYTES} bytes`))
-        stream.unpipe()
+        stream.destroy(httpError(413, `upload exceeds ${MAX_UPLOAD_BYTES} bytes`))
         req.unpipe(busboy)
       })
 
-      pendingWrite = pipeline(stream, createWriteStream(destPath)).catch((err) => {
+      pendingWrite = writer(stream).catch((err) => {
         settle(err)
       })
     })

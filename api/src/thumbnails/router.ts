@@ -1,30 +1,21 @@
 import { Router } from 'express'
-import { createWriteStream } from 'node:fs'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { pipeline } from 'node:stream/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import Busboy from 'busboy'
 import { Binary } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import mongo from '#mongo'
-import config from '#config'
 import { resizeThumbnail } from './service.ts'
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
-const createUploadTmpDir = async () => {
-  const base = config.tmpDir || tmpdir()
-  await mkdir(base, { recursive: true })
-  return mkdtemp(join(base, 'registry-thumbnail-'))
-}
-
-function streamSingleFileUpload (req: import('express').Request, destPath: string): Promise<{ mimetype: string }> {
+// Buffers the single uploaded file in memory (capped at MAX_UPLOAD_BYTES).
+// Thumbnails are small and need to be handed to Sharp as a buffer anyway,
+// so we skip any filesystem tmp step even for the fs backend.
+function bufferSingleFileUpload (req: import('express').Request): Promise<{ data: Buffer, mimetype: string }> {
   return new Promise((resolve, reject) => {
     let settled = false
-    const settle = (err: Error | null, result?: { mimetype: string }) => {
+    const settle = (err: Error | null, result?: { data: Buffer, mimetype: string }) => {
       if (settled) return
       settled = true
       if (err) reject(err)
@@ -33,7 +24,7 @@ function streamSingleFileUpload (req: import('express').Request, destPath: strin
 
     let fileSeen = false
     let mimetype = 'application/octet-stream'
-    let pendingWrite: Promise<void> | null = null
+    const chunks: Buffer[] = []
 
     const busboy = Busboy({
       headers: req.headers,
@@ -44,20 +35,19 @@ function streamSingleFileUpload (req: import('express').Request, destPath: strin
       if (fileSeen) { stream.resume(); return }
       fileSeen = true
       mimetype = info.mimeType || mimetype
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk))
       stream.on('limit', () => {
         settle(httpError(413, `upload exceeds ${MAX_UPLOAD_BYTES} bytes`))
-        stream.unpipe()
         req.unpipe(busboy)
       })
-      pendingWrite = pipeline(stream, createWriteStream(destPath)).catch((err) => settle(err))
+      stream.on('error', (err) => settle(err))
     })
 
     busboy.on('error', (err) => settle(err as Error))
-    busboy.on('finish', async () => {
+    busboy.on('finish', () => {
       if (!fileSeen) return settle(httpError(400, 'no file provided in upload'))
-      try { if (pendingWrite) await pendingWrite } catch (err) { return settle(err as Error) }
       if (settled) return
-      settle(null, { mimetype })
+      settle(null, { data: Buffer.concat(chunks), mimetype })
     })
 
     req.on('aborted', () => settle(httpError(400, 'upload aborted')))
@@ -69,7 +59,6 @@ function streamSingleFileUpload (req: import('express').Request, destPath: strin
 export const artefactThumbnailRouter = Router({ mergeParams: true })
 
 artefactThumbnailRouter.post('/', async (req, res, next) => {
-  let tmpDir: string | undefined
   try {
     await session.reqAdminMode(req)
 
@@ -77,13 +66,11 @@ artefactThumbnailRouter.post('/', async (req, res, next) => {
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     if (!artefact) throw httpError(404, 'artefact not found')
 
-    tmpDir = await createUploadTmpDir()
-    const tmpFile = join(tmpDir, 'upload.bin')
-    const { mimetype } = await streamSingleFileUpload(req, tmpFile)
+    const { data, mimetype } = await bufferSingleFileUpload(req)
 
     let resized
     try {
-      resized = await resizeThumbnail({ filePath: tmpFile, mimetype })
+      resized = await resizeThumbnail({ data, mimetype })
     } catch (err: any) {
       if (err?.message === 'IMAGE_EXCEEDS_PIXEL_LIMIT') throw httpError(400, 'image exceeds maximum pixel limit')
       if (err?.message === 'INVALID_IMAGE_DIMENSIONS') throw httpError(400, 'invalid image')
@@ -117,9 +104,7 @@ artefactThumbnailRouter.post('/', async (req, res, next) => {
       { returnDocument: 'after' }
     )
     res.status(201).json(updated)
-  } catch (err) { next(err) } finally {
-    if (tmpDir) await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
-  }
+  } catch (err) { next(err) }
 })
 
 artefactThumbnailRouter.delete('/', async (req, res, next) => {

@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, unlink, stat, rm } from 'node:fs/promises'
+import { mkdir, unlink, stat, rm, rename } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import type { Readable } from 'node:stream'
@@ -44,6 +44,13 @@ export class FsBackend implements FileBackend {
     } catch {
       return false
     }
+  }
+
+  async move (srcPath: string, dstPath: string) {
+    const src = resolvePath(basePath(), srcPath)
+    const dst = resolvePath(basePath(), dstPath)
+    await mkdir(dirname(dst), { recursive: true })
+    await rename(src, dst)
   }
 
   async clean () {

@@ -3,7 +3,6 @@ export default {
   privateEventsUrl: undefined,
   mongoUrl: 'mongodb://localhost:27017/data-fair-registry',
   port: 8080,
-  tmpDir: '/tmp',
   dataDir: '/data',
   maxUploadBytes: 200 * 1024 * 1024 * 1024,
   filesStorage: 'fs',

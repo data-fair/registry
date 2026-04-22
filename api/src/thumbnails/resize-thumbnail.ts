@@ -1,7 +1,7 @@
 import sharp from 'sharp'
 
 export type ResizeInput = {
-  filePath: string
+  data: Buffer
   mimetype: string
 }
 
@@ -16,8 +16,8 @@ export type ResizeOutput = {
 export const TARGET_WIDTH = 400
 export const MAX_PIXELS = 50_000_000 // 50 megapixels
 
-export default async function resizeThumbnail ({ filePath }: ResizeInput): Promise<ResizeOutput> {
-  const image = sharp(filePath, { failOn: 'error' })
+export default async function resizeThumbnail ({ data }: ResizeInput): Promise<ResizeOutput> {
+  const image = sharp(data, { failOn: 'error' })
   const metadata = await image.metadata()
   const srcWidth = metadata.width ?? 0
   const srcHeight = metadata.height ?? 0

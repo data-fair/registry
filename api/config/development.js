@@ -8,7 +8,6 @@ export default {
   privateDirectoryUrl: `http://localhost:${process.env.SD_PORT}`,
   privateEventsUrl: `http://localhost:${process.env.EVENTS_PORT}`,
   mongoUrl: `mongodb://localhost:${process.env.MONGO_PORT}/data-fair-registry-development`,
-  tmpDir: './tmp',
   dataDir: './data',
   observer: {
     active: false

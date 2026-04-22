@@ -12,5 +12,6 @@ export interface FileBackend {
   getDownloadUrl (path: string, opts: { filename: string }): Promise<string | null>
   delete (path: string): Promise<void>
   exists (path: string): Promise<boolean>
+  move (srcPath: string, dstPath: string): Promise<void>
   clean (): Promise<void>
 }
