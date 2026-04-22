@@ -76,22 +76,6 @@ export class RegistryMongo {
         artefact: [{ artefactId: 1 }, { unique: true }]
       }
     })
-    // Drop legacy string thumbnail URLs left over from the old schema.
-    await this.artefacts.updateMany(
-      { thumbnail: { $type: 'string' } },
-      { $unset: { thumbnail: '' } }
-    )
-    // Rename legacy 'federation' api-key type to 'read'.
-    await mongoLib.db.collection('api-keys').updateMany(
-      { type: 'federation' },
-      { $set: { type: 'read' } }
-    )
-    // Remove legacy API keys that lack a shortId — they use the old hash
-    // format and are no longer authenticatable after the HMAC migration.
-    const { deletedCount } = await mongoLib.db.collection('api-keys').deleteMany({ shortId: { $exists: false } })
-    if (deletedCount) {
-      console.warn(`[migration] Deleted ${deletedCount} legacy API key(s) (old hash format, no longer valid)`)
-    }
   }
 }
 

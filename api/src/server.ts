@@ -37,7 +37,7 @@ export const start = async () => {
   // Daily sync of all remote registries
   syncTimer = setInterval(() => {
     syncAllRemoteRegistries().catch(err => {
-      console.error('[sync] Daily sync error:', err.message || err)
+      internalError('daily-sync', err)
     })
   }, 24 * 60 * 60 * 1000)
 
