@@ -4,6 +4,10 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
   CopyObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCopyCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
   paginateListObjectsV2,
   type S3ClientConfig
 } from '@aws-sdk/client-s3'
@@ -110,15 +114,74 @@ export class S3Backend implements FileBackend {
   }
 
   async move (srcPath: string, dstPath: string) {
-    await this.dataClient.send(new CopyObjectCommand({
-      Bucket: config.s3!.bucket,
-      CopySource: `${config.s3!.bucket}/${encodeURI(srcPath)}`,
-      Key: dstPath
-    }))
+    await this.copy(srcPath, dstPath)
     await this.metadataClient.send(new DeleteObjectCommand({
       Bucket: config.s3!.bucket,
       Key: srcPath
     }))
+  }
+
+  // S3 CopyObject fails with "copy source larger than maximum allowable size"
+  // above 5GB — fall back to multipart UploadPartCopy past that threshold.
+  private async copy (srcPath: string, dstPath: string) {
+    const bucket = config.s3!.bucket
+    const copySource = `${bucket}/${encodeURI(srcPath)}`
+
+    const head = await this.metadataClient.send(new HeadObjectCommand({ Bucket: bucket, Key: srcPath }))
+    const fileSize = head.ContentLength!
+
+    const maxSingleCopySize = 5 * 1024 * 1024 * 1024
+    if (fileSize < maxSingleCopySize) {
+      await this.dataClient.send(new CopyObjectCommand({
+        Bucket: bucket,
+        CopySource: copySource,
+        Key: dstPath
+      }))
+      return
+    }
+
+    const multipartChunkSize = 100 * 1024 * 1024
+    const totalParts = Math.ceil(fileSize / multipartChunkSize)
+    const createResp = await this.dataClient.send(new CreateMultipartUploadCommand({
+      Bucket: bucket,
+      Key: dstPath
+    }))
+    const uploadId = createResp.UploadId!
+
+    try {
+      const copyParts = []
+      for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
+        const start = (partNumber - 1) * multipartChunkSize
+        const end = Math.min(partNumber * multipartChunkSize, fileSize) - 1
+        copyParts.push(this.dataClient.send(new UploadPartCopyCommand({
+          Bucket: bucket,
+          Key: dstPath,
+          CopySource: copySource,
+          CopySourceRange: `bytes=${start}-${end}`,
+          UploadId: uploadId,
+          PartNumber: partNumber
+        })))
+      }
+      const responses = await Promise.all(copyParts)
+      await this.dataClient.send(new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: dstPath,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: responses.map((r, i) => ({
+            ETag: r.CopyPartResult!.ETag,
+            PartNumber: i + 1
+          }))
+        }
+      }))
+    } catch (err) {
+      await this.dataClient.send(new AbortMultipartUploadCommand({
+        Bucket: bucket,
+        Key: dstPath,
+        UploadId: uploadId
+      })).catch(() => {})
+      throw err
+    }
   }
 
   async clean () {
