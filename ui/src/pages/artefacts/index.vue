@@ -54,7 +54,7 @@
             density="compact"
             mandatory
           >
-            <v-btn value="updatedAt">
+            <v-btn value="dataUpdatedAt">
               {{ t('recent') }}
             </v-btn>
             <v-btn value="name">
@@ -76,7 +76,7 @@
               <th>{{ t('name') }}</th>
               <th>{{ t('category') }}</th>
               <th>{{ t('version') }}</th>
-              <th>{{ t('updatedAt') }}</th>
+              <th>{{ t('dataUpdatedAt') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -100,7 +100,7 @@
                 </v-chip>
               </td>
               <td>{{ artefact.version || '-' }}</td>
-              <td>{{ dayjs(artefact.updatedAt).format('L LT') }}</td>
+              <td>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</td>
             </tr>
           </tbody>
         </v-table>
@@ -243,7 +243,7 @@ fr:
   recent: "R\xE9cents"
   name: Nom
   version: Version
-  updatedAt: "Mis \xE0 jour"
+  dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
   total: artefact(s)
   createKey: "Cr\xE9er une cl\xE9 de lecture"
   keyName: "Nom de la cl\xE9"
@@ -262,7 +262,7 @@ en:
   recent: Recent
   name: Name
   version: Version
-  updatedAt: Updated
+  dataUpdatedAt: Data updated
   total: artefact(s)
   createKey: Create read key
   keyName: Key name
@@ -301,7 +301,7 @@ const tab = ref('browse')
 // --- Browse tab state ---
 const q = useStringSearchParam('q')
 const category = useStringSearchParam('category')
-const sort = ref('updatedAt')
+const sort = ref('dataUpdatedAt')
 const pageSize = 20
 const page = ref(1)
 

@@ -12,7 +12,7 @@ import mongo from '#mongo'
 import config from '#config'
 import { authenticateApiKey, tryAuthenticateReadKey } from '../auth.ts'
 import { artefactAccessFilter, artefactAccessFilterForAccount, assertDownloadAccess, assertDownloadAccessForAccount } from '../access.ts'
-import { writeFile, readFile, getDownloadUrl, deleteFile, moveFile } from '../files-storage/index.ts'
+import { writeFile, readFile, getDownloadUrl, deleteFile, moveFile, fileStats } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
@@ -92,7 +92,7 @@ router.get('/', async (req, res, next) => {
     }
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
-    const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { updatedAt: -1 }
+    const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { dataUpdatedAt: -1 }
 
     // Text search on name
     if (req.query.q) {
@@ -265,6 +265,7 @@ router.post('/:name/versions', async (req, res, next) => {
     await moveFile(stagingPath, tarballPath)
     stagingStored = false
     finalTarballPath = tarballPath
+    const { size } = await fileStats(tarballPath)
 
     // Upsert artefact
     const now = new Date().toISOString()
@@ -278,7 +279,8 @@ router.post('/:name/versions', async (req, res, next) => {
           category,
           ...(manifest.processingConfigSchema ? { processingConfigSchema: manifest.processingConfigSchema } : {}),
           ...(manifest.applicationConfigSchema ? { applicationConfigSchema: manifest.applicationConfigSchema } : {}),
-          updatedAt: now
+          updatedAt: now,
+          dataUpdatedAt: now
         },
         $setOnInsert: {
           _id: artefactId,
@@ -302,6 +304,7 @@ router.post('/:name/versions', async (req, res, next) => {
       ...(architecture ? { architecture } : {}),
       ...semverParts,
       tarballPath,
+      size,
       uploadedAt: now,
       uploadedBy: apiKey
         ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
@@ -442,6 +445,7 @@ router.post('/file/:name', async (req, res, next) => {
     await moveFile(stagingPath, filePath)
     stagingStored = false
     newFilePath = filePath
+    const { size } = await fileStats(filePath)
 
     const now = new Date().toISOString()
     await mongo.artefacts.updateOne(
@@ -450,13 +454,15 @@ router.post('/file/:name', async (req, res, next) => {
         $set: {
           filePath,
           fileName,
+          size,
           category,
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
           uploadedBy: apiKey
             ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
             : { internal: true },
-          updatedAt: now
+          updatedAt: now,
+          dataUpdatedAt: now
         },
         $setOnInsert: {
           _id: artefactId,

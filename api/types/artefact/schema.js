@@ -149,6 +149,7 @@ export default {
     origin: { type: 'string', readOnly: true },
     filePath: { type: 'string', readOnly: true },
     fileName: { type: 'string', readOnly: true },
+    size: { type: 'integer', readOnly: true },
     uploadedBy: {
       type: 'object',
       readOnly: true,
@@ -161,6 +162,7 @@ export default {
       }
     },
     createdAt: { type: 'string', format: 'date-time', readOnly: true },
-    updatedAt: { type: 'string', format: 'date-time', readOnly: true }
+    updatedAt: { type: 'string', format: 'date-time', readOnly: true },
+    dataUpdatedAt: { type: 'string', format: 'date-time', readOnly: true }
   }
 }

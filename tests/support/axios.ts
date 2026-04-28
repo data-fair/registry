@@ -26,3 +26,23 @@ export const clean = async () => {
 export const setArtefactOrigin = async (artefactId: string, origin: string) => {
   await anonymousAx.put(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/artefacts/${encodeURIComponent(artefactId)}/origin`, { origin })
 }
+
+// TODO: remove with backfill-size upgrade
+export const resetSize = async () => {
+  await anonymousAx.post(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/backfill-size/reset`)
+}
+
+// TODO: remove with backfill-size upgrade
+export const runBackfillSize = async () => {
+  await anonymousAx.post(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/backfill-size/run`)
+}
+
+// TODO: remove with backfill-data-updated-at upgrade
+export const resetDataUpdatedAt = async () => {
+  await anonymousAx.post(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/backfill-data-updated-at/reset`)
+}
+
+// TODO: remove with backfill-data-updated-at upgrade
+export const runBackfillDataUpdatedAt = async () => {
+  await anonymousAx.post(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/backfill-data-updated-at/run`)
+}

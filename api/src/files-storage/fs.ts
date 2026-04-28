@@ -46,6 +46,11 @@ export class FsBackend implements FileBackend {
     }
   }
 
+  async stats (path: string) {
+    const { size, mtime } = await stat(resolvePath(basePath(), path))
+    return { size, lastModified: mtime }
+  }
+
   async move (srcPath: string, dstPath: string) {
     const src = resolvePath(basePath(), srcPath)
     const dst = resolvePath(basePath(), dstPath)

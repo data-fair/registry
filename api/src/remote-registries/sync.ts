@@ -39,6 +39,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
       semverPatch: rv.semverPatch,
       ...(rv.semverPrerelease ? { semverPrerelease: rv.semverPrerelease } : {}),
       tarballPath: rv.tarballPath,
+      ...(typeof rv.size === 'number' ? { size: rv.size } : {}),
       uploadedAt: rv.uploadedAt,
       ...(rv.uploadedBy ? { uploadedBy: rv.uploadedBy } : {})
     })
@@ -68,7 +69,8 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         ...(remoteArtefact.processingConfigSchema ? { processingConfigSchema: remoteArtefact.processingConfigSchema } : {}),
         ...(remoteArtefact.applicationConfigSchema ? { applicationConfigSchema: remoteArtefact.applicationConfigSchema } : {}),
         origin: remoteUrl,
-        updatedAt: now
+        updatedAt: now,
+        dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
       },
       $setOnInsert: {
         _id: artefactId,
@@ -109,11 +111,13 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
         $set: {
           filePath,
           fileName,
+          ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
           category: remoteArtefact.category,
           ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
           ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
           origin: remoteUrl,
-          updatedAt: now
+          updatedAt: now,
+          dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
         },
         $setOnInsert: {
           _id: artefactId,

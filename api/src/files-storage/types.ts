@@ -6,12 +6,18 @@ export interface ReadStreamResult {
   lastModified: Date
 }
 
+export interface FileStats {
+  size: number
+  lastModified: Date
+}
+
 export interface FileBackend {
   writeStream (stream: Readable, path: string): Promise<void>
   readStream (path: string, ifModifiedSince?: string): Promise<ReadStreamResult>
   getDownloadUrl (path: string, opts: { filename: string }): Promise<string | null>
   delete (path: string): Promise<void>
   exists (path: string): Promise<boolean>
+  stats (path: string): Promise<FileStats>
   move (srcPath: string, dstPath: string): Promise<void>
   clean (): Promise<void>
 }

@@ -117,6 +117,14 @@ export class S3Backend implements FileBackend {
     }
   }
 
+  async stats (path: string) {
+    const head = await this.metadataClient.send(new HeadObjectCommand({
+      Bucket: config.s3!.bucket,
+      Key: path
+    }))
+    return { size: head.ContentLength!, lastModified: head.LastModified! }
+  }
+
   async move (srcPath: string, dstPath: string) {
     await this.copy(srcPath, dstPath)
     await this.metadataClient.send(new DeleteObjectCommand({

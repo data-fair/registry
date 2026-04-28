@@ -12,6 +12,8 @@ import { publicThumbnailsRouter } from './thumbnails/router.ts'
 import remoteRegistriesRouter from './remote-registries/router.ts'
 import mongo from '#mongo'
 import { cleanFiles } from './files-storage/index.ts'
+import { backfillSize } from './upgrades/backfill-size.ts'
+import { backfillDataUpdatedAt } from './upgrades/backfill-data-updated-at.ts'
 import config from '#config'
 
 export const app = express()
@@ -61,6 +63,35 @@ if (process.env.NODE_ENV === 'development') {
     } else {
       await mongo.artefacts.updateOne({ _id: req.params.id }, { $unset: { origin: '' } })
     }
+    res.send()
+  })
+
+  // TODO: remove with backfill-size upgrade
+  app.post('/api/test-env/backfill-size/reset', async (req, res) => {
+    assertReqInternal(req)
+    await mongo.artefacts.updateMany({}, { $unset: { size: '' } })
+    await mongo.versions.updateMany({}, { $unset: { size: '' } })
+    res.send()
+  })
+
+  // TODO: remove with backfill-size upgrade
+  app.post('/api/test-env/backfill-size/run', async (req, res) => {
+    assertReqInternal(req)
+    await backfillSize()
+    res.send()
+  })
+
+  // TODO: remove with backfill-data-updated-at upgrade
+  app.post('/api/test-env/backfill-data-updated-at/reset', async (req, res) => {
+    assertReqInternal(req)
+    await mongo.artefacts.updateMany({}, { $unset: { dataUpdatedAt: '' } })
+    res.send()
+  })
+
+  // TODO: remove with backfill-data-updated-at upgrade
+  app.post('/api/test-env/backfill-data-updated-at/run', async (req, res) => {
+    assertReqInternal(req)
+    await backfillDataUpdatedAt()
     res.send()
   })
 }

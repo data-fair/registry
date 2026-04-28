@@ -19,6 +19,7 @@
       <v-card-text>
         <v-row>
           <v-col
+            v-if="artefact.format !== 'file'"
             cols="12"
             sm="6"
             md="4"
@@ -29,6 +30,7 @@
             <div>{{ artefact.packageName }}</div>
           </v-col>
           <v-col
+            v-if="artefact.format !== 'file'"
             cols="12"
             sm="6"
             md="4"
@@ -39,6 +41,7 @@
             <div>{{ artefact.version }}</div>
           </v-col>
           <v-col
+            v-if="artefact.format !== 'file'"
             cols="12"
             sm="6"
             md="4"
@@ -47,6 +50,17 @@
               {{ t('licence') }}
             </div>
             <div>{{ artefact.licence || '-' }}</div>
+          </v-col>
+          <v-col
+            v-if="artefact.format === 'file'"
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <div class="text-medium-emphasis text-body-2">
+              {{ t('fileName') }}
+            </div>
+            <div>{{ artefact.fileName || '-' }}</div>
           </v-col>
           <v-col
             cols="12"
@@ -64,6 +78,17 @@
             </v-chip>
           </v-col>
           <v-col
+            v-if="artefact.format === 'file'"
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <div class="text-medium-emphasis text-body-2">
+              {{ t('size') }}
+            </div>
+            <div>{{ artefact.size != null ? formatBytes(artefact.size, locale) : '-' }}</div>
+          </v-col>
+          <v-col
             cols="12"
             sm="6"
             md="4"
@@ -72,6 +97,16 @@
               {{ t('created') }}
             </div>
             <div>{{ dayjs(artefact.createdAt).format('L LT') }}</div>
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <div class="text-medium-emphasis text-body-2">
+              {{ t('dataUpdated') }}
+            </div>
+            <div>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</div>
           </v-col>
           <v-col
             cols="12"
@@ -165,8 +200,38 @@
       </v-card-actions>
     </v-card>
 
-    <!-- Version list -->
-    <v-card class="mb-4">
+    <!-- File download (file format) -->
+    <v-card
+      v-if="artefact.format === 'file' && artefact.filePath"
+      class="mb-4"
+    >
+      <v-card-title>{{ t('download') }}</v-card-title>
+      <v-card-text>
+        <div class="d-flex align-center">
+          <span class="text-body-1 mr-4">{{ artefact.fileName || artefact.name }}</span>
+          <span
+            v-if="typeof artefact.size === 'number'"
+            class="text-medium-emphasis text-body-2 mr-4"
+          >
+            {{ formatBytes(artefact.size, locale) }}
+          </span>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :prepend-icon="mdiDownload"
+            :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/download`"
+          >
+            {{ t('download') }}
+          </v-btn>
+        </div>
+      </v-card-text>
+    </v-card>
+
+    <!-- Version list (npm only) -->
+    <v-card
+      v-if="artefact.format !== 'file'"
+      class="mb-4"
+    >
       <v-card-title>
         {{ t('versions') }}
         <span class="text-medium-emphasis text-body-2 ml-2">({{ versions.length }})</span>
@@ -176,7 +241,9 @@
           <tr>
             <th>{{ t('version') }}</th>
             <th>{{ t('architecture') }}</th>
+            <th>{{ t('size') }}</th>
             <th>{{ t('uploadedAt') }}</th>
+            <th />
           </tr>
         </thead>
         <tbody>
@@ -196,7 +263,16 @@
               </v-chip>
             </td>
             <td>{{ v.architecture || '-' }}</td>
+            <td>{{ v.size != null ? formatBytes(v.size, locale) : '-' }}</td>
             <td>{{ dayjs(v.uploadedAt).format('L LT') }}</td>
+            <td class="text-right">
+              <v-btn
+                :icon="mdiDownload"
+                size="small"
+                variant="text"
+                :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/versions/${v.version}/tarball`"
+              />
+            </td>
           </tr>
         </tbody>
       </v-table>
@@ -266,10 +342,14 @@ fr:
   latestVersion: Dernière version
   licence: Licence
   category: Catégorie
+  fileName: Nom du fichier
+  download: Télécharger
   created: Créé le
   updated: Mis à jour le
+  dataUpdated: Données mises à jour le
   editableMetadata: Métadonnées éditables
   save: Enregistrer
+  size: Taille
   versions: Versions
   version: Version
   architecture: Architecture
@@ -297,10 +377,14 @@ en:
   latestVersion: Latest Version
   licence: Licence
   category: Category
+  fileName: File Name
+  download: Download
   created: Created
   updated: Updated
+  dataUpdated: Data updated
   editableMetadata: Editable Metadata
   save: Save
+  size: Size
   versions: Versions
   version: Version
   architecture: Architecture
@@ -320,7 +404,7 @@ en:
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
-import { mdiImage } from '@mdi/js'
+import { mdiImage, mdiDownload } from '@mdi/js'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
 import type { Artefact, Version } from '#api/types'

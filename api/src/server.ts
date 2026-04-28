@@ -9,6 +9,8 @@ import { app } from './app.ts'
 import config from '#config'
 import mongo from '#mongo'
 import { syncAllRemoteRegistries } from './remote-registries/sync.ts'
+import { backfillSize } from './upgrades/backfill-size.ts'
+import { backfillDataUpdatedAt } from './upgrades/backfill-data-updated-at.ts'
 
 const server = createServer(app)
 const httpTerminator = createHttpTerminator({ server })
@@ -45,6 +47,11 @@ export const start = async () => {
       internalError('daily-sync', err)
     })
   }, 24 * 60 * 60 * 1000)
+
+  // TODO: remove with backfill-size upgrade
+  backfillSize().catch(err => internalError('backfill-size', err))
+  // TODO: remove with backfill-data-updated-at upgrade
+  backfillDataUpdatedAt().catch(err => internalError('backfill-data-updated-at', err))
 
   console.log(`API server listening on port ${config.port}`)
 }

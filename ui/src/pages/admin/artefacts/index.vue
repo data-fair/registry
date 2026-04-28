@@ -43,7 +43,7 @@
           density="compact"
           mandatory
         >
-          <v-btn value="updatedAt">
+          <v-btn value="dataUpdatedAt">
             {{ t('recent') }}
           </v-btn>
           <v-btn value="name">
@@ -66,7 +66,7 @@
             <th>{{ t('category') }}</th>
             <th>{{ t('version') }}</th>
             <th>{{ t('visibility') }}</th>
-            <th>{{ t('updatedAt') }}</th>
+            <th>{{ t('dataUpdatedAt') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -105,7 +105,7 @@
                 size="small"
               />
             </td>
-            <td>{{ dayjs(artefact.updatedAt).format('L LT') }}</td>
+            <td>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</td>
           </tr>
         </tbody>
       </v-table>
@@ -134,7 +134,7 @@ fr:
   name: Nom
   version: Version
   visibility: Visibilité
-  updatedAt: Mis à jour
+  dataUpdatedAt: Données mises à jour
   total: artefact(s)
   mirror: miroir
 en:
@@ -146,7 +146,7 @@ en:
   name: Name
   version: Version
   visibility: Visibility
-  updatedAt: Updated
+  dataUpdatedAt: Data updated
   total: artefact(s)
   mirror: mirror
 </i18n>
@@ -175,7 +175,7 @@ useBreadcrumbs().setForPage(() => [
 
 const q = useStringSearchParam('q')
 const category = useStringSearchParam('category')
-const sort = ref('updatedAt')
+const sort = ref('dataUpdatedAt')
 const pageSize = 20
 const page = ref(1)
 

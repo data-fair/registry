@@ -12,6 +12,12 @@
       <v-card-text>
         <div class="d-flex align-center">
           <span class="text-body-1 mr-4">{{ artefact.fileName || artefact.name }}</span>
+          <span
+            v-if="typeof artefact.size === 'number'"
+            class="text-medium-emphasis text-body-2 mr-4"
+          >
+            {{ formatBytes(artefact.size, locale) }}
+          </span>
           <v-btn
             color="primary"
             variant="flat"
@@ -33,6 +39,12 @@
       <v-card-text>
         <div class="d-flex align-center">
           <span class="text-body-1 mr-4">{{ latestVersion?.version }}</span>
+          <span
+            v-if="typeof latestVersion?.size === 'number'"
+            class="text-medium-emphasis text-body-2 mr-4"
+          >
+            {{ formatBytes(latestVersion.size, locale) }}
+          </span>
           <v-btn
             color="primary"
             variant="flat"
@@ -141,6 +153,7 @@
           <tr>
             <th>{{ t('version') }}</th>
             <th>{{ t('architecture') }}</th>
+            <th>{{ t('size') }}</th>
             <th>{{ t('uploadedAt') }}</th>
             <th v-if="hasGrant" />
           </tr>
@@ -162,6 +175,7 @@
               </v-chip>
             </td>
             <td>{{ v.architecture || '-' }}</td>
+            <td>{{ v.size != null ? formatBytes(v.size, locale) : '-' }}</td>
             <td>{{ dayjs(v.uploadedAt).format('L LT') }}</td>
             <td
               v-if="hasGrant"
@@ -197,6 +211,7 @@ fr:
   versions: Versions
   version: Version
   architecture: Architecture
+  size: Taille
   uploadedAt: "T\xE9l\xE9vers\xE9 le"
   downloadLatest: "T\xE9l\xE9charger la derni\xE8re version"
   download: "T\xE9l\xE9charger"
@@ -213,6 +228,7 @@ en:
   versions: Versions
   version: Version
   architecture: Architecture
+  size: Size
   uploadedAt: Uploaded
   downloadLatest: Download Latest
   download: Download
