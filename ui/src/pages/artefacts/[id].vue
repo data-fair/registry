@@ -127,6 +127,26 @@
             </v-chip>
           </v-col>
           <v-col
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <div class="text-medium-emphasis text-body-2">
+              {{ t('size') }}
+            </div>
+            <div>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</div>
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <div class="text-medium-emphasis text-body-2">
+              {{ t('dataUpdatedAt') }}
+            </div>
+            <div>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</div>
+          </v-col>
+          <v-col
             v-if="description"
             cols="12"
           >
@@ -212,6 +232,7 @@ fr:
   version: Version
   architecture: Architecture
   size: Taille
+  dataUpdatedAt: "Donn\xE9es mises \xE0 jour le"
   uploadedAt: "T\xE9l\xE9vers\xE9 le"
   downloadLatest: "T\xE9l\xE9charger la derni\xE8re version"
   download: "T\xE9l\xE9charger"
@@ -229,6 +250,7 @@ en:
   version: Version
   architecture: Architecture
   size: Size
+  dataUpdatedAt: Data updated
   uploadedAt: Uploaded
   downloadLatest: Download Latest
   download: Download

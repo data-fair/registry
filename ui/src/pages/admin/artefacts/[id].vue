@@ -78,7 +78,6 @@
             </v-chip>
           </v-col>
           <v-col
-            v-if="artefact.format === 'file'"
             cols="12"
             sm="6"
             md="4"
@@ -86,7 +85,7 @@
             <div class="text-medium-emphasis text-body-2">
               {{ t('size') }}
             </div>
-            <div>{{ artefact.size != null ? formatBytes(artefact.size, locale) : '-' }}</div>
+            <div>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</div>
           </v-col>
           <v-col
             cols="12"

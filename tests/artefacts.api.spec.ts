@@ -34,6 +34,9 @@ test.describe('Artefacts', () => {
       expect(res.data.artefact.name).toBe('@test/processing-hello')
       expect(res.data.artefact.category).toBe('processing')
       expect(res.data.version.version).toBe('1.0.0')
+      // npm artefact mirrors the latest version's tarball size for prominent display
+      expect(typeof res.data.artefact.size).toBe('number')
+      expect(res.data.artefact.size).toBeGreaterThan(0)
 
       // Audit trail: version detail carries uploadedBy
       const admin = await superAdmin
@@ -43,6 +46,7 @@ test.describe('Artefacts', () => {
       expect(detail.data.uploadedBy.apiKeyName).toBe('test-upload')
       expect(typeof detail.data.size).toBe('number')
       expect(detail.data.size).toBeGreaterThan(0)
+      expect(detail.data.size).toBe(res.data.artefact.size)
     })
 
     test('upload without API key returns 401', async () => {
@@ -697,15 +701,19 @@ test.describe('File artefacts', () => {
 
       // Simulate pre-existing rows: drop size, then run upgrade
       await resetSize()
-      const beforeNpm = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401/versions/1.0.0')
-      expect(beforeNpm.data.size).toBeUndefined()
+      const beforeNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401/versions/1.0.0')
+      expect(beforeNpmVer.data.size).toBeUndefined()
+      const beforeNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401')
+      expect(beforeNpmArtefact.data.size).toBeUndefined()
       const beforeFile = await admin.get('/api/v1/artefacts/sized-file')
       expect(beforeFile.data.size).toBeUndefined()
 
       await runBackfillSize()
 
-      const afterNpm = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401/versions/1.0.0')
-      expect(afterNpm.data.size).toBe(tarballSize)
+      const afterNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401/versions/1.0.0')
+      expect(afterNpmVer.data.size).toBe(tarballSize)
+      const afterNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401')
+      expect(afterNpmArtefact.data.size).toBe(tarballSize)
       const afterFile = await admin.get('/api/v1/artefacts/sized-file')
       expect(afterFile.data.size).toBe(Buffer.byteLength('hello-world-bytes'))
     })

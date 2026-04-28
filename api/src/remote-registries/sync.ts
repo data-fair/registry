@@ -68,6 +68,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
         ...(remoteArtefact.processingConfigSchema ? { processingConfigSchema: remoteArtefact.processingConfigSchema } : {}),
         ...(remoteArtefact.applicationConfigSchema ? { applicationConfigSchema: remoteArtefact.applicationConfigSchema } : {}),
+        ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
         origin: remoteUrl,
         updatedAt: now,
         dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt

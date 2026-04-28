@@ -76,6 +76,7 @@
               <th>{{ t('name') }}</th>
               <th>{{ t('category') }}</th>
               <th>{{ t('version') }}</th>
+              <th>{{ t('size') }}</th>
               <th>{{ t('dataUpdatedAt') }}</th>
             </tr>
           </thead>
@@ -100,6 +101,7 @@
                 </v-chip>
               </td>
               <td>{{ artefact.version || '-' }}</td>
+              <td>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</td>
               <td>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</td>
             </tr>
           </tbody>
@@ -243,6 +245,7 @@ fr:
   recent: "R\xE9cents"
   name: Nom
   version: Version
+  size: Taille
   dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
   total: artefact(s)
   createKey: "Cr\xE9er une cl\xE9 de lecture"
@@ -262,6 +265,7 @@ en:
   recent: Recent
   name: Name
   version: Version
+  size: Size
   dataUpdatedAt: Data updated
   total: artefact(s)
   createKey: Create read key

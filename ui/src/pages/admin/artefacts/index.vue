@@ -65,6 +65,7 @@
             <th>{{ t('name') }}</th>
             <th>{{ t('category') }}</th>
             <th>{{ t('version') }}</th>
+            <th>{{ t('size') }}</th>
             <th>{{ t('visibility') }}</th>
             <th>{{ t('dataUpdatedAt') }}</th>
           </tr>
@@ -98,6 +99,7 @@
               </v-chip>
             </td>
             <td>{{ artefact.version }}</td>
+            <td>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</td>
             <td>
               <v-icon
                 :icon="artefact.public ? mdiEye : mdiEyeOff"
@@ -133,6 +135,7 @@ fr:
   recent: Récents
   name: Nom
   version: Version
+  size: Taille
   visibility: Visibilité
   dataUpdatedAt: Données mises à jour
   total: artefact(s)
@@ -145,6 +148,7 @@ en:
   recent: Recent
   name: Name
   version: Version
+  size: Size
   visibility: Visibility
   dataUpdatedAt: Data updated
   total: artefact(s)

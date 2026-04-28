@@ -279,6 +279,7 @@ router.post('/:name/versions', async (req, res, next) => {
           category,
           ...(manifest.processingConfigSchema ? { processingConfigSchema: manifest.processingConfigSchema } : {}),
           ...(manifest.applicationConfigSchema ? { applicationConfigSchema: manifest.applicationConfigSchema } : {}),
+          size,
           updatedAt: now,
           dataUpdatedAt: now
         },
