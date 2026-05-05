@@ -97,6 +97,41 @@ test.describe('resolveVersionQuery', () => {
     const { sort } = resolveVersionQuery('a@1', '1.2.3')
     expect(sort).toEqual({ semverMajor: -1, semverMinor: -1, semverPatch: -1 })
   })
+
+  test('no architecture: no fallback filter', () => {
+    const result = resolveVersionQuery('a@1', '1.2.3')
+    expect(result.fallbackFilter).toBeUndefined()
+  })
+
+  test('with architecture: primary filter narrows to that arch, fallback matches noarch', () => {
+    const { filter, fallbackFilter } = resolveVersionQuery('a@1', '1.2.3', 'arm64')
+    expect(filter).toMatchObject({ artefactId: 'a@1', version: '1.2.3', architecture: 'arm64' })
+    expect(fallbackFilter).toMatchObject({ artefactId: 'a@1', version: '1.2.3', architecture: { $exists: false } })
+  })
+
+  test('with architecture and minor selector: arch is added to both filters', () => {
+    const { filter, fallbackFilter } = resolveVersionQuery('a@1', '1.2', 'x64')
+    expect(filter).toMatchObject({
+      artefactId: 'a@1',
+      semverMajor: 1,
+      semverMinor: 2,
+      semverPrerelease: { $exists: false },
+      architecture: 'x64'
+    })
+    expect(fallbackFilter).toMatchObject({
+      artefactId: 'a@1',
+      semverMajor: 1,
+      semverMinor: 2,
+      semverPrerelease: { $exists: false },
+      architecture: { $exists: false }
+    })
+  })
+
+  test('with architecture and prerelease selector: arch is added to both filters', () => {
+    const { filter, fallbackFilter } = resolveVersionQuery('a@1', '1.0.0-beta.1', 'arm64')
+    expect(filter).toMatchObject({ version: '1.0.0-beta.1', architecture: 'arm64' })
+    expect(fallbackFilter).toMatchObject({ version: '1.0.0-beta.1', architecture: { $exists: false } })
+  })
 })
 
 test.describe('extractManifest', () => {

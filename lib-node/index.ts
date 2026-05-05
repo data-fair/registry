@@ -3,10 +3,17 @@ import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, rename, stat, utimes } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
+import { arch as defaultArch } from 'node:process'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import type { Readable } from 'node:stream'
+
+export interface Account {
+  type: 'user' | 'organization'
+  id: string
+  department?: string
+}
 
 export interface EnsureArtefactOpts {
   registryUrl: string
@@ -14,6 +21,24 @@ export interface EnsureArtefactOpts {
   artefactId: string
   version: string
   cacheDir: string
+  /**
+   * Architecture to request (e.g. 'arm64', 'x64'). Defaults to the running
+   * Node process arch (`process.arch`). Pass an empty string to opt out and
+   * leave selection up to the registry (legacy behaviour).
+   *
+   * Registry resolution semantics: an arch-tagged tarball is preferred; if no
+   * tarball matches the requested arch, the registry falls back to a tarball
+   * uploaded with no architecture (noarch). If neither exists, the call
+   * returns 404.
+   */
+  architecture?: string
+  /**
+   * When set, the registry validates that this account has access to the
+   * artefact (public OR explicit privateAccess grant). Combined with
+   * `secretKey`, this lets internal services act on behalf of an account
+   * without bypassing access control.
+   */
+  account?: Account
 }
 
 export interface EnsureArtefactResult {
@@ -24,37 +49,43 @@ export interface EnsureArtefactResult {
 
 interface CacheMeta {
   version: string
+  architecture?: string
 }
 
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
-  const ax = axiosBuilder({
-    baseURL: opts.registryUrl,
-    headers: { 'x-secret-key': opts.secretKey }
-  })
+  const architecture = opts.architecture === undefined ? defaultArch : (opts.architecture || undefined)
+  const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
+  if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
+  const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
 
   const encodedId = encodeURIComponent(opts.artefactId)
-  const versionRes = await ax.get(`/api/v1/artefacts/${encodedId}/versions/${opts.version}`)
+  const params = architecture ? { architecture } : undefined
+  const versionRes = await ax.get(`/api/v1/artefacts/${encodedId}/versions/${opts.version}`, { params })
   const resolvedVersion: string = versionRes.data.version
+  // The registry may have served a noarch fallback if no exact-arch match existed.
+  const resolvedArch: string | undefined = versionRes.data.architecture
 
   const artefactDir = join(opts.cacheDir, opts.artefactId)
   const metaPath = join(artefactDir, '.current-version.json')
-  const extractDir = join(artefactDir, resolvedVersion)
+  // Cache key includes arch suffix so two pods on different arches don't clobber each other.
+  const cacheKey = `${resolvedVersion}${resolvedArch ? '_' + resolvedArch : ''}`
+  const extractDir = join(artefactDir, cacheKey)
 
   // Check cache
   try {
     const raw = await readFile(metaPath, 'utf-8')
     const meta: CacheMeta = JSON.parse(raw)
-    if (meta.version === resolvedVersion) {
+    if (meta.version === resolvedVersion && (meta.architecture ?? undefined) === resolvedArch) {
       return { path: extractDir, version: resolvedVersion, downloaded: false }
     }
   } catch {
     // no cache or invalid metadata
   }
 
-  // Download tarball
+  // Download tarball — same arch query so the registry serves the same variant we just resolved
   const tarballRes = await ax.get(
     `/api/v1/artefacts/${encodedId}/versions/${resolvedVersion}/tarball`,
-    { responseType: 'stream' }
+    { responseType: 'stream', params }
   )
 
   // Extract to temp dir then atomic rename
@@ -74,15 +105,17 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   try {
     const raw = await readFile(metaPath, 'utf-8')
     const oldMeta: CacheMeta = JSON.parse(raw)
-    if (oldMeta.version !== resolvedVersion) {
-      await rm(join(artefactDir, oldMeta.version), { recursive: true, force: true })
+    const oldKey = `${oldMeta.version}${oldMeta.architecture ? '_' + oldMeta.architecture : ''}`
+    if (oldKey !== cacheKey) {
+      await rm(join(artefactDir, oldKey), { recursive: true, force: true })
     }
   } catch {
     // no old version to clean
   }
 
   // Write cache metadata
-  await writeFile(metaPath, JSON.stringify({ version: resolvedVersion } satisfies CacheMeta))
+  const meta: CacheMeta = { version: resolvedVersion, ...(resolvedArch ? { architecture: resolvedArch } : {}) }
+  await writeFile(metaPath, JSON.stringify(meta))
 
   return { path: extractDir, version: resolvedVersion, downloaded: true }
 }

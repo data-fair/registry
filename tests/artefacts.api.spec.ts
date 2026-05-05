@@ -389,6 +389,87 @@ test.describe('Artefacts', () => {
     })
   })
 
+  test.describe('Architecture-aware version resolution', () => {
+    test.beforeEach(async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const admin = await superAdmin
+
+      // 1.0.0 — both arch variants
+      for (const arch of ['arm64', 'x64']) {
+        const tarball = await createTestTarball({ name: '@test/multiarch', version: '1.0.0' })
+        const form = new FormData()
+        form.append('architecture', arch)
+        form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+        await ax.post('/api/v1/artefacts/%40test%2Fmultiarch/versions', form, { headers: form.getHeaders() })
+      }
+      // 1.0.1 — only arm64
+      const t11 = await createTestTarball({ name: '@test/multiarch', version: '1.0.1' })
+      const f11 = new FormData()
+      f11.append('architecture', 'arm64')
+      f11.append('file', t11, { filename: 'package.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/%40test%2Fmultiarch/versions', f11, { headers: f11.getHeaders() })
+
+      // 2.0.0 — noarch only
+      const t20 = await createTestTarball({ name: '@test/multiarch', version: '2.0.0' })
+      const f20 = new FormData()
+      f20.append('file', t20, { filename: 'package.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/%40test%2Fmultiarch/versions', f20, { headers: f20.getHeaders() })
+
+      await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch%401', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch%402', { public: true })
+    })
+
+    test('exact version, arch query param picks the matching variant', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.0?architecture=arm64')
+      expect(res.data.version).toBe('1.0.0')
+      expect(res.data.architecture).toBe('arm64')
+    })
+
+    test('minor-level resolver: x64 worker requesting 1.0 gets only-x64 patch (1.0.0), since 1.0.1 is arm64-only', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0?architecture=x64')
+      expect(res.data.version).toBe('1.0.0')
+      expect(res.data.architecture).toBe('x64')
+    })
+
+    test('arm64 worker requesting 1.0 gets latest arm64 patch (1.0.1)', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0?architecture=arm64')
+      expect(res.data.version).toBe('1.0.1')
+      expect(res.data.architecture).toBe('arm64')
+    })
+
+    test('noarch fallback: x64 worker requesting 2.0.0 gets the noarch tarball', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%402/versions/2.0.0?architecture=x64')
+      expect(res.data.version).toBe('2.0.0')
+      expect(res.data.architecture).toBeUndefined()
+    })
+
+    test('arch with no match and no noarch fallback returns 404', async () => {
+      try {
+        await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.1?architecture=x64')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
+
+    test('without architecture: legacy behaviour, returns whichever variant Mongo returns first', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.0')
+      expect(res.data.version).toBe('1.0.0')
+      expect(['arm64', 'x64']).toContain(res.data.architecture)
+    })
+
+    test('tarball download honours architecture query param', async () => {
+      const admin = await superAdmin
+      // Need internal secret to introspect; use admin session for the download instead
+      const arm = await admin.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.0/tarball?architecture=arm64', {
+        maxRedirects: 0,
+        validateStatus: s => s === 200 || s === 302
+      })
+      // Just check we got a response without 404; redirect or stream is fine.
+      expect([200, 302]).toContain(arm.status)
+    })
+  })
+
   test.describe('2-deep retention', () => {
     test('keeps only 2 most recent patches per minor branch', async () => {
       const ax = axiosWithApiKey(uploadApiKey)

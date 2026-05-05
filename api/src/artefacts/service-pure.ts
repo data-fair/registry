@@ -131,38 +131,49 @@ export const parseSemver = (version: string) => {
   }
 }
 
-export const resolveVersionQuery = (artefactId: string, versionParam: string): { filter: Filter<Version>, sort: Record<string, 1 | -1> } => {
+export const resolveVersionQuery = (
+  artefactId: string,
+  versionParam: string,
+  architecture?: string
+): { filter: Filter<Version>, fallbackFilter?: Filter<Version>, sort: Record<string, 1 | -1> } => {
   const sort: Record<string, 1 | -1> = { semverMajor: -1, semverMinor: -1, semverPatch: -1 }
-  const filter: Filter<Version> = { artefactId }
+  const baseFilter: Filter<Version> = { artefactId }
 
   // Check if it's a prerelease request (contains -)
   if (versionParam.includes('-')) {
     // Exact version match for prereleases
-    filter.version = versionParam
-    return { filter, sort }
+    baseFilter.version = versionParam
+  } else {
+    const parts = versionParam.split('.')
+    const asInt = (s: string) => {
+      const n = parseInt(s, 10)
+      if (!Number.isFinite(n) || String(n) !== s) throw httpError(400, `invalid version selector: ${versionParam}`)
+      return n
+    }
+    if (parts.length === 3) {
+      // Exact match: 1.2.3
+      baseFilter.version = versionParam
+    } else if (parts.length === 2) {
+      // Minor-level: 1.2 → latest 1.2.x (stable only)
+      baseFilter.semverMajor = asInt(parts[0])
+      baseFilter.semverMinor = asInt(parts[1])
+      baseFilter.semverPrerelease = { $exists: false }
+    } else if (parts.length === 1) {
+      // Major-level: 1 → latest 1.x.y (stable only)
+      baseFilter.semverMajor = asInt(parts[0])
+      baseFilter.semverPrerelease = { $exists: false }
+    }
   }
 
-  const parts = versionParam.split('.')
-  const asInt = (s: string) => {
-    const n = parseInt(s, 10)
-    if (!Number.isFinite(n) || String(n) !== s) throw httpError(400, `invalid version selector: ${versionParam}`)
-    return n
+  if (architecture) {
+    return {
+      filter: { ...baseFilter, architecture },
+      // noarch fallback: a tarball uploaded without an architecture serves any arch.
+      fallbackFilter: { ...baseFilter, architecture: { $exists: false } },
+      sort
+    }
   }
-  if (parts.length === 3) {
-    // Exact match: 1.2.3
-    filter.version = versionParam
-  } else if (parts.length === 2) {
-    // Minor-level: 1.2 → latest 1.2.x (stable only)
-    filter.semverMajor = asInt(parts[0])
-    filter.semverMinor = asInt(parts[1])
-    filter.semverPrerelease = { $exists: false }
-  } else if (parts.length === 1) {
-    // Major-level: 1 → latest 1.x.y (stable only)
-    filter.semverMajor = asInt(parts[0])
-    filter.semverPrerelease = { $exists: false }
-  }
-
-  return { filter, sort }
+  return { filter: baseFilter, sort }
 }
 
 /**

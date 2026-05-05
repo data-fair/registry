@@ -3,15 +3,15 @@ import { pipeline } from 'node:stream/promises'
 import type { Readable } from 'node:stream'
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import Busboy from 'busboy'
-import { ObjectId, type Filter } from 'mongodb'
+import { ObjectId } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
-import { assertReqInternalSecret, reqIsInternal } from '@data-fair/lib-express/req-origin.js'
+import { reqIsInternal } from '@data-fair/lib-express/req-origin.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
 import config from '#config'
-import { authenticateApiKey, tryAuthenticateReadKey } from '../auth.ts'
-import { artefactAccessFilter, artefactAccessFilterForAccount, assertDownloadAccess, assertDownloadAccessForAccount } from '../access.ts'
+import { authenticateApiKey, resolveCaller, tryInternalSecretWithAccount } from '../auth.ts'
+import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { writeFile, readFile, getDownloadUrl, deleteFile, moveFile, fileStats } from '../files-storage/index.ts'
 import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
@@ -68,6 +68,8 @@ const safeDecode = (raw: string): string => {
   }
 }
 
+// Local internal-secret check used only by the upload endpoints (which don't
+// care about per-account scoping — uploads are admin-style operations).
 const tryInternalSecret = (req: import('express').Request): boolean => {
   if (!reqIsInternal(req)) return false
   const secretKey = req.get('x-secret-key')
@@ -81,15 +83,7 @@ const tryInternalSecret = (req: import('express').Request): boolean => {
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
-    let filter: Filter<Artefact>
-    if (tryInternalSecret(req)) {
-      filter = {}
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      filter = readAuth
-        ? await artefactAccessFilterForAccount(readAuth.owner)
-        : await artefactAccessFilter(req)
-    }
+    const filter = artefactAccessFilter(await resolveCaller(req))
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
     const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { dataUpdatedAt: -1 }
@@ -125,15 +119,7 @@ router.get('/', async (req, res, next) => {
 // Get artefact detail + versions
 router.get('/:id', async (req, res, next) => {
   try {
-    let filter: Filter<Artefact>
-    if (tryInternalSecret(req)) {
-      filter = {}
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      filter = readAuth
-        ? await artefactAccessFilterForAccount(readAuth.owner)
-        : await artefactAccessFilter(req)
-    }
+    const filter = artefactAccessFilter(await resolveCaller(req))
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
@@ -148,10 +134,15 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// Update editable metadata (superadmin)
+// Update editable metadata (superadmin OR internal-service)
+//
+// TEMPORARY: internal secret is accepted so the v6.0 first-boot migration
+// from the sister processings service can push title/description/public/
+// privateAccess from its legacy on-disk metadata.
 router.patch('/:id', async (req, res, next) => {
   try {
-    await session.reqAdminMode(req)
+    const internalAuth = tryInternalSecretWithAccount(req)
+    if (!internalAuth) await session.reqAdminMode(req)
     const body = patchReqBody.returnValid(req.body, { name: 'body' })
 
     const existing = await mongo.artefacts.findOne({ _id: req.params.id })
@@ -329,20 +320,16 @@ router.post('/:name/versions', async (req, res, next) => {
 // Resolve version
 router.get('/:id/versions/:version', async (req, res, next) => {
   try {
-    let filter: Filter<Artefact>
-    if (tryInternalSecret(req)) {
-      filter = {}
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      filter = readAuth
-        ? await artefactAccessFilterForAccount(readAuth.owner)
-        : await artefactAccessFilter(req)
-    }
+    const filter = artefactAccessFilter(await resolveCaller(req))
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
-    const { filter: vFilter, sort } = resolveVersionQuery(artefact._id, req.params.version)
-    const version = await mongo.versions.findOne(vFilter, { sort })
+    const architecture = typeof req.query.architecture === 'string' ? req.query.architecture : undefined
+    const { filter: vFilter, fallbackFilter, sort } = resolveVersionQuery(artefact._id, req.params.version, architecture)
+    let version = await mongo.versions.findOne(vFilter, { sort })
+    if (!version && fallbackFilter) {
+      version = await mongo.versions.findOne(fallbackFilter, { sort })
+    }
     if (!version) throw httpError(404, 'version not found')
     res.json(version)
   } catch (err) { next(err) }
@@ -351,30 +338,19 @@ router.get('/:id/versions/:version', async (req, res, next) => {
 // Download tarball
 router.get('/:id/versions/:version/tarball', async (req, res, next) => {
   try {
-    let artefact
-
-    // Three auth paths: internal secret, read API key, or session-based
-    const secretKey = req.get('x-secret-key')
-    if (secretKey) {
-      assertReqInternalSecret(req, config.secretKeys.internalServices!)
-      artefact = await mongo.artefacts.findOne({ _id: req.params.id })
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      if (readAuth) {
-        const filter = await artefactAccessFilterForAccount(readAuth.owner)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccessForAccount(readAuth.owner, artefact)
-      } else {
-        const filter = await artefactAccessFilter(req)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccess(req, artefact)
-      }
-    }
-
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
+    const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
+    // Download = grant + access. Same rule for every auth path; admins bypass.
+    await assertDownloadAccess(caller, artefact)
 
-    const { filter: vFilter, sort } = resolveVersionQuery(artefact._id, req.params.version)
-    const version = await mongo.versions.findOne(vFilter, { sort })
+    const architecture = typeof req.query.architecture === 'string' ? req.query.architecture : undefined
+    const { filter: vFilter, fallbackFilter, sort } = resolveVersionQuery(artefact._id, req.params.version, architecture)
+    let version = await mongo.versions.findOne(vFilter, { sort })
+    if (!version && fallbackFilter) {
+      version = await mongo.versions.findOne(fallbackFilter, { sort })
+    }
     if (!version) throw httpError(404, 'version not found')
 
     const filename = `${artefact.name}-${version.version}.tgz`
@@ -494,26 +470,11 @@ router.post('/file/:name', async (req, res, next) => {
 // Download raw file
 router.get('/:id/download', async (req, res, next) => {
   try {
-    let artefact
-
-    const secretKey = req.get('x-secret-key')
-    if (secretKey) {
-      assertReqInternalSecret(req, config.secretKeys.internalServices!)
-      artefact = await mongo.artefacts.findOne({ _id: req.params.id })
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      if (readAuth) {
-        const filter = await artefactAccessFilterForAccount(readAuth.owner)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccessForAccount(readAuth.owner, artefact)
-      } else {
-        const filter = await artefactAccessFilter(req)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccess(req, artefact)
-      }
-    }
-
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
+    const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
+    await assertDownloadAccess(caller, artefact)
     if (artefact.format !== 'file') throw httpError(400, 'this artefact is not a file-format artefact')
     if (!artefact.filePath) throw httpError(404, 'no file uploaded for this artefact')
 

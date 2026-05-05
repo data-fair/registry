@@ -142,9 +142,12 @@ test.describe('Read API key access', () => {
   })
 
   test.describe('No grant', () => {
-    test('read key for account without grant gets 403', async () => {
+    // Access-grants gate downloads (and read-key creation), not listing.
+    // A read key whose owner has no grant can still browse the catalog —
+    // they see public artefacts plus any explicitly granted privateAccess —
+    // but downloading is blocked.
+    test('read key without grant can list public artefacts', async () => {
       const admin = await superAdmin
-      // Grant access to dev1, create a read key, then revoke the grant
       await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'dev1' } })
       const keyRes = await admin.post('/api/v1/api-keys', {
         type: 'read',
@@ -154,9 +157,53 @@ test.describe('Read API key access', () => {
       const grants = await admin.get('/api/v1/access-grants')
       const dev1Grant = grants.data.results.find((g: any) => g.account.id === 'dev1')
       await admin.delete(`/api/v1/access-grants/${dev1Grant._id}`)
+
+      const ax = axiosWithApiKey(keyRes.data.key)
+      const res = await ax.get('/api/v1/artefacts')
+      const names = res.data.results.map((a: any) => a.name)
+      // dev1 has no privateAccess on any artefact, so only public ones show up.
+      expect(names).toContain('@test/public-pkg')
+      expect(names).toContain('terrain')
+      expect(names).not.toContain('@test/private-pkg')
+      expect(names).not.toContain('@test/other-pkg')
+    })
+
+    test('read key without grant cannot download tarballs', async () => {
+      const admin = await superAdmin
+      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'dev1' } })
+      const keyRes = await admin.post('/api/v1/api-keys', {
+        type: 'read',
+        name: 'no-grant-key-2',
+        owner: { type: 'organization', id: 'dev1' }
+      })
+      const grants = await admin.get('/api/v1/access-grants')
+      const dev1Grant = grants.data.results.find((g: any) => g.account.id === 'dev1')
+      await admin.delete(`/api/v1/access-grants/${dev1Grant._id}`)
+
       const ax = axiosWithApiKey(keyRes.data.key)
       try {
-        await ax.get('/api/v1/artefacts')
+        await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg%401/versions/1.0.0/tarball')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('read key without grant cannot download file artefacts', async () => {
+      const admin = await superAdmin
+      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'dev1' } })
+      const keyRes = await admin.post('/api/v1/api-keys', {
+        type: 'read',
+        name: 'no-grant-key-3',
+        owner: { type: 'organization', id: 'dev1' }
+      })
+      const grants = await admin.get('/api/v1/access-grants')
+      const dev1Grant = grants.data.results.find((g: any) => g.account.id === 'dev1')
+      await admin.delete(`/api/v1/access-grants/${dev1Grant._id}`)
+
+      const ax = axiosWithApiKey(keyRes.data.key)
+      try {
+        await ax.get('/api/v1/artefacts/terrain/download')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(403)
