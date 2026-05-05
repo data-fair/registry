@@ -2,7 +2,7 @@ import jsonSchema from '@data-fair/lib-utils/json-schema.js'
 import ArtefactSchema from '#types/artefact/schema.js'
 
 const schema = jsonSchema(ArtefactSchema)
-  .makePatchSchema(['title', 'description', 'public', 'privateAccess', 'processingConfigSchema', 'applicationConfigSchema'])
+  .makePatchSchema(['title', 'description', 'documentation', 'public', 'privateAccess', 'processingConfigSchema', 'applicationConfigSchema'])
   .schema
 
 export default {

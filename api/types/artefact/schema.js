@@ -144,6 +144,12 @@ export default {
         ]
       }
     },
+    documentation: {
+      type: 'string',
+      format: 'uri',
+      title: 'Documentation URL',
+      'x-i18n-title': { fr: 'URL de documentation' }
+    },
     processingConfigSchema: { type: 'object', layout: { comp: 'none' } },
     applicationConfigSchema: { type: 'object', layout: { comp: 'none' } },
     origin: { type: 'string', readOnly: true },
