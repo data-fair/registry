@@ -54,8 +54,12 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
     }
   }
 
-  // Upsert artefact metadata
+  // Upsert artefact metadata. latestMajor mirrors the upstream value if
+  // present, otherwise we recompute from the synced versions.
   const now = new Date().toISOString()
+  const latestMajor = typeof remoteArtefact.latestMajor === 'number'
+    ? remoteArtefact.latestMajor
+    : remoteVersions.reduce((m, v) => Math.max(m, v.semverMajor ?? 0), 0)
   await mongo.artefacts.updateOne(
     { _id: artefactId },
     {
@@ -66,9 +70,9 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         category: remoteArtefact.category,
         ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
         ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
-        ...(remoteArtefact.processingConfigSchema ? { processingConfigSchema: remoteArtefact.processingConfigSchema } : {}),
-        ...(remoteArtefact.applicationConfigSchema ? { applicationConfigSchema: remoteArtefact.applicationConfigSchema } : {}),
+        ...(remoteArtefact.group ? { group: remoteArtefact.group } : {}),
         ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
+        latestMajor,
         origin: remoteUrl,
         updatedAt: now,
         dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
@@ -77,7 +81,6 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         _id: artefactId,
         name: remoteArtefact.name,
         format: 'npm' as const,
-        majorVersion: remoteArtefact.majorVersion,
         public: false,
         privateAccess: [],
         createdAt: now

@@ -12,8 +12,6 @@ export interface Manifest {
   version: string
   licence?: string
   category?: string
-  processingConfigSchema?: Record<string, unknown>
-  applicationConfigSchema?: Record<string, unknown>
 }
 
 // Hard caps protecting against tar bombs and malformed archives.
@@ -75,9 +73,7 @@ export const extractManifest = async (stream: Readable): Promise<Manifest> => {
             name: pkg.name,
             version: pkg.version,
             licence: pkg.licence || pkg.license,
-            category: pkg.registry?.category || 'other',
-            processingConfigSchema: pkg.registry?.processingConfigSchema,
-            applicationConfigSchema: pkg.registry?.applicationConfigSchema
+            category: pkg.registry?.category || 'other'
           }
           // Abort the pipeline early; we've got what we need and don't want
           // to keep processing a potentially malicious tarball.

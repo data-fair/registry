@@ -13,7 +13,11 @@ export default {
     _id: { type: 'string', readOnly: true },
     name: { type: 'string', readOnly: true },
     format: { type: 'string', enum: ['npm', 'file'], readOnly: true },
-    majorVersion: { type: 'integer', readOnly: true },
+    latestMajor: {
+      type: 'integer',
+      readOnly: true,
+      description: 'Highest semverMajor across published versions. Maintained on every upload; lets clients pin new processings to the current major without listing versions.'
+    },
     packageName: { type: 'string', readOnly: true },
     version: { type: 'string', readOnly: true },
     licence: { type: 'string', readOnly: true },
@@ -62,6 +66,24 @@ export default {
             props: { autoGrow: true, rows: 3 },
             cols: { md: 6 }
           }
+        }
+      }
+    },
+    group: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        en: {
+          type: 'string',
+          title: 'Group - English',
+          'x-i18n-title': { fr: 'Groupe - Anglais' },
+          layout: { cols: { md: 6 } }
+        },
+        fr: {
+          type: 'string',
+          title: 'Group - French',
+          'x-i18n-title': { fr: 'Groupe - Français' },
+          layout: { cols: { md: 6 } }
         }
       }
     },
@@ -150,8 +172,6 @@ export default {
       title: 'Documentation URL',
       'x-i18n-title': { fr: 'URL de documentation' }
     },
-    processingConfigSchema: { type: 'object', layout: { comp: 'none' } },
-    applicationConfigSchema: { type: 'object', layout: { comp: 'none' } },
     origin: { type: 'string', readOnly: true },
     filePath: { type: 'string', readOnly: true },
     fileName: { type: 'string', readOnly: true },

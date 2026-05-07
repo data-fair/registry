@@ -243,7 +243,7 @@ router.post('/:name/versions', async (req, res, next) => {
 
     const semverParts = parseSemver(manifest.version)
     const majorVersion = semverParts.semverMajor
-    const artefactId = `${name}@${majorVersion}`
+    const artefactId = name
 
     const existingArtefact = await mongo.artefacts.findOne({ _id: artefactId })
     if (existingArtefact?.origin) {
@@ -258,8 +258,11 @@ router.post('/:name/versions', async (req, res, next) => {
     finalTarballPath = tarballPath
     const { size } = await fileStats(tarballPath)
 
-    // Upsert artefact
+    // Upsert artefact. `latestMajor` tracks max(version.semverMajor) across all
+    // published versions so the picker can pin new processings to the current
+    // major without listing versions; we bump it on a strictly-greater upload.
     const now = new Date().toISOString()
+    const newLatestMajor = Math.max(existingArtefact?.latestMajor ?? majorVersion, majorVersion)
     await mongo.artefacts.updateOne(
       { _id: artefactId },
       {
@@ -268,8 +271,7 @@ router.post('/:name/versions', async (req, res, next) => {
           version: manifest.version,
           licence: manifest.licence,
           category,
-          ...(manifest.processingConfigSchema ? { processingConfigSchema: manifest.processingConfigSchema } : {}),
-          ...(manifest.applicationConfigSchema ? { applicationConfigSchema: manifest.applicationConfigSchema } : {}),
+          latestMajor: newLatestMajor,
           size,
           updatedAt: now,
           dataUpdatedAt: now
@@ -278,7 +280,6 @@ router.post('/:name/versions', async (req, res, next) => {
           _id: artefactId,
           name,
           format: 'npm' as const,
-          majorVersion,
           public: false,
           privateAccess: [],
           createdAt: now
@@ -287,7 +288,9 @@ router.post('/:name/versions', async (req, res, next) => {
       { upsert: true }
     )
 
-    // Create version doc
+    // Create version doc. Registry stores no schema content from the
+    // package — consumers (processings, applications) read their own
+    // schemas straight from the cached tarball.
     const versionId = new ObjectId().toString()
     await mongo.versions.insertOne({
       _id: versionId,

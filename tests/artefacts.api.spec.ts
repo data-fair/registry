@@ -279,7 +279,7 @@ test.describe('Artefacts', () => {
       const form1 = new FormData()
       form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
       await ax.post('/api/v1/artefacts/%40test%2Fpublic-pkg/versions', form1, { headers: form1.getHeaders() })
-      await admin.patch('/api/v1/artefacts/%40test%2Fpublic-pkg%401', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fpublic-pkg', { public: true })
 
       // Upload a private artefact
       const tarball2 = await createTestTarball({ name: '@test/private-pkg', version: '2.0.0', category: 'catalog' })
@@ -302,7 +302,7 @@ test.describe('Artefacts', () => {
 
     test('get artefact detail with versions', async () => {
       const ax = await superAdmin
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg%401')
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg')
       expect(res.data.name).toBe('@test/public-pkg')
       expect(res.data.versions).toHaveLength(1)
       expect(res.data.versions[0].version).toBe('1.0.0')
@@ -316,13 +316,13 @@ test.describe('Artefacts', () => {
 
     test('internal secret can get private artefact detail', async () => {
       const ax = axiosInternal('secret-internal')
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg%402')
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg')
       expect(res.data.name).toBe('@test/private-pkg')
     })
 
     test('internal secret can resolve version on private artefact', async () => {
       const ax = axiosInternal('secret-internal')
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg%402/versions/2.0.0')
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg/versions/2.0.0')
       expect(res.data.version).toBe('2.0.0')
     })
   })
@@ -338,7 +338,7 @@ test.describe('Artefacts', () => {
 
     test('superadmin can PATCH editable metadata', async () => {
       const ax = await superAdmin
-      const res = await ax.patch('/api/v1/artefacts/%40test%2Fpkg%401', {
+      const res = await ax.patch('/api/v1/artefacts/%40test%2Fpkg', {
         title: { fr: 'Mon paquet', en: 'My package' },
         description: { fr: 'Une description', en: 'A description' },
         public: true
@@ -349,7 +349,7 @@ test.describe('Artefacts', () => {
 
     test('superadmin can DELETE artefact', async () => {
       const ax = await superAdmin
-      const deleteRes = await ax.delete('/api/v1/artefacts/%40test%2Fpkg%401')
+      const deleteRes = await ax.delete('/api/v1/artefacts/%40test%2Fpkg')
       expect(deleteRes.status).toBe(204)
 
       const listRes = await ax.get('/api/v1/artefacts')
@@ -369,22 +369,22 @@ test.describe('Artefacts', () => {
         await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
       }
       // Make public so we can access versions
-      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
-      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%402', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
     })
 
     test('exact version match', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg%401/versions/1.0.1')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.1')
       expect(res.data.version).toBe('1.0.1')
     })
 
     test('minor-level resolution (latest patch)', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg%401/versions/1.1')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.1')
       expect(res.data.version).toBe('1.1.1')
     })
 
     test('major-level resolution (latest minor+patch)', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg%401/versions/1')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/1')
       expect(res.data.version).toBe('1.1.1')
     })
   })
@@ -415,37 +415,37 @@ test.describe('Artefacts', () => {
       f20.append('file', t20, { filename: 'package.tgz', contentType: 'application/gzip' })
       await ax.post('/api/v1/artefacts/%40test%2Fmultiarch/versions', f20, { headers: f20.getHeaders() })
 
-      await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch%401', { public: true })
-      await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch%402', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch', { public: true })
     })
 
     test('exact version, arch query param picks the matching variant', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.0?architecture=arm64')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/1.0.0?architecture=arm64')
       expect(res.data.version).toBe('1.0.0')
       expect(res.data.architecture).toBe('arm64')
     })
 
     test('minor-level resolver: x64 worker requesting 1.0 gets only-x64 patch (1.0.0), since 1.0.1 is arm64-only', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0?architecture=x64')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/1.0?architecture=x64')
       expect(res.data.version).toBe('1.0.0')
       expect(res.data.architecture).toBe('x64')
     })
 
     test('arm64 worker requesting 1.0 gets latest arm64 patch (1.0.1)', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0?architecture=arm64')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/1.0?architecture=arm64')
       expect(res.data.version).toBe('1.0.1')
       expect(res.data.architecture).toBe('arm64')
     })
 
     test('noarch fallback: x64 worker requesting 2.0.0 gets the noarch tarball', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%402/versions/2.0.0?architecture=x64')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/2.0.0?architecture=x64')
       expect(res.data.version).toBe('2.0.0')
       expect(res.data.architecture).toBeUndefined()
     })
 
     test('arch with no match and no noarch fallback returns 404', async () => {
       try {
-        await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.1?architecture=x64')
+        await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/1.0.1?architecture=x64')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(404)
@@ -453,7 +453,7 @@ test.describe('Artefacts', () => {
     })
 
     test('without architecture: legacy behaviour, returns whichever variant Mongo returns first', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.0')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/1.0.0')
       expect(res.data.version).toBe('1.0.0')
       expect(['arm64', 'x64']).toContain(res.data.architecture)
     })
@@ -461,7 +461,7 @@ test.describe('Artefacts', () => {
     test('tarball download honours architecture query param', async () => {
       const admin = await superAdmin
       // Need internal secret to introspect; use admin session for the download instead
-      const arm = await admin.get('/api/v1/artefacts/%40test%2Fmultiarch%401/versions/1.0.0/tarball?architecture=arm64', {
+      const arm = await admin.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/1.0.0/tarball?architecture=arm64', {
         maxRedirects: 0,
         validateStatus: s => s === 200 || s === 302
       })
@@ -483,10 +483,10 @@ test.describe('Artefacts', () => {
         await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
       }
 
-      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
 
       // Should have kept only 1.0.1 and 1.0.2
-      const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg%401')
+      const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg')
       const versions = detail.data.versions.map((v: any) => v.version)
       expect(versions).toContain('1.0.2')
       expect(versions).toContain('1.0.1')
@@ -505,9 +505,9 @@ test.describe('Artefacts', () => {
         await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
       }
 
-      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
 
-      const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg%401')
+      const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg')
       const versions = detail.data.versions.map((v: any) => v.version)
       // 1.0.x: kept 1.0.1, 1.0.2 (pruned 1.0.0)
       // 1.1.x: kept 1.1.0, 1.1.1
@@ -525,7 +525,7 @@ test.describe('Artefacts', () => {
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
       await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', {
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', {
         public: true,
         privateAccess: [{ type: 'organization', id: 'test1' }]
       })
@@ -533,7 +533,7 @@ test.describe('Artefacts', () => {
 
     test('download with internal secret', async () => {
       const ax = axiosInternal('secret-internal')
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fpkg%401/versions/1.0.0/tarball', {
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.0/tarball', {
         responseType: 'arraybuffer'
       })
       expect(res.status).toBe(200)
@@ -545,7 +545,7 @@ test.describe('Artefacts', () => {
       await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
 
       const ax = await axiosAuth('test1-admin1', { org: 'test1' })
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fpkg%401/versions/1.0.0/tarball', {
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.0/tarball', {
         responseType: 'arraybuffer'
       })
       expect(res.status).toBe(200)
@@ -554,7 +554,7 @@ test.describe('Artefacts', () => {
     test('download without access returns 403', async () => {
       const ax = await axiosAuth('dev-standalone1')
       try {
-        await ax.get('/api/v1/artefacts/%40test%2Fpkg%401/versions/1.0.0/tarball')
+        await ax.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.0/tarball')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(403)
@@ -657,7 +657,7 @@ test.describe('File artefacts', () => {
       const form2 = new FormData()
       form2.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
       await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form2, { headers: form2.getHeaders() })
-      await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
     })
 
     test('both formats appear in list', async () => {
@@ -684,7 +684,7 @@ test.describe('File artefacts', () => {
     })
 
     test('detail returns npm artefact with versions array', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg%401')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg')
       expect(res.data.versions).toHaveLength(1)
     })
   })
@@ -782,18 +782,18 @@ test.describe('File artefacts', () => {
 
       // Simulate pre-existing rows: drop size, then run upgrade
       await resetSize()
-      const beforeNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401/versions/1.0.0')
+      const beforeNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg/versions/1.0.0')
       expect(beforeNpmVer.data.size).toBeUndefined()
-      const beforeNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401')
+      const beforeNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg')
       expect(beforeNpmArtefact.data.size).toBeUndefined()
       const beforeFile = await admin.get('/api/v1/artefacts/sized-file')
       expect(beforeFile.data.size).toBeUndefined()
 
       await runBackfillSize()
 
-      const afterNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401/versions/1.0.0')
+      const afterNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg/versions/1.0.0')
       expect(afterNpmVer.data.size).toBe(tarballSize)
-      const afterNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg%401')
+      const afterNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg')
       expect(afterNpmArtefact.data.size).toBe(tarballSize)
       const afterFile = await admin.get('/api/v1/artefacts/sized-file')
       expect(afterFile.data.size).toBe(Buffer.byteLength('hello-world-bytes'))
@@ -826,8 +826,8 @@ test.describe('File artefacts', () => {
       await new Promise(resolve => setTimeout(resolve, 5))
 
       // Metadata-only PATCH bumps updatedAt but not dataUpdatedAt
-      await admin.patch('/api/v1/artefacts/%40test%2Fdata-pkg%401', { public: true })
-      const npmAfterPatch = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg%401')
+      await admin.patch('/api/v1/artefacts/%40test%2Fdata-pkg', { public: true })
+      const npmAfterPatch = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg')
       expect(npmAfterPatch.data.dataUpdatedAt).toBe(initialNpmDataUpdatedAt)
       expect(npmAfterPatch.data.updatedAt).not.toBe(initialNpmDataUpdatedAt)
 
@@ -868,7 +868,7 @@ test.describe('File artefacts', () => {
       npmForm2.append('file', tarball2, { filename: 'p.tgz', contentType: 'application/gzip' })
       await ax.post('/api/v1/artefacts/%40test%2Fdata-pkg/versions', npmForm2, { headers: npmForm2.getHeaders() })
 
-      const latestVersion = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg%401/versions/1.0.1')
+      const latestVersion = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg/versions/1.0.1')
       const latestUploadedAt = latestVersion.data.uploadedAt
 
       // file artefact
@@ -881,14 +881,14 @@ test.describe('File artefacts', () => {
 
       // Simulate pre-existing rows
       await resetDataUpdatedAt()
-      const beforeNpm = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg%401')
+      const beforeNpm = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg')
       expect(beforeNpm.data.dataUpdatedAt).toBeUndefined()
       const beforeFile = await admin.get('/api/v1/artefacts/data-file')
       expect(beforeFile.data.dataUpdatedAt).toBeUndefined()
 
       await runBackfillDataUpdatedAt()
 
-      const afterNpm = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg%401')
+      const afterNpm = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg')
       expect(afterNpm.data.dataUpdatedAt).toBe(latestUploadedAt)
       // File-format artefacts derive dataUpdatedAt from the storage backend's
       // last-modified time — assert it's set within the upload window

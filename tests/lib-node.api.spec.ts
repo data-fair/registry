@@ -34,12 +34,12 @@ test.describe('lib-node-registry', () => {
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+    await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
-      artefactId: '@test/pkg@1',
+      artefactId: '@test/pkg',
       version: '1',
       cacheDir
     })
@@ -60,9 +60,9 @@ test.describe('lib-node-registry', () => {
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+    await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
 
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', version: '1', cacheDir }
+    const opts = { registryUrl, secretKey, artefactId: '@test/pkg', version: '1', cacheDir }
 
     const result1 = await ensureArtefact(opts)
     expect(result1.downloaded).toBe(true)
@@ -81,9 +81,9 @@ test.describe('lib-node-registry', () => {
     const form1 = new FormData()
     form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
     await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form1, { headers: form1.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+    await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
 
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', version: '1', cacheDir }
+    const opts = { registryUrl, secretKey, artefactId: '@test/pkg', version: '1', cacheDir }
 
     const result1 = await ensureArtefact(opts)
     expect(result1.version).toBe('1.0.0')

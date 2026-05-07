@@ -16,7 +16,7 @@ const createArtefact = async (name = '@test/pkg') => {
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
   await ax.post(`/api/v1/artefacts/${encodeURIComponent(name)}/versions`, form, { headers: form.getHeaders() })
-  return `${name}@1`
+  return name
 }
 
 const uploadThumb = async (ax: any, artefactId: string, buf: Buffer) => {
@@ -107,7 +107,7 @@ test.describe('Thumbnails', () => {
   test('upload targeting a missing artefact returns 404', async () => {
     const admin = await superAdmin
     try {
-      await uploadThumb(admin, '@no/such@1', await makePng())
+      await uploadThumb(admin, '@no/such', await makePng())
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(404)

@@ -57,14 +57,14 @@ test.describe('parseSemver', () => {
 
 test.describe('resolveVersionQuery', () => {
   test('exact match for x.y.z', () => {
-    const { filter } = resolveVersionQuery('a@1', '1.2.3')
-    expect(filter).toMatchObject({ artefactId: 'a@1', version: '1.2.3' })
+    const { filter } = resolveVersionQuery('a', '1.2.3')
+    expect(filter).toMatchObject({ artefactId: 'a', version: '1.2.3' })
   })
 
   test('minor-level filter excludes prereleases', () => {
-    const { filter } = resolveVersionQuery('a@1', '1.2')
+    const { filter } = resolveVersionQuery('a', '1.2')
     expect(filter).toMatchObject({
-      artefactId: 'a@1',
+      artefactId: 'a',
       semverMajor: 1,
       semverMinor: 2,
       semverPrerelease: { $exists: false }
@@ -72,54 +72,54 @@ test.describe('resolveVersionQuery', () => {
   })
 
   test('major-level filter excludes prereleases', () => {
-    const { filter } = resolveVersionQuery('a@1', '1')
+    const { filter } = resolveVersionQuery('a', '1')
     expect(filter).toMatchObject({
-      artefactId: 'a@1',
+      artefactId: 'a',
       semverMajor: 1,
       semverPrerelease: { $exists: false }
     })
   })
 
   test('prerelease selector does exact match', () => {
-    const { filter } = resolveVersionQuery('a@1', '1.0.0-beta.1')
+    const { filter } = resolveVersionQuery('a', '1.0.0-beta.1')
     expect(filter).toMatchObject({ version: '1.0.0-beta.1' })
   })
 
   test('rejects non-numeric major selector', () => {
-    expect(() => resolveVersionQuery('a@1', 'abc')).toThrow(/invalid version selector/)
+    expect(() => resolveVersionQuery('a', 'abc')).toThrow(/invalid version selector/)
   })
 
   test('rejects non-numeric minor selector', () => {
-    expect(() => resolveVersionQuery('a@1', '1.x')).toThrow(/invalid version selector/)
+    expect(() => resolveVersionQuery('a', '1.x')).toThrow(/invalid version selector/)
   })
 
   test('sort is descending by major/minor/patch', () => {
-    const { sort } = resolveVersionQuery('a@1', '1.2.3')
+    const { sort } = resolveVersionQuery('a', '1.2.3')
     expect(sort).toEqual({ semverMajor: -1, semverMinor: -1, semverPatch: -1 })
   })
 
   test('no architecture: no fallback filter', () => {
-    const result = resolveVersionQuery('a@1', '1.2.3')
+    const result = resolveVersionQuery('a', '1.2.3')
     expect(result.fallbackFilter).toBeUndefined()
   })
 
   test('with architecture: primary filter narrows to that arch, fallback matches noarch', () => {
-    const { filter, fallbackFilter } = resolveVersionQuery('a@1', '1.2.3', 'arm64')
-    expect(filter).toMatchObject({ artefactId: 'a@1', version: '1.2.3', architecture: 'arm64' })
-    expect(fallbackFilter).toMatchObject({ artefactId: 'a@1', version: '1.2.3', architecture: { $exists: false } })
+    const { filter, fallbackFilter } = resolveVersionQuery('a', '1.2.3', 'arm64')
+    expect(filter).toMatchObject({ artefactId: 'a', version: '1.2.3', architecture: 'arm64' })
+    expect(fallbackFilter).toMatchObject({ artefactId: 'a', version: '1.2.3', architecture: { $exists: false } })
   })
 
   test('with architecture and minor selector: arch is added to both filters', () => {
-    const { filter, fallbackFilter } = resolveVersionQuery('a@1', '1.2', 'x64')
+    const { filter, fallbackFilter } = resolveVersionQuery('a', '1.2', 'x64')
     expect(filter).toMatchObject({
-      artefactId: 'a@1',
+      artefactId: 'a',
       semverMajor: 1,
       semverMinor: 2,
       semverPrerelease: { $exists: false },
       architecture: 'x64'
     })
     expect(fallbackFilter).toMatchObject({
-      artefactId: 'a@1',
+      artefactId: 'a',
       semverMajor: 1,
       semverMinor: 2,
       semverPrerelease: { $exists: false },
@@ -128,7 +128,7 @@ test.describe('resolveVersionQuery', () => {
   })
 
   test('with architecture and prerelease selector: arch is added to both filters', () => {
-    const { filter, fallbackFilter } = resolveVersionQuery('a@1', '1.0.0-beta.1', 'arm64')
+    const { filter, fallbackFilter } = resolveVersionQuery('a', '1.0.0-beta.1', 'arm64')
     expect(filter).toMatchObject({ version: '1.0.0-beta.1', architecture: 'arm64' })
     expect(fallbackFilter).toMatchObject({ version: '1.0.0-beta.1', architecture: { $exists: false } })
   })

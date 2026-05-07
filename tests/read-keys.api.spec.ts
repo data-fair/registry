@@ -20,7 +20,7 @@ test.describe('Read API key access', () => {
     const form1 = new FormData()
     form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/%40test%2Fpublic-pkg/versions', form1, { headers: form1.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpublic-pkg%401', {
+    await admin.patch('/api/v1/artefacts/%40test%2Fpublic-pkg', {
       public: true,
       privateAccess: [{ type: 'organization', id: 'test1' }]
     })
@@ -30,7 +30,7 @@ test.describe('Read API key access', () => {
     const form2 = new FormData()
     form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/%40test%2Fprivate-pkg/versions', form2, { headers: form2.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fprivate-pkg%402', {
+    await admin.patch('/api/v1/artefacts/%40test%2Fprivate-pkg', {
       privateAccess: [{ type: 'organization', id: 'test1' }]
     })
 
@@ -77,7 +77,7 @@ test.describe('Read API key access', () => {
   test.describe('Detail', () => {
     test('read key can get artefact detail', async () => {
       const ax = axiosWithApiKey(readApiKey)
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg%401')
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg')
       expect(res.data.name).toBe('@test/public-pkg')
       expect(res.data.versions).toHaveLength(1)
     })
@@ -85,7 +85,7 @@ test.describe('Read API key access', () => {
     test('read key cannot get artefact outside scope', async () => {
       const ax = axiosWithApiKey(readApiKey)
       try {
-        await ax.get('/api/v1/artefacts/%40test%2Fother-pkg%403')
+        await ax.get('/api/v1/artefacts/%40test%2Fother-pkg')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(404)
@@ -96,7 +96,7 @@ test.describe('Read API key access', () => {
   test.describe('Version resolution', () => {
     test('read key can resolve version', async () => {
       const ax = axiosWithApiKey(readApiKey)
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg%401/versions/1')
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg/versions/1')
       expect(res.data.version).toBe('1.0.0')
     })
   })
@@ -104,7 +104,7 @@ test.describe('Read API key access', () => {
   test.describe('Tarball download', () => {
     test('read key can download tarball', async () => {
       const ax = axiosWithApiKey(readApiKey)
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg%401/versions/1.0.0/tarball', {
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg/versions/1.0.0/tarball', {
         responseType: 'arraybuffer'
       })
       expect(res.status).toBe(200)
@@ -113,7 +113,7 @@ test.describe('Read API key access', () => {
 
     test('read key can download private artefact tarball', async () => {
       const ax = axiosWithApiKey(readApiKey)
-      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg%402/versions/2.0.0/tarball', {
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fprivate-pkg/versions/2.0.0/tarball', {
         responseType: 'arraybuffer'
       })
       expect(res.status).toBe(200)
@@ -122,7 +122,7 @@ test.describe('Read API key access', () => {
     test('read key cannot download artefact outside scope', async () => {
       const ax = axiosWithApiKey(readApiKey)
       try {
-        await ax.get('/api/v1/artefacts/%40test%2Fother-pkg%403/versions/3.0.0/tarball')
+        await ax.get('/api/v1/artefacts/%40test%2Fother-pkg/versions/3.0.0/tarball')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(404)
@@ -182,7 +182,7 @@ test.describe('Read API key access', () => {
 
       const ax = axiosWithApiKey(keyRes.data.key)
       try {
-        await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg%401/versions/1.0.0/tarball')
+        await ax.get('/api/v1/artefacts/%40test%2Fpublic-pkg/versions/1.0.0/tarball')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(403)

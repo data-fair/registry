@@ -59,8 +59,29 @@ export class RegistryMongo {
     await this.connect()
     await mongoLib.configure({
       artefacts: {
-        'name-major': [{ name: 1, majorVersion: 1 }, { unique: true }],
-        fulltext: { name: 'text' }
+        // _id is the package name, so uniqueness on name is already enforced
+        // by the primary key — no separate index needed. Fulltext spans the
+        // identifier plus the i18n display fields, with weights tuned so the
+        // technical handle dominates and description is a tiebreaker.
+        fulltext: [{
+          name: 'text',
+          'title.fr': 'text',
+          'title.en': 'text',
+          'group.fr': 'text',
+          'group.en': 'text',
+          'description.fr': 'text',
+          'description.en': 'text'
+        }, {
+          weights: {
+            name: 10,
+            'title.fr': 5,
+            'title.en': 5,
+            'group.fr': 3,
+            'group.en': 3,
+            'description.fr': 1,
+            'description.en': 1
+          }
+        }]
       },
       versions: {
         'artefact-version-arch': [{ artefactId: 1, version: 1, architecture: 1 }, { unique: true }]
