@@ -358,11 +358,14 @@ test.describe('Artefacts', () => {
   })
 
   test.describe('Version resolution', () => {
+    // Fixture chosen so all queried versions survive the cross-major prune
+    // policy (older majors keep their latest only; latest major keeps last 2).
+    // Resulting kept set: { 1.0.1, 2.1.0, 2.1.1 }.
     test.beforeEach(async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const admin = await superAdmin
 
-      for (const v of ['1.0.0', '1.0.1', '1.1.0', '1.1.1', '2.0.0']) {
+      for (const v of ['1.0.0', '1.0.1', '2.0.0', '2.1.0', '2.1.1']) {
         const tarball = await createTestTarball({ name: '@test/pkg', version: v })
         const form = new FormData()
         form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
@@ -373,23 +376,31 @@ test.describe('Artefacts', () => {
       await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
     })
 
-    test('exact version match', async () => {
+    test('exact version match (older-major survivor)', async () => {
       const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.1')
       expect(res.data.version).toBe('1.0.1')
     })
 
     test('minor-level resolution (latest patch)', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.1')
-      expect(res.data.version).toBe('1.1.1')
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/2.1')
+      expect(res.data.version).toBe('2.1.1')
     })
 
     test('major-level resolution (latest minor+patch)', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/2')
+      expect(res.data.version).toBe('2.1.1')
+    })
+
+    test('older-major resolution by major selector', async () => {
       const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg/versions/1')
-      expect(res.data.version).toBe('1.1.1')
+      expect(res.data.version).toBe('1.0.1')
     })
   })
 
   test.describe('Architecture-aware version resolution', () => {
+    // Fixture stays inside major 1 so both 1.0.0 variants survive the
+    // top-2-of-latest-major retention. Adding a 2.0.0 here would demote
+    // major 1 to "older major" and prune everything below 1.0.1.
     test.beforeEach(async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const admin = await superAdmin
@@ -408,12 +419,6 @@ test.describe('Artefacts', () => {
       f11.append('architecture', 'arm64')
       f11.append('file', t11, { filename: 'package.tgz', contentType: 'application/gzip' })
       await ax.post('/api/v1/artefacts/%40test%2Fmultiarch/versions', f11, { headers: f11.getHeaders() })
-
-      // 2.0.0 — noarch only
-      const t20 = await createTestTarball({ name: '@test/multiarch', version: '2.0.0' })
-      const f20 = new FormData()
-      f20.append('file', t20, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/%40test%2Fmultiarch/versions', f20, { headers: f20.getHeaders() })
 
       await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch', { public: true })
       await admin.patch('/api/v1/artefacts/%40test%2Fmultiarch', { public: true })
@@ -435,12 +440,6 @@ test.describe('Artefacts', () => {
       const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/1.0?architecture=arm64')
       expect(res.data.version).toBe('1.0.1')
       expect(res.data.architecture).toBe('arm64')
-    })
-
-    test('noarch fallback: x64 worker requesting 2.0.0 gets the noarch tarball', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fmultiarch/versions/2.0.0?architecture=x64')
-      expect(res.data.version).toBe('2.0.0')
-      expect(res.data.architecture).toBeUndefined()
     })
 
     test('arch with no match and no noarch fallback returns 404', async () => {
@@ -470,12 +469,37 @@ test.describe('Artefacts', () => {
     })
   })
 
-  test.describe('2-deep retention', () => {
-    test('keeps only 2 most recent patches per minor branch', async () => {
+  test.describe('Architecture-aware noarch fallback', () => {
+    // Separate scope from the multi-arch tests above so this fixture's
+    // single major doesn't compete with theirs (mixing "2.0.0 noarch" and
+    // "1.0.0 multi-arch" in one fixture would prune 1.0.0 once 2.0.0 makes
+    // major 2 the new latest).
+    test.beforeEach(async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const admin = await superAdmin
 
-      // Upload 3 patch versions for minor 1.0
+      const t = await createTestTarball({ name: '@test/noarch', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', t, { filename: 'package.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/%40test%2Fnoarch/versions', form, { headers: form.getHeaders() })
+
+      await admin.patch('/api/v1/artefacts/%40test%2Fnoarch', { public: true })
+      await admin.patch('/api/v1/artefacts/%40test%2Fnoarch', { public: true })
+    })
+
+    test('noarch fallback: x64 worker requesting an exact version gets the noarch tarball', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fnoarch/versions/1.0.0?architecture=x64')
+      expect(res.data.version).toBe('1.0.0')
+      expect(res.data.architecture).toBeUndefined()
+    })
+  })
+
+  test.describe('Cross-major retention', () => {
+    test('latest major: keeps the 2 most recent patches within a single minor', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const admin = await superAdmin
+
+      // Three patches in the same minor of the only/latest major.
       for (const v of ['1.0.0', '1.0.1', '1.0.2']) {
         const tarball = await createTestTarball({ name: '@test/pkg', version: v })
         const form = new FormData()
@@ -485,7 +509,7 @@ test.describe('Artefacts', () => {
 
       await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
 
-      // Should have kept only 1.0.1 and 1.0.2
+      // Top 2 (minor, patch) tuples of latest major → 1.0.2, 1.0.1.
       const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg')
       const versions = detail.data.versions.map((v: any) => v.version)
       expect(versions).toContain('1.0.2')
@@ -494,7 +518,7 @@ test.describe('Artefacts', () => {
       expect(detail.data.versions).toHaveLength(2)
     })
 
-    test('does not prune across different minor branches', async () => {
+    test('latest major: top-2 spans across minor branches (older minors get pruned)', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const admin = await superAdmin
 
@@ -507,12 +531,31 @@ test.describe('Artefacts', () => {
 
       await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
 
+      // Top 2 distinct (minor, patch) of latest major 1 → 1.1.1, 1.1.0.
+      // All of 1.0.x are pruned because they're outside the top-2 of major 1.
       const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg')
-      const versions = detail.data.versions.map((v: any) => v.version)
-      // 1.0.x: kept 1.0.1, 1.0.2 (pruned 1.0.0)
-      // 1.1.x: kept 1.1.0, 1.1.1
-      expect(versions).toHaveLength(4)
-      expect(versions).not.toContain('1.0.0')
+      const versions = detail.data.versions.map((v: any) => v.version).sort()
+      expect(versions).toEqual(['1.1.0', '1.1.1'])
+    })
+
+    test('older major: only its latest version is kept once a newer major is published', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const admin = await superAdmin
+
+      // 1.0.0 + 1.0.1 in major 1; then a 2.0.0 promotes major 2 to "latest".
+      // Major 1 falls back to "older major" → keep only its latest (1.0.1).
+      for (const v of ['1.0.0', '1.0.1', '2.0.0']) {
+        const tarball = await createTestTarball({ name: '@test/pkg', version: v })
+        const form = new FormData()
+        form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+        await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+      }
+
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
+
+      const detail = await admin.get('/api/v1/artefacts/%40test%2Fpkg')
+      const versions = detail.data.versions.map((v: any) => v.version).sort()
+      expect(versions).toEqual(['1.0.1', '2.0.0'])
     })
   })
 
