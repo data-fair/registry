@@ -73,6 +73,7 @@
         <v-table density="comfortable">
           <thead>
             <tr>
+              <th style="width: 56px;" />
               <th>{{ t('name') }}</th>
               <th>{{ t('category') }}</th>
               <th>{{ t('version') }}</th>
@@ -87,6 +88,16 @@
               style="cursor: pointer;"
               @click="router.push(`/artefacts/${encodeURIComponent(artefact._id)}`)"
             >
+              <td>
+                <img
+                  v-if="artefact.thumbnail"
+                  :src="`${$apiPath}/v1/thumbnails/${artefact.thumbnail.id}/data`"
+                  :alt="(artefact.title as any)?.[locale] || artefact.name"
+                  width="40"
+                  height="40"
+                  style="object-fit: contain; display: block;"
+                >
+              </td>
               <td>
                 <strong>{{ (artefact.title as any)?.[locale] || artefact.name }}</strong>
                 <br>
