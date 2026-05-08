@@ -32,6 +32,16 @@
       "default": 524288000,
       "description": "Maximum accepted size in bytes for a single uploaded artefact (tarball or raw file)."
     },
+    "maxDecompressedBytes": {
+      "type": "integer",
+      "default": 1073741824,
+      "description": "Maximum accepted decompressed size in bytes for an uploaded npm tarball. Caps tar-bomb potential independent of the compressed upload size."
+    },
+    "maxTarEntries": {
+      "type": "integer",
+      "default": 100000,
+      "description": "Maximum number of entries (files + directories) accepted in an uploaded npm tarball. Pre-installed node_modules can easily exceed the lower legacy default."
+    },
     "privateDirectoryUrl": {
       "type": "string",
       "pattern": "^https?://"

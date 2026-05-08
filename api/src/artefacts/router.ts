@@ -226,17 +226,22 @@ router.post('/:name/versions', async (req, res, next) => {
 
     // Stream the multipart file straight into the configured storage at a
     // staging path — no local fs tmp needed even for the S3 backend.
-    const { architecture } = await streamTarballUpload(req, (stream) => writeFile(stream, stagingPath))
+    const { architecture, category: uploadCategory } = await streamTarballUpload(req, (stream) => writeFile(stream, stagingPath))
     stagingStored = true
 
     // Extract manifest by reading the staged object back (pipeline enforces decompression limits).
     const { body: manifestStream } = await readFile(stagingPath)
-    const manifest = await extractManifest(manifestStream)
+    const manifest = await extractManifest(manifestStream, {
+      maxDecompressedBytes: config.maxDecompressedBytes,
+      maxTarEntries: config.maxTarEntries
+    })
     if (manifest.name !== name) {
       throw httpError(400, `package name mismatch: URL says "${name}" but package.json says "${manifest.name}"`)
     }
 
-    const category = pickCategory(manifest.category, npmCategories)
+    // Multipart `category` field overrides what's in package.json#registry.category
+    // (used by the v6 migration to backfill a category for legacy plugin tarballs).
+    const category = pickCategory(uploadCategory ?? manifest.category, npmCategories)
     if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
       throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
     }
@@ -307,8 +312,8 @@ router.post('/:name/versions', async (req, res, next) => {
     })
     storedOk = true
 
-    // 2-deep retention: keep only the 2 most recent patches per minor branch
-    await pruneOldVersions(artefactId, semverParts.semverMajor, semverParts.semverMinor)
+    // Retention: keep latest of each older major, last 2 of latest major.
+    await pruneOldVersions(artefactId)
 
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     res.status(201).json({ artefact, version: { _id: versionId, version: manifest.version } })
@@ -504,10 +509,10 @@ router.get('/:id/download', async (req, res, next) => {
 // `architecture` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.
 type StreamWriter = (stream: Readable) => Promise<void>
 
-function streamTarballUpload (req: import('express').Request, writer: StreamWriter): Promise<{ architecture?: string }> {
+function streamTarballUpload (req: import('express').Request, writer: StreamWriter): Promise<{ architecture?: string, category?: string }> {
   return new Promise((resolve, reject) => {
     let settled = false
-    const settle = (err: Error | null, result?: { architecture?: string }) => {
+    const settle = (err: Error | null, result?: { architecture?: string, category?: string }) => {
       if (settled) return
       settled = true
       if (err) reject(err)
@@ -515,6 +520,7 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
     }
 
     let architecture: string | undefined
+    let category: string | undefined
     let fileSeen = false
     let pendingWrite: Promise<void> | null = null
 
@@ -531,6 +537,11 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
 
     busboy.on('field', (name, val) => {
       if (name === 'architecture') architecture = val
+      // Optional override for the artefact category. Plugin tarballs from before
+      // the registry convention don't carry `package.json#registry.category`,
+      // so the migration sends it as a multipart field. New plugins should
+      // declare it in package.json.
+      if (name === 'category') category = val
     })
 
     busboy.on('file', (_name, stream) => {
@@ -560,7 +571,7 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
         return settle(err as Error)
       }
       if (settled) return
-      settle(null, { architecture })
+      settle(null, { architecture, category })
     })
 
     req.on('aborted', () => settle(httpError(400, 'upload aborted')))

@@ -8,8 +8,7 @@ import {
   parseSemver,
   resolveVersionQuery,
   computePruneSet,
-  MAX_DECOMPRESSED_BYTES,
-  MAX_TAR_ENTRIES
+  MAX_DECOMPRESSED_BYTES
 } from '../api/src/artefacts/service-pure.ts'
 
 const gzipBuffer = async (raw: Buffer): Promise<Buffer> => {
@@ -216,78 +215,82 @@ test.describe('extractManifest', () => {
   })
 
   test('caps entry count', async () => {
-    // Construct a tarball with MAX_TAR_ENTRIES+10 entries where package.json
-    // is LAST, so early-abort doesn't save us.
-    if (MAX_TAR_ENTRIES > 20000) {
-      test.skip()
-      return
-    }
+    // Use the opts override so this stays cheap regardless of the default cap.
+    // package.json is LAST so the early-abort doesn't save us.
+    const cap = 50
     const entries: Array<{ name: string, content: string }> = []
-    for (let i = 0; i < MAX_TAR_ENTRIES + 10; i++) {
+    for (let i = 0; i < cap + 10; i++) {
       entries.push({ name: `package/a${i}.txt`, content: 'x' })
     }
     entries.push({ name: 'package/package.json', content: manifest() })
     const tarball = await packTarball(entries)
-    await expect(extractManifest(Readable.from(tarball))).rejects.toMatchObject({ status: 413 })
+    await expect(extractManifest(Readable.from(tarball), { maxTarEntries: cap })).rejects.toMatchObject({ status: 413 })
   })
 })
 
 test.describe('computePruneSet', () => {
-  const v = (patch: number, arch?: string) => ({ semverPatch: patch, architecture: arch, _id: `${patch}${arch ?? ''}` })
+  const v = (major: number, minor: number, patch: number, arch?: string) => ({
+    semverMajor: major,
+    semverMinor: minor,
+    semverPatch: patch,
+    architecture: arch,
+    _id: `${major}.${minor}.${patch}${arch ?? ''}`
+  })
 
-  test('keeps up to 2 distinct patches — no delete needed', () => {
-    expect(computePruneSet([v(5), v(4)])).toEqual([])
-    expect(computePruneSet([v(3)])).toEqual([])
+  test('empty / single / no-prune-needed cases', () => {
     expect(computePruneSet([])).toEqual([])
+    expect(computePruneSet([v(1, 0, 0)])).toEqual([])
+    // Two versions of the latest major — both kept.
+    expect(computePruneSet([v(1, 1, 0), v(1, 0, 0)])).toEqual([])
   })
 
-  test('deletes older patches past the 2-deep window', () => {
-    const versions = [v(5), v(4), v(3), v(2), v(1)]
+  test('latest major: keeps last 2 distinct (minor, patch) tuples', () => {
+    const versions = [v(5, 2, 1), v(5, 2, 0), v(5, 1, 0), v(5, 0, 0)]
     const toDelete = computePruneSet(versions)
-    expect(toDelete.map(x => x.semverPatch)).toEqual([3, 2, 1])
+    expect(toDelete.map(x => x._id)).toEqual(['5.1.0', '5.0.0'])
   })
 
-  test('multi-arch same patch: all variants of a kept patch are retained', () => {
-    const versions = [v(5, 'x86_64'), v(5, 'arm64'), v(4, 'x86_64'), v(4, 'arm64')]
-    // Only 2 distinct patches → nothing to delete even though 4 docs exist.
-    expect(computePruneSet(versions)).toEqual([])
-  })
-
-  test('multi-arch staggered patches: pruning all variants of the oldest patch', () => {
-    // Input is already sorted: (5,x86),(5,arm),(4,x86),(3,x86),(3,arm)
+  test('older major: keeps only the latest version', () => {
     const versions = [
-      v(5, 'x86_64'), v(5, 'arm64'),
-      v(4, 'x86_64'),
-      v(3, 'x86_64'), v(3, 'arm64')
+      v(5, 0, 0), // latest major; keeps top 2 — only 1 here, kept
+      v(4, 3, 5), v(4, 2, 0), v(4, 1, 0), v(4, 0, 0) // older major; only 4.3.5 kept
     ]
     const toDelete = computePruneSet(versions)
-    // Distinct patches: [5,4,3] → keep [5,4], delete both arch variants of 3.
-    expect(toDelete).toHaveLength(2)
-    expect(toDelete.every(x => x.semverPatch === 3)).toBe(true)
+    expect(toDelete.map(x => x._id).sort()).toEqual(['4.0.0', '4.1.0', '4.2.0'])
   })
 
-  test('uploading a third arch for a high patch does not delete lower patches unexpectedly', () => {
-    // Scenario: already had 1.0.1, 1.0.2; then 1.0.2 uploaded for a third arch.
-    // Distinct patches are still [2,1] so nothing should be deleted.
+  test('mixed majors example: latest keeps 2, others keep 1', () => {
     const versions = [
-      v(2, 'x86_64'), v(2, 'arm64'), v(2, 'armv7'),
-      v(1, 'x86_64')
-    ]
-    expect(computePruneSet(versions)).toEqual([])
-  })
-
-  test('five patches with mixed arch: keeps top 2 patches across all arches', () => {
-    const versions = [
-      v(5, 'x86_64'),
-      v(4, 'arm64'),
-      v(3, 'x86_64'), v(3, 'arm64'),
-      v(2, 'x86_64'),
-      v(1, 'x86_64')
+      v(5, 2, 1), v(5, 2, 0), v(5, 1, 0), v(5, 0, 0),
+      v(4, 3, 5), v(4, 2, 0), v(4, 1, 0), v(4, 0, 0),
+      v(3, 0, 1), v(3, 0, 0)
     ]
     const toDelete = computePruneSet(versions)
-    const deletedPatches = new Set(toDelete.map(x => x.semverPatch))
-    expect(deletedPatches).toEqual(new Set([3, 2, 1]))
-    // Verify both arch variants of patch 3 are in the delete set.
-    expect(toDelete.filter(x => x.semverPatch === 3)).toHaveLength(2)
+    const deletedIds = toDelete.map(x => x._id).sort()
+    expect(deletedIds).toEqual([
+      '3.0.0',
+      '4.0.0', '4.1.0', '4.2.0',
+      '5.0.0', '5.1.0'
+    ])
+  })
+
+  test('multi-arch: every variant of a kept tuple is retained, every variant of a pruned tuple is deleted', () => {
+    const versions = [
+      v(5, 1, 0, 'x64'), v(5, 1, 0, 'arm64'),
+      v(5, 0, 0, 'x64'), v(5, 0, 0, 'arm64'),
+      v(4, 2, 0, 'x64'), v(4, 2, 0, 'arm64'),
+      v(4, 1, 0, 'x64')
+    ]
+    const toDelete = computePruneSet(versions)
+    // Latest major 5: keep tuples {(1,0), (0,0)} → both arch variants kept (4 docs).
+    // Older major 4: keep tuple {(2,0)} → both arch variants kept; (1,0) pruned (1 doc).
+    expect(toDelete).toHaveLength(1)
+    expect(toDelete[0]._id).toBe('4.1.0x64')
+  })
+
+  test('only one major present: behaves as latest-major rule (top 2 tuples)', () => {
+    const versions = [v(2, 5, 0), v(2, 4, 1), v(2, 4, 0), v(2, 3, 0)]
+    const toDelete = computePruneSet(versions)
+    expect(toDelete.map(x => x._id)).toEqual(['2.4.0', '2.3.0'])
   })
 })

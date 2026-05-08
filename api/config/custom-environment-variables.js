@@ -19,6 +19,14 @@ export default {
     __name: 'MAX_UPLOAD_BYTES',
     __format: 'number'
   },
+  maxDecompressedBytes: {
+    __name: 'MAX_DECOMPRESSED_BYTES',
+    __format: 'number'
+  },
+  maxTarEntries: {
+    __name: 'MAX_TAR_ENTRIES',
+    __format: 'number'
+  },
   filesStorage: 'FILES_STORAGE',
   s3: {
     region: 'S3_REGION',

@@ -14,17 +14,17 @@ export {
 } from './service-pure.ts'
 
 /**
- * 2-deep retention: keep only the 2 most recent distinct patch values
- * (ignoring prereleases) per minor branch. All architecture variants for a
- * kept patch are retained; variants for pruned patches are fully deleted.
+ * Cross-major retention (prereleases excluded). For older majors keeps the
+ * latest version only; for the latest major keeps the 2 most recent. See
+ * computePruneSet for the full rule set. Every architecture variant of a
+ * pruned (major, minor, patch) tuple is deleted; every variant of a kept
+ * tuple stays.
  */
-export const pruneOldVersions = async (artefactId: string, semverMajor: number, semverMinor: number) => {
+export const pruneOldVersions = async (artefactId: string) => {
   const versions = await mongo.versions.find({
     artefactId,
-    semverMajor,
-    semverMinor,
     semverPrerelease: { $exists: false }
-  }).sort({ semverPatch: -1, architecture: 1 }).toArray()
+  }).sort({ semverMajor: -1, semverMinor: -1, semverPatch: -1, architecture: 1 }).toArray()
 
   const toDelete = computePruneSet(versions)
   for (const version of toDelete) {
