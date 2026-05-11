@@ -350,7 +350,8 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
     const filter = artefactAccessFilter(caller)
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
-    // Download = grant + access. Same rule for every auth path; admins bypass.
+    // Download = public/privateAccess (already enforced by `filter` above) +
+    // an access-grant — except admins and trusted internal callers, see canDownload.
     await assertDownloadAccess(caller, artefact)
 
     const architecture = typeof req.query.architecture === 'string' ? req.query.architecture : undefined

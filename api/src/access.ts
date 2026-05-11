@@ -11,14 +11,20 @@ export type Account = { type: string, id: string, department?: string }
  * - `admin: true` → bypass all access checks. Used for superadmin sessions
  *   and for internal-secret calls that did not set `x-account`.
  * - `account` set → caller acts on behalf of that account. Listing returns
- *   public artefacts plus those with a matching `privateAccess` entry;
- *   downloads additionally require the account to hold an access-grant.
+ *   public artefacts plus those with a matching `privateAccess` entry.
+ *   Downloads additionally require the account to hold an access-grant,
+ *   UNLESS `internal` is set.
+ * - `internal: true` → the account context came from a trusted sibling
+ *   service (internal secret + `x-account`), not from an external API key or
+ *   session. Such callers skip the access-grant requirement on downloads —
+ *   only the artefact's own `public`/`privateAccess` gate applies. Always
+ *   accompanied by `account`.
  * - neither → anonymous. Only public artefacts are visible; no downloads.
  *
  * The same `Caller` shape is built from any auth path (session, read API
  * key, internal secret + `x-account`) by `resolveCaller(req)` in `auth.ts`.
  */
-export type Caller = { admin: boolean, account?: Account }
+export type Caller = { admin: boolean, account?: Account, internal?: boolean }
 
 /**
  * Mongo filter for *listing/reading* artefact metadata.
@@ -43,23 +49,29 @@ export const artefactAccessFilter = (caller: Caller): Filter<Artefact> => {
 /**
  * True iff the caller can DOWNLOAD this artefact.
  *
- * Downloads require both:
- *  - the caller account holds a global access-grant, AND
+ * Downloads require:
  *  - the artefact is public OR carries an explicit `privateAccess` for the
- *    caller's account.
+ *    caller's account, AND
+ *  - the caller account holds a global access-grant — UNLESS the caller is a
+ *    trusted internal sibling service (`caller.internal`), which is exempt
+ *    from the grant requirement (the processings API/worker acting on behalf
+ *    of a processing's owner must be able to fetch plugin tarballs without an
+ *    operator manually enrolling every owner).
  *
- * Admins bypass both checks. Anonymous callers can never download — even
+ * Admins bypass everything. Anonymous callers can never download — even
  * public artefacts — because access-grants are the gate for any sustained
- * consumption of registry data.
+ * external consumption of registry data.
  */
 export const canDownload = async (caller: Caller, artefact: Artefact): Promise<boolean> => {
   if (caller.admin) return true
   if (!caller.account) return false
-  const grant = await mongo.accessGrants.findOne({
-    'account.type': caller.account.type,
-    'account.id': caller.account.id
-  })
-  if (!grant) return false
+  if (!caller.internal) {
+    const grant = await mongo.accessGrants.findOne({
+      'account.type': caller.account.type,
+      'account.id': caller.account.id
+    })
+    if (!grant) return false
+  }
   if (artefact.public) return true
   return !!artefact.privateAccess?.some(
     a => a.type === caller.account!.type && a.id === caller.account!.id

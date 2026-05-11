@@ -57,8 +57,10 @@ export type InternalAuthResult =
  *   is set. This preserves the historical full-bypass behaviour for
  *   internal admin tasks.
  * - Returns `{ account }` when the secret is valid AND a well-formed
- *   `x-account` is present. The caller must then enforce access-grants for
- *   that account before serving artefact data.
+ *   `x-account` is present. `resolveCaller` marks the resulting `Caller` as
+ *   `internal`, so the account's `public`/`privateAccess` gate still applies
+ *   but the access-grant requirement on downloads does not (trusted sibling
+ *   service acting on behalf of one of its own owners).
  *
  * Throws 400 on a malformed `x-account` header (so a bug in the caller
  * surfaces loudly rather than silently falling back to bypass).
@@ -114,7 +116,7 @@ export const resolveCaller = async (req: Request): Promise<Caller> => {
   const internal = tryInternalSecretWithAccount(req)
   if (internal) {
     if (internal.account === null) return { admin: true }
-    return { admin: false, account: internal.account }
+    return { admin: false, account: internal.account, internal: true }
   }
   const readAuth = await tryAuthenticateReadKey(req)
   if (readAuth) return { admin: false, account: readAuth.owner }

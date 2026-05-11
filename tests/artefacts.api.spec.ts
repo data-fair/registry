@@ -583,6 +583,45 @@ test.describe('Artefacts', () => {
       expect(res.headers['content-type']).toContain('gzip')
     })
 
+    test('download with internal secret + x-account does not require an access-grant (public artefact)', async () => {
+      const ax = axiosInternal('secret-internal')
+      // No POST /access-grants for this account: a trusted sibling service
+      // (processings worker acting on behalf of a processing owner) must be
+      // able to fetch a public artefact's tarball without operator enrolment.
+      const res = await ax.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.0/tarball', {
+        responseType: 'arraybuffer',
+        headers: { 'x-account': JSON.stringify({ type: 'organization', id: 'no-grant-org' }) }
+      })
+      expect(res.status).toBe(200)
+      expect(res.headers['content-type']).toContain('gzip')
+    })
+
+    test('download with internal secret + x-account still respects privateAccess on a private artefact', async () => {
+      const admin = await superAdmin
+      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', {
+        public: false,
+        privateAccess: [{ type: 'organization', id: 'test1' }]
+      })
+      const ax = axiosInternal('secret-internal')
+
+      // account on privateAccess, no grant → allowed
+      const ok = await ax.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.0/tarball', {
+        responseType: 'arraybuffer',
+        headers: { 'x-account': JSON.stringify({ type: 'organization', id: 'test1' }) }
+      })
+      expect(ok.status).toBe(200)
+
+      // account neither public nor on privateAccess → not visible
+      try {
+        await ax.get('/api/v1/artefacts/%40test%2Fpkg/versions/1.0.0/tarball', {
+          headers: { 'x-account': JSON.stringify({ type: 'organization', id: 'other-org' }) }
+        })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
+
     test('download with session + grant', async () => {
       const admin = await superAdmin
       await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
