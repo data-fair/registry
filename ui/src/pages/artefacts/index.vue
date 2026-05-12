@@ -70,7 +70,10 @@
       />
 
       <template v-else-if="artefactsFetch.data.value">
-        <v-table density="comfortable">
+        <v-table
+          density="comfortable"
+          hover
+        >
           <thead>
             <tr>
               <th style="width: 56px;" />
@@ -85,8 +88,7 @@
             <tr
               v-for="artefact in artefactsFetch.data.value.results"
               :key="artefact._id"
-              style="cursor: pointer;"
-              @click="router.push(`/artefacts/${encodeURIComponent(artefact._id)}`)"
+              class="artefact-row"
             >
               <td>
                 <img
@@ -99,7 +101,12 @@
                 >
               </td>
               <td>
-                <strong>{{ (artefact.title as any)?.[locale] || artefact.name }}</strong>
+                <router-link
+                  :to="`/artefacts/${encodeURIComponent(artefact._id)}`"
+                  class="artefact-row-link"
+                >
+                  <strong>{{ (artefact.title as any)?.[locale] || artefact.name }}</strong>
+                </router-link>
                 <br>
                 <span class="text-medium-emphasis text-body-2">{{ artefact._id }}</span>
               </td>
@@ -292,14 +299,12 @@ en:
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { mdiMagnify, mdiDelete } from '@mdi/js'
 import { VDateInput } from 'vuetify/labs/VDateInput'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
-const router = useRouter()
 const session = useSession()
 const { dayjs } = useLocaleDayjs()
 
@@ -380,3 +385,20 @@ async function deleteKey (id: string) {
   }
 }
 </script>
+
+<style scoped>
+.artefact-row {
+  position: relative;
+}
+.artefact-row-link {
+  color: inherit;
+  text-decoration: none;
+}
+/* Stretch the link over the whole row so the entire line is clickable while
+   staying a real <a> — middle-click / open-in-new-tab / hover preview work. */
+.artefact-row-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+</style>
