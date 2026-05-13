@@ -149,7 +149,7 @@ async function main () {
     {
       id: '@koumoul/application-demo@1',
       body: {
-        privateAccess: [{ type: 'organization', id: 'test1' }],
+        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }],
         title: { fr: 'Application de démo', en: 'Demo application' }
       }
     },
@@ -165,7 +165,7 @@ async function main () {
     },
     {
       id: 'basemap-style',
-      body: { privateAccess: [{ type: 'organization', id: 'test1' }] }
+      body: { privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] }
     }
   ]
 

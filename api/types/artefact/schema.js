@@ -112,58 +112,25 @@ export default {
       layout: { if: '!parent.data?.public' },
       items: {
         type: 'object',
-        discriminator: { propertyName: 'type' },
-        oneOfLayout: { emptyData: true },
-        oneOf: [
-          {
-            title: 'Organization',
-            'x-i18n-title': { fr: 'Organisation' },
-            required: ['type', 'id'],
-            additionalProperties: false,
-            properties: {
-              type: { type: 'string', const: 'organization' },
-              id: {
-                type: 'string',
-                title: 'Organization',
-                'x-i18n-title': { fr: 'Organisation' },
-                layout: {
-                  getItems: {
-                    url: '/simple-directory/api/organizations?size=20',
-                    qSearchParam: 'q',
-                    itemsResults: 'data.results',
-                    itemTitle: '`${item.name} (${item.id})`',
-                    itemValue: 'item.id',
-                    itemIcon: '`/simple-directory/api/avatars/organization/${item.id}/avatar.png`'
-                  }
-                }
-              }
-            }
-          },
-          {
-            title: 'User',
-            'x-i18n-title': { fr: 'Utilisateur' },
-            required: ['type', 'id'],
-            additionalProperties: false,
-            properties: {
-              type: { type: 'string', const: 'user' },
-              id: {
-                type: 'string',
-                title: 'User',
-                'x-i18n-title': { fr: 'Utilisateur' },
-                layout: {
-                  getItems: {
-                    url: '/simple-directory/api/users?size=20',
-                    qSearchParam: 'q',
-                    itemsResults: 'data.results',
-                    itemTitle: '`${item.name} (${item.id})`',
-                    itemValue: 'item.id',
-                    itemIcon: '`/simple-directory/api/avatars/user/${item.id}/avatar.png`'
-                  }
-                }
-              }
-            }
+        title: 'Account',
+        'x-i18n-title': { fr: 'Compte' },
+        additionalProperties: false,
+        required: ['type', 'id', 'name'],
+        properties: {
+          type: { type: 'string', enum: ['user', 'organization'] },
+          id: { type: 'string' },
+          name: { type: 'string' }
+        },
+        layout: {
+          getItems: {
+            url: '/simple-directory/api/accounts?size=20',
+            qSearchParam: 'q',
+            itemsResults: 'data.results',
+            itemTitle: '`${item.name} (${item.id})`',
+            itemKey: '`${item.type}:${item.id}`',
+            itemIcon: '`/simple-directory/api/avatars/${item.type}/${item.id}/avatar.png`'
           }
-        ]
+        }
       }
     },
     documentation: {

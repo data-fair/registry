@@ -180,7 +180,7 @@ test.describe('API Keys', () => {
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await ax.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true, privateAccess: [{ type: 'organization', id: 'test1' }] })
+    await ax.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true, privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] })
 
     // Create a read key and use it
     await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })

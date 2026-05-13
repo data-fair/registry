@@ -25,7 +25,7 @@ test.describe('Account-facing access patterns', () => {
     form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/%40test%2Fprivate-pkg/versions', form2, { headers: form2.getHeaders() })
     await admin.patch('/api/v1/artefacts/%40test%2Fprivate-pkg', {
-      privateAccess: [{ type: 'organization', id: 'test1' }]
+      privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
     })
 
     // Grant access to test1 org

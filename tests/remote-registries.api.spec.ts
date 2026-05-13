@@ -291,7 +291,7 @@ test.describe('Remote registries', () => {
       // Allowed: public and privateAccess
       const okRes = await ax.patch('/api/v1/artefacts/%40test%2Fmirrored', {
         public: true,
-        privateAccess: [{ type: 'organization', id: 'test1' }]
+        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
       })
       expect(okRes.data.public).toBe(true)
 

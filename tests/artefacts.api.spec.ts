@@ -570,7 +570,7 @@ test.describe('Artefacts', () => {
       await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
       await admin.patch('/api/v1/artefacts/%40test%2Fpkg', {
         public: true,
-        privateAccess: [{ type: 'organization', id: 'test1' }]
+        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
       })
     })
 
@@ -600,7 +600,7 @@ test.describe('Artefacts', () => {
       const admin = await superAdmin
       await admin.patch('/api/v1/artefacts/%40test%2Fpkg', {
         public: false,
-        privateAccess: [{ type: 'organization', id: 'test1' }]
+        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
       })
       const ax = axiosInternal('secret-internal')
 

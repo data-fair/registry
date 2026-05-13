@@ -140,7 +140,7 @@ test.describe('File artefacts', () => {
       await ax.post('/api/v1/artefacts/file/terrain', form, { headers: form.getHeaders() })
       await admin.patch('/api/v1/artefacts/terrain', {
         public: true,
-        privateAccess: [{ type: 'organization', id: 'test1' }]
+        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
       })
     })
 
