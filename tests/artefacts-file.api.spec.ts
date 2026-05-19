@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, axiosInternal, clean, resetSize, runBackfillSize, resetDataUpdatedAt, runBackfillDataUpdatedAt } from './support/axios.ts'
+import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, axiosInternal, clean } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 test.describe('File artefacts', () => {
@@ -201,45 +201,6 @@ test.describe('File artefacts', () => {
     })
   })
 
-  // TODO: remove with backfill-size upgrade
-  test.describe('Size backfill', () => {
-    test('backfill restores size on artefacts and versions missing it', async () => {
-      const ax = axiosWithApiKey(uploadApiKey)
-      const admin = await superAdmin
-
-      // npm version
-      const tarball = await createTestTarball({ name: '@test/sized-pkg', version: '1.0.0' })
-      const tarballSize = tarball.length
-      const npmForm = new FormData()
-      npmForm.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/%40test%2Fsized-pkg/versions', npmForm, { headers: npmForm.getHeaders() })
-
-      // file artefact
-      const fileForm = new FormData()
-      fileForm.append('file', Buffer.from('hello-world-bytes'), { filename: 'a.bin', contentType: 'application/octet-stream' })
-      fileForm.append('category', 'other')
-      await ax.post('/api/v1/artefacts/file/sized-file', fileForm, { headers: fileForm.getHeaders() })
-
-      // Simulate pre-existing rows: drop size, then run upgrade
-      await resetSize()
-      const beforeNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg/versions/1.0.0')
-      expect(beforeNpmVer.data.size).toBeUndefined()
-      const beforeNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg')
-      expect(beforeNpmArtefact.data.size).toBeUndefined()
-      const beforeFile = await admin.get('/api/v1/artefacts/sized-file')
-      expect(beforeFile.data.size).toBeUndefined()
-
-      await runBackfillSize()
-
-      const afterNpmVer = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg/versions/1.0.0')
-      expect(afterNpmVer.data.size).toBe(tarballSize)
-      const afterNpmArtefact = await admin.get('/api/v1/artefacts/%40test%2Fsized-pkg')
-      expect(afterNpmArtefact.data.size).toBe(tarballSize)
-      const afterFile = await admin.get('/api/v1/artefacts/sized-file')
-      expect(afterFile.data.size).toBe(Buffer.byteLength('hello-world-bytes'))
-    })
-  })
-
   test.describe('dataUpdatedAt', () => {
     test('upload sets dataUpdatedAt; metadata patch leaves it unchanged', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
@@ -290,53 +251,6 @@ test.describe('File artefacts', () => {
       fileForm2.append('category', 'other')
       const fileRes2 = await ax.post('/api/v1/artefacts/file/data-file', fileForm2, { headers: fileForm2.getHeaders() })
       expect(fileRes2.data.artefact.dataUpdatedAt > initialFileDataUpdatedAt).toBe(true)
-    })
-
-    // TODO: remove with backfill-data-updated-at upgrade
-    test('backfill restores dataUpdatedAt on artefacts missing it', async () => {
-      const ax = axiosWithApiKey(uploadApiKey)
-      const admin = await superAdmin
-
-      // npm artefact with two versions — backfill should pick the latest version's uploadedAt
-      const tarball1 = await createTestTarball({ name: '@test/data-pkg', version: '1.0.0' })
-      const npmForm1 = new FormData()
-      npmForm1.append('file', tarball1, { filename: 'p.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/%40test%2Fdata-pkg/versions', npmForm1, { headers: npmForm1.getHeaders() })
-      await new Promise(resolve => setTimeout(resolve, 5))
-      const tarball2 = await createTestTarball({ name: '@test/data-pkg', version: '1.0.1' })
-      const npmForm2 = new FormData()
-      npmForm2.append('file', tarball2, { filename: 'p.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/%40test%2Fdata-pkg/versions', npmForm2, { headers: npmForm2.getHeaders() })
-
-      const latestVersion = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg/versions/1.0.1')
-      const latestUploadedAt = latestVersion.data.uploadedAt
-
-      // file artefact
-      const fileForm = new FormData()
-      fileForm.append('file', Buffer.from('data'), { filename: 'a.bin', contentType: 'application/octet-stream' })
-      fileForm.append('category', 'other')
-      const fileUploadedBefore = Date.now()
-      await ax.post('/api/v1/artefacts/file/data-file', fileForm, { headers: fileForm.getHeaders() })
-      const fileUploadedAfter = Date.now()
-
-      // Simulate pre-existing rows
-      await resetDataUpdatedAt()
-      const beforeNpm = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg')
-      expect(beforeNpm.data.dataUpdatedAt).toBeUndefined()
-      const beforeFile = await admin.get('/api/v1/artefacts/data-file')
-      expect(beforeFile.data.dataUpdatedAt).toBeUndefined()
-
-      await runBackfillDataUpdatedAt()
-
-      const afterNpm = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg')
-      expect(afterNpm.data.dataUpdatedAt).toBe(latestUploadedAt)
-      // File-format artefacts derive dataUpdatedAt from the storage backend's
-      // last-modified time — assert it's set within the upload window
-      // (filesystem mtime can have second-resolution, so allow a small slack).
-      const afterFile = await admin.get('/api/v1/artefacts/data-file')
-      const ts = new Date(afterFile.data.dataUpdatedAt).getTime()
-      expect(ts).toBeGreaterThanOrEqual(fileUploadedBefore - 1000)
-      expect(ts).toBeLessThanOrEqual(fileUploadedAfter + 1000)
     })
   })
 })

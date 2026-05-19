@@ -2,7 +2,6 @@ import mongoLib from '@data-fair/lib-node/mongo.js'
 import type { Binary } from 'mongodb'
 import config from '#config'
 import type { Artefact } from '#types/artefact/index.ts'
-import type { Version } from '#types/version/index.ts'
 import type { ApiKey } from '#types/api-key/index.ts'
 import type { AccessGrant } from '#types/access-grant/index.ts'
 import type { RemoteRegistry } from '#types/remote-registry/index.ts'
@@ -29,10 +28,6 @@ export class RegistryMongo {
 
   get artefacts () {
     return mongoLib.db.collection<Artefact>('artefacts')
-  }
-
-  get versions () {
-    return mongoLib.db.collection<Version>('versions')
   }
 
   get apiKeys () {
@@ -82,9 +77,6 @@ export class RegistryMongo {
             'description.en': 1
           }
         }]
-      },
-      versions: {
-        'artefact-version-arch': [{ artefactId: 1, version: 1, architecture: 1 }, { unique: true }]
       },
       'api-keys': {
         'hashed-key': [{ hashedKey: 1 }, { unique: true }],
