@@ -19,36 +19,27 @@ export interface EnsureArtefactOpts {
   registryUrl: string
   secretKey: string
   artefactId: string
-  version: string
   cacheDir: string
   /**
-   * Architecture to request (e.g. 'arm64', 'x64'). Defaults to the running
-   * Node process arch (`process.arch`). Pass an empty string to opt out and
-   * leave selection up to the registry (legacy behaviour).
-   *
-   * Registry resolution semantics: an arch-tagged tarball is preferred; if no
-   * tarball matches the requested arch, the registry falls back to a tarball
-   * uploaded with no architecture (noarch). If neither exists, the call
-   * returns 404.
+   * Architecture to request. Defaults to the running Node process arch.
+   * Pass an empty string to skip the arch query (registry returns the
+   * `noarch` slot if present).
    */
   architecture?: string
-  /**
-   * When set, the registry validates that this account has access to the
-   * artefact (public OR explicit privateAccess grant). Combined with
-   * `secretKey`, this lets internal services act on behalf of an account
-   * without bypassing access control.
-   */
   account?: Account
 }
 
 export interface EnsureArtefactResult {
   path: string
+  /** Manifest-extracted version from the artefact doc; display-only. */
   version: string
+  /** `dataUpdatedAt` of the artefact doc when this download happened. */
+  dataUpdatedAt: string
   downloaded: boolean
 }
 
 interface CacheMeta {
-  version: string
+  dataUpdatedAt: string
   architecture?: string
 }
 
@@ -59,131 +50,34 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
 
   const encodedId = encodeURIComponent(opts.artefactId)
-  const params = architecture ? { architecture } : undefined
-  const versionRes = await ax.get(`/api/v1/artefacts/${encodedId}/versions/${opts.version}`, { params })
-  const resolvedVersion: string = versionRes.data.version
-  // The registry may have served a noarch fallback if no exact-arch match existed.
-  const resolvedArch: string | undefined = versionRes.data.architecture
+  const detailRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
+  const artefact = detailRes.data
+  if (artefact.format !== 'npm') {
+    throw new Error(`artefact ${opts.artefactId} is not an npm artefact (format=${artefact.format})`)
+  }
+  const dataUpdatedAt: string = artefact.dataUpdatedAt || artefact.updatedAt
+  const version: string = artefact.version
 
   const artefactDir = join(opts.cacheDir, opts.artefactId)
-  const metaPath = join(artefactDir, '.current-version.json')
-  // Cache key includes arch suffix so two pods on different arches don't clobber each other.
-  const cacheKey = `${resolvedVersion}${resolvedArch ? '_' + resolvedArch : ''}`
+  const metaPath = join(artefactDir, '.current.json')
+  const cacheKey = architecture ? `${architecture}` : 'noarch'
   const extractDir = join(artefactDir, cacheKey)
 
-  // Check cache
   try {
     const raw = await readFile(metaPath, 'utf-8')
     const meta: CacheMeta = JSON.parse(raw)
-    if (meta.version === resolvedVersion && (meta.architecture ?? undefined) === resolvedArch) {
-      return { path: extractDir, version: resolvedVersion, downloaded: false }
-    }
-  } catch {
-    // no cache or invalid metadata
-  }
-
-  // Download tarball — same arch query so the registry serves the same variant we just resolved
-  const tarballRes = await ax.get(
-    `/api/v1/artefacts/${encodedId}/versions/${resolvedVersion}/tarball`,
-    { responseType: 'stream', params }
-  )
-
-  // Extract to temp dir then atomic rename
-  const tmpDir = `${extractDir}.tmp.${process.pid}`
-  await rm(tmpDir, { recursive: true, force: true })
-  await mkdir(tmpDir, { recursive: true })
-  try {
-    await extractTarball(tarballRes.data as Readable, tmpDir)
-  } catch (err) {
-    await rm(tmpDir, { recursive: true, force: true })
-    throw err
-  }
-  await rm(extractDir, { recursive: true, force: true })
-  await rename(tmpDir, extractDir)
-
-  // Clean up old version
-  try {
-    const raw = await readFile(metaPath, 'utf-8')
-    const oldMeta: CacheMeta = JSON.parse(raw)
-    const oldKey = `${oldMeta.version}${oldMeta.architecture ? '_' + oldMeta.architecture : ''}`
-    if (oldKey !== cacheKey) {
-      await rm(join(artefactDir, oldKey), { recursive: true, force: true })
-    }
-  } catch {
-    // no old version to clean
-  }
-
-  // Write cache metadata
-  const meta: CacheMeta = { version: resolvedVersion, ...(resolvedArch ? { architecture: resolvedArch } : {}) }
-  await writeFile(metaPath, JSON.stringify(meta))
-
-  return { path: extractDir, version: resolvedVersion, downloaded: true }
-}
-
-export interface EnsureBranchArtefactOpts {
-  registryUrl: string
-  secretKey: string
-  artefactId: string
-  cacheDir: string
-  /** Optional account context, mirrors `ensureArtefact`. */
-  account?: Account
-}
-
-export interface EnsureBranchArtefactResult {
-  path: string
-  /**
-   * Source artefact's `dataUpdatedAt`. Branch tarballs are mutable, so
-   * callers that need to detect a new build between calls can compare this
-   * across invocations.
-   */
-  dataUpdatedAt: string
-  /** `true` when a new tarball was downloaded (cache miss). */
-  downloaded: boolean
-}
-
-interface BranchCacheMeta {
-  dataUpdatedAt: string
-}
-
-/**
- * Fetch a branch artefact (rolling, single-tarball, no versions).
- *
- * Two-step flow: fetch the artefact doc to read `dataUpdatedAt`, then
- * download the tarball if our cached copy is stale or missing. The on-disk
- * cache lives under `<cacheDir>/<artefactId>/current/` with a sibling meta
- * file `.current-branch.json`. Versioned (`npm`) artefacts use
- * `ensureArtefact`; raw-file artefacts use `ensureArtefactFile`.
- */
-export async function ensureBranchArtefact (opts: EnsureBranchArtefactOpts): Promise<EnsureBranchArtefactResult> {
-  const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
-  if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
-  const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
-  const encodedId = encodeURIComponent(opts.artefactId)
-
-  const detailRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
-  if (detailRes.data.format !== 'branch') {
-    throw new Error(`artefact ${opts.artefactId} is not a branch artefact (format=${detailRes.data.format})`)
-  }
-  const dataUpdatedAt: string = detailRes.data.dataUpdatedAt || detailRes.data.updatedAt
-
-  const artefactDir = join(opts.cacheDir, opts.artefactId)
-  const metaPath = join(artefactDir, '.current-branch.json')
-  const extractDir = join(artefactDir, 'current')
-
-  try {
-    const raw = await readFile(metaPath, 'utf-8')
-    const meta: BranchCacheMeta = JSON.parse(raw)
-    if (meta.dataUpdatedAt === dataUpdatedAt) {
-      return { path: extractDir, dataUpdatedAt, downloaded: false }
+    if (meta.dataUpdatedAt === dataUpdatedAt && (meta.architecture ?? undefined) === architecture) {
+      return { path: extractDir, version, dataUpdatedAt, downloaded: false }
     }
   } catch {
     // cold cache or invalid metadata
   }
 
-  const tarballRes = await ax.get(
-    `/api/v1/artefacts/${encodedId}/branch/tarball`,
-    { responseType: 'stream' }
-  )
+  const params = architecture ? { architecture } : undefined
+  const tarballRes = await ax.get(`/api/v1/artefacts/${encodedId}/tarball`, {
+    responseType: 'stream',
+    params
+  })
 
   const tmpDir = `${extractDir}.tmp.${process.pid}`
   await rm(tmpDir, { recursive: true, force: true })
@@ -197,10 +91,10 @@ export async function ensureBranchArtefact (opts: EnsureBranchArtefactOpts): Pro
   await rm(extractDir, { recursive: true, force: true })
   await rename(tmpDir, extractDir)
 
-  const meta: BranchCacheMeta = { dataUpdatedAt }
+  const meta: CacheMeta = { dataUpdatedAt, ...(architecture ? { architecture } : {}) }
   await writeFile(metaPath, JSON.stringify(meta))
 
-  return { path: extractDir, dataUpdatedAt, downloaded: true }
+  return { path: extractDir, version, dataUpdatedAt, downloaded: true }
 }
 
 export interface EnsureArtefactFileOpts {
