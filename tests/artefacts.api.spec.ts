@@ -14,6 +14,131 @@ test.describe('Artefacts', () => {
     uploadApiKey = keyRes.data.key
   })
 
+  test.describe('Unified npm upload', () => {
+    test.beforeEach(async () => {
+      await clean()
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'test-upload' })
+      uploadApiKey = keyRes.data.key
+    })
+
+    test('upload happy path creates an npm artefact with one tarball slot', async () => {
+      const tarball = await createTestTarball({
+        name: '@data-fair/processing-gpkg',
+        version: '1.2.3',
+        licence: 'MIT',
+        category: 'processing'
+      })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+      form.append('architecture', 'x64')
+
+      const ax = axiosWithApiKey(uploadApiKey)
+      const res = await ax.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@data-fair/processing-gpkg@1'),
+        form,
+        { headers: form.getHeaders() }
+      )
+      expect(res.status).toBe(201)
+      expect(res.data.artefact._id).toBe('@data-fair/processing-gpkg@1')
+      expect(res.data.artefact.format).toBe('npm')
+      expect(res.data.artefact.packageName).toBe('@data-fair/processing-gpkg')
+      expect(res.data.artefact.version).toBe('1.2.3')
+      expect(res.data.artefact.category).toBe('processing')
+      expect(res.data.artefact.tarballs).toBeTruthy()
+      expect(res.data.artefact.tarballs.x64).toBeTruthy()
+      expect(typeof res.data.artefact.tarballs.x64.size).toBe('number')
+      expect(res.data.artefact.tarballs.x64.size).toBeGreaterThan(0)
+      expect(res.data.artefact.tarballs.x64.uploadedBy.apiKeyName).toBe('test-upload')
+    })
+
+    test('upload without architecture form field defaults to noarch slot', async () => {
+      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+
+      const ax = axiosWithApiKey(uploadApiKey)
+      const res = await ax.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        form,
+        { headers: form.getHeaders() }
+      )
+      expect(res.status).toBe(201)
+      expect(res.data.artefact.tarballs.noarch).toBeTruthy()
+      expect(res.data.artefact.tarballs.x64).toBeUndefined()
+    })
+
+    test('per-arch upload updates only that slot', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      for (const arch of ['x64', 'arm64']) {
+        const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+        const form = new FormData()
+        form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+        form.append('architecture', arch)
+        await ax.post(
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+          form,
+          { headers: form.getHeaders() }
+        )
+      }
+      const admin = await superAdmin
+      const detail = await admin.get('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'))
+      expect(Object.keys(detail.data.tarballs).sort()).toEqual(['arm64', 'x64'])
+    })
+
+    test('re-upload to same arch swaps the tarball and bumps dataUpdatedAt', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form1 = new FormData()
+      form1.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      form1.append('architecture', 'x64')
+      const first = await ax.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        form1,
+        { headers: form1.getHeaders() }
+      )
+      const firstPath = first.data.artefact.tarballs.x64.path
+      const firstDataAt = first.data.artefact.dataUpdatedAt
+
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      const form2 = new FormData()
+      form2.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.1' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      form2.append('architecture', 'x64')
+      const second = await ax.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        form2,
+        { headers: form2.getHeaders() }
+      )
+      expect(second.data.artefact.tarballs.x64.path).not.toBe(firstPath)
+      expect(second.data.artefact.version).toBe('1.0.1')
+      expect(second.data.artefact.dataUpdatedAt).not.toBe(firstDataAt)
+    })
+
+    test('re-upload with different manifest name on the same artefact id returns 409', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form1 = new FormData()
+      form1.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      await ax.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        form1,
+        { headers: form1.getHeaders() }
+      )
+
+      const form2 = new FormData()
+      form2.append('file', await createTestTarball({ name: '@other/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      try {
+        await ax.post(
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+          form2,
+          { headers: form2.getHeaders() }
+        )
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(409)
+      }
+    })
+  })
+
   test.describe('Upload', () => {
     test('upload a tarball with valid API key', async () => {
       const tarball = await createTestTarball({

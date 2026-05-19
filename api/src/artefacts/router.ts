@@ -13,7 +13,7 @@ import config from '#config'
 import { authenticateApiKey, resolveCaller, tryInternalSecretWithAccount } from '../auth.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { writeFile, readFile, getDownloadUrl, deleteFile, moveFile, fileStats } from '../files-storage/index.ts'
-import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
+import { extractManifest } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
 
@@ -116,23 +116,14 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// Get artefact detail + versions
+// Get artefact detail
+// All formats carry their tarball references directly on the doc.
 router.get('/:id', async (req, res, next) => {
   try {
     const filter = artefactAccessFilter(await resolveCaller(req))
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
-
-    if (artefact.format === 'npm') {
-      const versions = await mongo.versions.find({ artefactId: artefact._id })
-        .sort({ semverMajor: -1, semverMinor: -1, semverPatch: -1 })
-        .toArray()
-      res.json({ ...artefact, versions })
-    } else {
-      // file and branch artefacts carry their single tarball reference directly
-      // on the doc — no versions sub-collection.
-      res.json(artefact)
-    }
+    res.json(artefact)
   } catch (err) { next(err) }
 })
 
@@ -476,6 +467,112 @@ router.post('/file/:name', async (req, res, next) => {
   } catch (err) {
     if (stagingStored) await deleteFile(stagingPath).catch(() => {})
     if (newFilePath && !storedOk) await deleteFile(newFilePath).catch(() => {})
+    next(err)
+  }
+})
+
+// Upload npm artefact (API key or internal secret auth, multipart).
+// Each artefact id holds a `tarballs: { [arch]: ... }` map; per-arch upload
+// updates one slot, leaves the others alone. `noarch` is the default arch
+// for portable builds.
+router.post('/npm/:id', async (req, res, next) => {
+  const stagingPath = `_staging/${randomUUID()}.tgz`
+  let stagingStored = false
+  let newTarballPath: string | undefined
+  let storedOk = false
+  try {
+    const isInternal = tryInternalSecret(req)
+    let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
+    if (!isInternal) {
+      apiKey = await authenticateApiKey(req)
+      if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload npm artefacts')
+    }
+
+    const id = safeDecode(req.params.id)
+    if (apiKey?.allowedName && apiKey.allowedName !== id) {
+      throw httpError(403, `this API key is not allowed to upload "${id}"`)
+    }
+
+    const existing = await mongo.artefacts.findOne({ _id: id })
+    if (existing?.origin) {
+      throw httpError(409, 'this artefact is managed by a remote registry')
+    }
+    if (existing && existing.format !== 'npm') {
+      throw httpError(409, `this artefact already exists as a "${existing.format}" artefact`)
+    }
+
+    const { architecture, category: uploadCategory } = await streamTarballUpload(req, (stream) => writeFile(stream, stagingPath))
+    stagingStored = true
+
+    const { body: manifestStream } = await readFile(stagingPath)
+    const manifest = await extractManifest(manifestStream, {
+      maxDecompressedBytes: config.maxDecompressedBytes,
+      maxTarEntries: config.maxTarEntries
+    })
+
+    if (existing?.packageName && existing.packageName !== manifest.name) {
+      throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
+    }
+
+    const category = pickCategory(uploadCategory ?? manifest.category, npmCategories)
+    if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
+      throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
+    }
+
+    const arch = architecture || 'noarch'
+    const tarballPath = `npm/${id}/${arch}-${randomUUID()}.tgz`
+    await moveFile(stagingPath, tarballPath)
+    stagingStored = false
+    newTarballPath = tarballPath
+    const { size } = await fileStats(tarballPath)
+
+    const now = new Date().toISOString()
+    const tarballEntry = {
+      path: tarballPath,
+      size,
+      uploadedAt: now,
+      uploadedBy: apiKey
+        ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+        : { internal: true }
+    }
+
+    await mongo.artefacts.updateOne(
+      { _id: id },
+      {
+        $set: {
+          packageName: manifest.name,
+          version: manifest.version,
+          ...(manifest.licence ? { licence: manifest.licence } : {}),
+          category,
+          [`tarballs.${arch}`]: tarballEntry,
+          size,
+          updatedAt: now,
+          dataUpdatedAt: now
+        },
+        $setOnInsert: {
+          _id: id,
+          name: id,
+          format: 'npm' as const,
+          public: false,
+          privateAccess: [],
+          createdAt: now
+        }
+      },
+      { upsert: true }
+    )
+    storedOk = true
+
+    // Best-effort delete of the previous occupant of this arch slot.
+    const previousPath = (existing as any)?.tarballs?.[arch]?.path
+    if (previousPath && previousPath !== tarballPath) {
+      await deleteFile(previousPath).catch(() => {})
+    }
+
+    const artefact = await mongo.artefacts.findOne({ _id: id })
+    res.status(201).json({ artefact })
+  } catch (err) {
+    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
+    if (newTarballPath && !storedOk) await deleteFile(newTarballPath).catch(() => {})
     next(err)
   }
 })
