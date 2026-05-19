@@ -21,8 +21,7 @@ export type Account = { type: string, id: string, department?: string }
  *   accompanied by `account`.
  * - `viaReadKey: true` → the caller authenticated with a read-type API key.
  *   This is the federation path: a remote registry mirroring artefacts from
- *   this one. Branch artefacts are hidden from these callers so dev builds
- *   never federate outward (see `artefactAccessFilter`).
+ *   this one.
  * - neither → anonymous. Only public artefacts are visible; no downloads.
  *
  * The same `Caller` shape is built from any auth path (session, read API
@@ -40,18 +39,14 @@ export type Caller = { admin: boolean, account?: Account, internal?: boolean, vi
  * who isn't on their `privateAccess` list.
  */
 export const artefactAccessFilter = (caller: Caller): Filter<Artefact> => {
-  // Sender-side federation filter: branch artefacts never federate. A read
-  // API key is the federation path, so we hide branch artefacts from those
-  // callers regardless of their access scope.
-  const base: Filter<Artefact> = caller.viaReadKey ? { format: { $ne: 'branch' } } : {}
-  if (caller.admin) return base
+  if (caller.admin) return {}
   const orClauses: Filter<Artefact>[] = [{ public: true }]
   if (caller.account) {
     orClauses.push({
       privateAccess: { $elemMatch: { type: caller.account.type, id: caller.account.id } }
     })
   }
-  return { ...base, $or: orClauses }
+  return { $or: orClauses }
 }
 
 /**
