@@ -111,23 +111,23 @@ jobs:
           npm pack
           TARBALL=$(ls ./*.tgz)
 
-          # 2. Extract to ./staging/package/ (npm tarball's top-level prefix).
-          mkdir staging
-          tar xzf "$TARBALL" -C staging
+          # 2. Extract to ./build/package/ (npm tarball's top-level prefix).
+          mkdir build
+          tar xzf "$TARBALL" -C build
 
           # 3. `npm pack` excludes package-lock.json; copy it in for a
           # reproducible `npm ci`.
-          cp package-lock.json staging/package/
+          cp package-lock.json build/package/
 
           # 4. Install prod deps INSIDE the consumer base image so native
           # bindings are musl-linked and match what runs in production.
           docker run --rm \
-            -v "$PWD/staging/package:/work" -w /work \
+            -v "$PWD/build/package:/work" -w /work \
             "$ALPINE_NODE_IMAGE" \
             npm ci --omit=dev --omit=optional --no-audit --no-fund
 
           # 5. Repack, preserving the `package/` prefix the registry expects.
-          tar czf with-deps.tgz -C staging package
+          tar czf with-deps.tgz -C build package
 
       - name: Upload to registry
         env:
@@ -195,15 +195,24 @@ jobs:
 
 For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, use a **branch artefact**. A branch artefact carries a single mutable tarball — the registry's docker-tag analogue — replaced in place on each upload, never federated outward.
 
-Branch artefacts live under a distinct `_id` (operator-chosen), separate from the release artefact. By convention this is `<package-name>-<branch>`, so `@data-fair/processing-gpkg` would have a sibling `@data-fair/processing-gpkg-main` in staging. Naming is convention, not enforced — the registry just stores `packageName` from the manifest and `branchName` from the upload.
+A branch artefact lives at its own `_id`, distinct from the release artefact and chosen by you (the operator). The recommended convention is `<package-name>-<branch>`, so the source package `@data-fair/processing-gpkg` would have a sibling branch artefact `@data-fair/processing-gpkg-main` in staging. The registry doesn't enforce the convention — it stores the `packageName` extracted from `package.json` separately from the artefact `_id`, plus the `branchName` you send as a form field.
+
+Two registries, two artefacts:
+
+| Production registry | Staging registry |
+|--------------------|------------------|
+| `@data-fair/processing-gpkg` (npm, versioned) | `@data-fair/processing-gpkg` (npm, mirrored from prod via federation, read-only) |
+|  | `@data-fair/processing-gpkg-main` (branch, local) |
+
+Branch artefacts are filtered out of the federation feed, so the production registry never sees them.
 
 ### Step 1 — Create the staging upload API key
 
 In the **staging** registry UI, create a key (separate from the production one):
 
 - **Type:** `upload`
-- **Name:** `ci-<plugin>-staging`
-- **Allowed name:** `<package-name>-<branch>` (e.g. `@data-fair/processing-gpkg-main`)
+- **Name:** `ci-<plugin>-staging` (e.g. `ci-processing-gpkg-staging`)
+- **Allowed name:** the branch artefact's `_id`, **not** the package name (e.g. `@data-fair/processing-gpkg-main`). The URL path segment, the API key scope, and the artefact's stored `_id` must all agree.
 
 This key only authenticates against the staging registry. The production key from the tag flow above stays unchanged.
 
@@ -240,6 +249,9 @@ jobs:
     env:
       REGISTRY_URL: https://staging-koumoul.com/registry
       ALPINE_NODE_IMAGE: node:24.11.1-alpine3.22
+      # Branch artefact id on the staging registry — must match `allowedName`
+      # on the staging upload key.
+      BRANCH_ARTEFACT_SUFFIX: -main
     steps:
       - uses: actions/checkout@v4
 
@@ -252,14 +264,14 @@ jobs:
           set -euo pipefail
           npm pack
           TARBALL=$(ls ./*.tgz)
-          mkdir staging
-          tar xzf "$TARBALL" -C staging
-          cp package-lock.json staging/package/
+          mkdir build
+          tar xzf "$TARBALL" -C build
+          cp package-lock.json build/package/
           docker run --rm \
-            -v "$PWD/staging/package:/work" -w /work \
+            -v "$PWD/build/package:/work" -w /work \
             "$ALPINE_NODE_IMAGE" \
             npm ci --omit=dev --omit=optional --no-audit --no-fund
-          tar czf with-deps.tgz -C staging package
+          tar czf with-deps.tgz -C build package
 
       - name: Upload branch build to staging
         env:
@@ -267,21 +279,31 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE_NAME=$(node -p "require('./package.json').name")
-          BRANCH_ARTEFACT_NAME="${PACKAGE_NAME}-main"
+          BRANCH_ARTEFACT_NAME="${PACKAGE_NAME}${BRANCH_ARTEFACT_SUFFIX}"
           ENCODED_NAME=$(node -p "encodeURIComponent('${BRANCH_ARTEFACT_NAME}')")
           curl -f -X POST \
             "${REGISTRY_URL}/api/v1/artefacts/branch/${ENCODED_NAME}" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
-            -F "branchName=main" \
+            -F "branchName=${GITHUB_REF_NAME}" \
             -F "architecture=x64" \
             -F "file=@with-deps.tgz"
 ```
 
 Notes:
 
-- The build step is identical to the tag flow. Don't extract it into a reusable workflow yet — copy-paste stays readable until there's a third consumer.
+- The build step is byte-for-byte identical to the tag-flow build step. Don't extract it into a reusable workflow yet — copy-paste stays readable until there's a third consumer.
 - No tag-vs-`package.json` version check here; there's no tag. The manifest's `version` is stored on the artefact doc for display only.
-- Consumers that pin to the branch artefact (e.g. a processing configured against `@data-fair/processing-gpkg-main`) pick up new uploads automatically via `dataUpdatedAt` cache invalidation in `@data-fair/lib-node-registry`'s `ensureBranchArtefact`.
+- `branchName` is informational — it shows up in the staging UI as a "dev: main" chip on the artefact and on any processing pointed at it. The registry doesn't parse it.
+
+### Consumer side
+
+On the staging instance, when an operator creates a processing against the staging registry:
+
+1. The processings UI's plugin picker shows the branch artefact alongside the federated releases, with a `dev: main` chip.
+2. Picking it stores `pluginId = "<branch-artefact-id>"` on the processing — no `@major` suffix, because there are no versions to pin.
+3. The worker resolves it via `ensureBranchArtefact` on each run. The on-disk cache is keyed by the artefact's `dataUpdatedAt`, so every successful CI push triggers a fresh download on the next processing run.
+
+Consumer services need `@data-fair/lib-node-registry` **≥ 0.3.0** for `ensureBranchArtefact` to exist.
 
 ---
 
@@ -419,7 +441,7 @@ This is inherently more secure than GitHub's default model — the protection is
 ### Minimal checklist
 
 - [ ] API key stored as a CI secret (never in code)
-- [ ] API key scoped with `allowedName` to the plugin's `package.json#name`
+- [ ] API key scoped with `allowedName` — to the plugin's `package.json#name` for the tag flow, or to the operator-chosen `<package-name>-<branch>` artefact id for the branch flow
 - [ ] Publish job restricted to tag pushes on protected branches
 - [ ] **GitHub: secret stored in an environment (not repository level) with required reviewers**
 - [ ] **GitHub: environment restricted to specific branches/tags**
