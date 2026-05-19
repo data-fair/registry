@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { ObjectId } from 'mongodb'
 import locks from '@data-fair/lib-node/locks.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import type { AxiosInstance } from 'axios'
@@ -12,54 +11,42 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
   const encodedId = encodeURIComponent(artefactId)
   const remoteRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
   const remoteArtefact = remoteRes.data
-  const remoteVersions: any[] = remoteArtefact.versions || []
+  type TarballSlot = NonNullable<Artefact['tarballs']>[string]
+  const remoteTarballs: Record<string, TarballSlot & { uploadedAt: string }> =
+    remoteArtefact.tarballs || {}
 
-  const localVersions = await mongo.versions.find({ artefactId }).toArray()
-  const localVersionKeys = new Set(localVersions.map(v => `${v.version}:${v.architecture || ''}`))
-  const remoteVersionKeys = new Set(remoteVersions.map((v: any) => `${v.version}:${v.architecture || ''}`))
+  const local = await mongo.artefacts.findOne({ _id: artefactId })
+  const localTarballs: Record<string, TarballSlot & { uploadedAt: string }> = local?.tarballs || {}
 
-  // Download missing versions — stream the remote response straight into our
-  // configured files-storage, no local fs detour.
-  for (const rv of remoteVersions) {
-    const key = `${rv.version}:${rv.architecture || ''}`
-    if (localVersionKeys.has(key)) continue
-
-    const dlRes = await ax.get(`/api/v1/artefacts/${encodedId}/versions/${rv.version}/tarball`, {
-      responseType: 'stream'
-    })
-    await writeFile(dlRes.data, rv.tarballPath)
-
-    await mongo.versions.insertOne({
-      _id: new ObjectId().toString(),
-      artefactId,
-      version: rv.version,
-      ...(rv.architecture ? { architecture: rv.architecture } : {}),
-      semverMajor: rv.semverMajor,
-      semverMinor: rv.semverMinor,
-      semverPatch: rv.semverPatch,
-      ...(rv.semverPrerelease ? { semverPrerelease: rv.semverPrerelease } : {}),
-      tarballPath: rv.tarballPath,
-      ...(typeof rv.size === 'number' ? { size: rv.size } : {}),
-      uploadedAt: rv.uploadedAt,
-      ...(rv.uploadedBy ? { uploadedBy: rv.uploadedBy } : {})
-    })
-  }
-
-  // Delete local versions pruned upstream
-  for (const lv of localVersions) {
-    const key = `${lv.version}:${lv.architecture || ''}`
-    if (!remoteVersionKeys.has(key)) {
-      await deleteFile(lv.tarballPath).catch(() => {})
-      await mongo.versions.deleteOne({ _id: lv._id })
+  const newTarballs: typeof localTarballs = {}
+  for (const [arch, remoteSlot] of Object.entries(remoteTarballs)) {
+    const localSlot = localTarballs[arch]
+    if (localSlot && localSlot.uploadedAt === remoteSlot.uploadedAt) {
+      newTarballs[arch] = localSlot
+      continue
+    }
+    // Download the tarball for this arch slot — stream straight into storage.
+    const dlRes = await ax.get(
+      `/api/v1/artefacts/${encodedId}/tarball?architecture=${encodeURIComponent(arch)}`,
+      { responseType: 'stream' }
+    )
+    await writeFile(dlRes.data, remoteSlot.path)
+    newTarballs[arch] = {
+      path: remoteSlot.path,
+      size: remoteSlot.size ?? 0,
+      uploadedAt: remoteSlot.uploadedAt,
+      ...(remoteSlot.uploadedBy ? { uploadedBy: remoteSlot.uploadedBy } : {})
     }
   }
 
-  // Upsert artefact metadata. latestMajor mirrors the upstream value if
-  // present, otherwise we recompute from the synced versions.
+  // Delete local arch slots pruned upstream.
+  for (const [arch, localSlot] of Object.entries(localTarballs)) {
+    if (!(arch in remoteTarballs)) {
+      await deleteFile(localSlot.path).catch(() => {})
+    }
+  }
+
   const now = new Date().toISOString()
-  const latestMajor = typeof remoteArtefact.latestMajor === 'number'
-    ? remoteArtefact.latestMajor
-    : remoteVersions.reduce((m, v) => Math.max(m, v.semverMajor ?? 0), 0)
   await mongo.artefacts.updateOne(
     { _id: artefactId },
     {
@@ -72,7 +59,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
         ...(remoteArtefact.group ? { group: remoteArtefact.group } : {}),
         ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
-        latestMajor,
+        tarballs: newTarballs,
         origin: remoteUrl,
         updatedAt: now,
         dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
