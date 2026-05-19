@@ -40,7 +40,6 @@ export interface EnsureArtefactResult {
 
 interface CacheMeta {
   dataUpdatedAt: string
-  architecture?: string
 }
 
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
@@ -59,14 +58,14 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   const version: string = artefact.version
 
   const artefactDir = join(opts.cacheDir, opts.artefactId)
-  const metaPath = join(artefactDir, '.current.json')
   const cacheKey = architecture ? `${architecture}` : 'noarch'
   const extractDir = join(artefactDir, cacheKey)
+  const metaPath = join(extractDir, '.meta.json')
 
   try {
     const raw = await readFile(metaPath, 'utf-8')
     const meta: CacheMeta = JSON.parse(raw)
-    if (meta.dataUpdatedAt === dataUpdatedAt && (meta.architecture ?? undefined) === architecture) {
+    if (meta.dataUpdatedAt === dataUpdatedAt) {
       return { path: extractDir, version, dataUpdatedAt, downloaded: false }
     }
   } catch {
@@ -84,15 +83,14 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   await mkdir(tmpDir, { recursive: true })
   try {
     await extractTarball(tarballRes.data as Readable, tmpDir)
+    // Write meta inside tmpDir so it survives the rename atomically.
+    await writeFile(join(tmpDir, '.meta.json'), JSON.stringify({ dataUpdatedAt } satisfies CacheMeta))
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true })
     throw err
   }
   await rm(extractDir, { recursive: true, force: true })
   await rename(tmpDir, extractDir)
-
-  const meta: CacheMeta = { dataUpdatedAt, ...(architecture ? { architecture } : {}) }
-  await writeFile(metaPath, JSON.stringify(meta))
 
   return { path: extractDir, version, dataUpdatedAt, downloaded: true }
 }
