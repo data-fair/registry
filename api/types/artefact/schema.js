@@ -12,14 +12,7 @@ export default {
   properties: {
     _id: { type: 'string', readOnly: true },
     name: { type: 'string', readOnly: true },
-    format: { type: 'string', enum: ['npm', 'file', 'branch'], readOnly: true },
-    branchName: { type: 'string', readOnly: true },
-    architecture: { type: 'string', readOnly: true },
-    latestMajor: {
-      type: 'integer',
-      readOnly: true,
-      description: 'Highest semverMajor across published versions. Maintained on every upload; lets clients pin new processings to the current major without listing versions.'
-    },
+    format: { type: 'string', enum: ['npm', 'file'], readOnly: true },
     packageName: { type: 'string', readOnly: true },
     version: { type: 'string', readOnly: true },
     licence: { type: 'string', readOnly: true },
@@ -27,66 +20,52 @@ export default {
       type: 'string',
       enum: ['processing', 'catalog', 'application', 'tileset', 'maplibre-style', 'other']
     },
+    tarballs: {
+      type: 'object',
+      readOnly: true,
+      additionalProperties: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['path', 'size', 'uploadedAt'],
+        properties: {
+          path: { type: 'string' },
+          size: { type: 'integer' },
+          uploadedAt: { type: 'string', format: 'date-time' },
+          uploadedBy: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              apiKeyId: { type: 'string' },
+              apiKeyName: { type: 'string' },
+              shortId: { type: 'string' },
+              internal: { type: 'boolean' }
+            }
+          }
+        }
+      }
+    },
     title: {
       type: 'object',
       additionalProperties: false,
       properties: {
-        en: {
-          type: 'string',
-          title: 'Title - English',
-          'x-i18n-title': { fr: 'Titre - Anglais' },
-          layout: { cols: { md: 6 } }
-        },
-        fr: {
-          type: 'string',
-          title: 'Title - French',
-          'x-i18n-title': { fr: 'Titre - Français' },
-          layout: { cols: { md: 6 } }
-        }
+        en: { type: 'string', title: 'Title - English', 'x-i18n-title': { fr: 'Titre - Anglais' }, layout: { cols: { md: 6 } } },
+        fr: { type: 'string', title: 'Title - French', 'x-i18n-title': { fr: 'Titre - Français' }, layout: { cols: { md: 6 } } }
       }
     },
     description: {
       type: 'object',
       additionalProperties: false,
       properties: {
-        en: {
-          type: 'string',
-          title: 'Description - English',
-          'x-i18n-title': { fr: 'Description - Anglais' },
-          layout: {
-            comp: 'textarea',
-            props: { autoGrow: true, rows: 3 },
-            cols: { md: 6 }
-          }
-        },
-        fr: {
-          type: 'string',
-          title: 'Description - French',
-          'x-i18n-title': { fr: 'Description - Français' },
-          layout: {
-            comp: 'textarea',
-            props: { autoGrow: true, rows: 3 },
-            cols: { md: 6 }
-          }
-        }
+        en: { type: 'string', title: 'Description - English', 'x-i18n-title': { fr: 'Description - Anglais' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { md: 6 } } },
+        fr: { type: 'string', title: 'Description - French', 'x-i18n-title': { fr: 'Description - Français' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { md: 6 } } }
       }
     },
     group: {
       type: 'object',
       additionalProperties: false,
       properties: {
-        en: {
-          type: 'string',
-          title: 'Group - English',
-          'x-i18n-title': { fr: 'Groupe - Anglais' },
-          layout: { cols: { md: 6 } }
-        },
-        fr: {
-          type: 'string',
-          title: 'Group - French',
-          'x-i18n-title': { fr: 'Groupe - Français' },
-          layout: { cols: { md: 6 } }
-        }
+        en: { type: 'string', title: 'Group - English', 'x-i18n-title': { fr: 'Groupe - Anglais' }, layout: { cols: { md: 6 } } },
+        fr: { type: 'string', title: 'Group - French', 'x-i18n-title': { fr: 'Groupe - Français' }, layout: { cols: { md: 6 } } }
       }
     },
     thumbnail: {
