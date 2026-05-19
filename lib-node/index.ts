@@ -120,6 +120,89 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   return { path: extractDir, version: resolvedVersion, downloaded: true }
 }
 
+export interface EnsureBranchArtefactOpts {
+  registryUrl: string
+  secretKey: string
+  artefactId: string
+  cacheDir: string
+  /** Optional account context, mirrors `ensureArtefact`. */
+  account?: Account
+}
+
+export interface EnsureBranchArtefactResult {
+  path: string
+  /**
+   * Source artefact's `dataUpdatedAt`. Branch tarballs are mutable, so
+   * callers that need to detect a new build between calls can compare this
+   * across invocations.
+   */
+  dataUpdatedAt: string
+  /** `true` when a new tarball was downloaded (cache miss). */
+  downloaded: boolean
+}
+
+interface BranchCacheMeta {
+  dataUpdatedAt: string
+}
+
+/**
+ * Fetch a branch artefact (rolling, single-tarball, no versions).
+ *
+ * Two-step flow: fetch the artefact doc to read `dataUpdatedAt`, then
+ * download the tarball if our cached copy is stale or missing. The on-disk
+ * cache lives under `<cacheDir>/<artefactId>/current/` with a sibling meta
+ * file `.current-branch.json`. Versioned (`npm`) artefacts use
+ * `ensureArtefact`; raw-file artefacts use `ensureArtefactFile`.
+ */
+export async function ensureBranchArtefact (opts: EnsureBranchArtefactOpts): Promise<EnsureBranchArtefactResult> {
+  const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
+  if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
+  const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
+  const encodedId = encodeURIComponent(opts.artefactId)
+
+  const detailRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
+  if (detailRes.data.format !== 'branch') {
+    throw new Error(`artefact ${opts.artefactId} is not a branch artefact (format=${detailRes.data.format})`)
+  }
+  const dataUpdatedAt: string = detailRes.data.dataUpdatedAt || detailRes.data.updatedAt
+
+  const artefactDir = join(opts.cacheDir, opts.artefactId)
+  const metaPath = join(artefactDir, '.current-branch.json')
+  const extractDir = join(artefactDir, 'current')
+
+  try {
+    const raw = await readFile(metaPath, 'utf-8')
+    const meta: BranchCacheMeta = JSON.parse(raw)
+    if (meta.dataUpdatedAt === dataUpdatedAt) {
+      return { path: extractDir, dataUpdatedAt, downloaded: false }
+    }
+  } catch {
+    // cold cache or invalid metadata
+  }
+
+  const tarballRes = await ax.get(
+    `/api/v1/artefacts/${encodedId}/branch/tarball`,
+    { responseType: 'stream' }
+  )
+
+  const tmpDir = `${extractDir}.tmp.${process.pid}`
+  await rm(tmpDir, { recursive: true, force: true })
+  await mkdir(tmpDir, { recursive: true })
+  try {
+    await extractTarball(tarballRes.data as Readable, tmpDir)
+  } catch (err) {
+    await rm(tmpDir, { recursive: true, force: true })
+    throw err
+  }
+  await rm(extractDir, { recursive: true, force: true })
+  await rename(tmpDir, extractDir)
+
+  const meta: BranchCacheMeta = { dataUpdatedAt }
+  await writeFile(metaPath, JSON.stringify(meta))
+
+  return { path: extractDir, dataUpdatedAt, downloaded: true }
+}
+
 export interface EnsureArtefactFileOpts {
   registryUrl: string
   secretKey: string

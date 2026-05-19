@@ -4,7 +4,16 @@ This guide covers how to publish artefacts to the registry from GitHub Actions a
 
 ## API Key Setup
 
-Upload API keys are created by a superadmin in the registry UI. The raw key is displayed **once** at creation time — copy it immediately and store it as a CI secret. It is never retrievable again (only a SHA-512 hash is stored server-side).
+Upload API keys are created by a superadmin in the registry UI ("Admin → API keys → New"). Pick:
+
+- **Type:** `upload`.
+- **Name:** something you can audit — e.g. `ci-<plugin>-<env>` (`ci-processing-gpkg-prod`).
+- **Allowed name:** the exact `package.json#name` of the plugin (e.g. `@data-fair/processing-gpkg`). Scoping to one package means a leaked key can only overwrite that package's versions.
+- **Allowed category:** optional, but recommended for tileset-style file uploads (`tileset`, `maplibre-style`).
+
+The raw key is displayed **once** at creation time — copy it immediately and store it as a CI secret. It is never retrievable again (only a SHA-512 hash is stored server-side).
+
+You need **one key per registry environment**. A key issued by `koumoul.com/registry` will not authenticate against `staging-koumoul.com/registry` and vice-versa.
 
 ## Authentication
 
@@ -20,16 +29,44 @@ curl -X POST https://registry.example.com/api/v1/artefacts/<name>/versions \
 
 ## GitHub Actions
 
-### Storing the secret
+The recommended setup for an npm-format plugin (processing, catalog, application) is **one workflow file, triggered on `v*` tags, publishing a tarball that bundles `node_modules` built inside the same Alpine image consumers run**. Three steps end-to-end.
+
+### Step 1 — Create the upload API key
+
+In the registry UI (see [API Key Setup](#api-key-setup) above), create a key for the production registry (e.g. `https://koumoul.com/registry`):
+
+- **Type:** `upload`
+- **Name:** `ci-<plugin>-prod` (e.g. `ci-processing-gpkg-prod`)
+- **Allowed name:** the exact `package.json#name` (e.g. `@data-fair/processing-gpkg`)
+
+Copy the key immediately — it is shown once.
+
+### Step 2 — Create the `production` environment and store the key
 
 **Use environment secrets, not repository secrets** (see [Security Best Practices](#github-actions-understanding-the-threat-model) below).
 
-1. Go to **Settings > Environments** and create an environment (e.g., `production`).
-2. Add a required reviewer (deployment protection rule).
-3. Optionally restrict to branches/tags (e.g., `main` and `v*`).
-4. In the environment, add a secret named `REGISTRY_API_KEY`.
+UI flow:
 
-### Workflow example (npm tarball)
+1. Repo → **Settings > Environments > New environment** → name `production`.
+2. Add a **required reviewer** (deployment protection rule).
+3. Under **Deployment branches and tags**, add the rule `v*` so the environment is only available on release tags.
+4. Click **Add secret** → name `REGISTRY_API_KEY`, value = the key from step 1.
+
+Or with the GitHub CLI:
+
+```bash
+gh api -X PUT "repos/$OWNER/$REPO/environments/production" \
+  -f reviewers='[{"type":"User","id":<your-user-id>}]' \
+  --field deployment_branch_policy='{"protected_branches":false,"custom_branch_policies":true}'
+gh api -X POST "repos/$OWNER/$REPO/environments/production/deployment-branch-policies" -f name='v*'
+gh secret set REGISTRY_API_KEY --env production
+```
+
+### Step 3 — Add the publish workflow
+
+The tarball must contain `node_modules` because consumer services (e.g. the processings worker) install the artefact via `@data-fair/lib-node-registry`, which only extracts the tarball — it never runs `npm install`. Native binaries must be built on the same base image consumers run (currently `node:24.11.1-alpine3.22`), or musl-vs-glibc mismatches will crash at load time.
+
+`.github/workflows/publish.yml`:
 
 ```yaml
 name: Publish to Registry
@@ -38,38 +75,84 @@ on:
     tags:
       - 'v*'
 
-# IMPORTANT: no permissions needed beyond default read for checkout
 permissions:
   contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # CRITICAL: only run on tag pushes to the default branch
     if: github.ref_type == 'tag' && github.event_name == 'push'
-    environment: production  # require manual approval if configured
+    environment: production
+    env:
+      REGISTRY_URL: https://koumoul.com/registry
+      # Must match the base image used by the consumer service (e.g. processings).
+      # Bump this in lockstep with the consumer Dockerfile.
+      ALPINE_NODE_IMAGE: node:24.11.1-alpine3.22
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
 
-      - run: npm ci
-      - run: npm pack
+      - name: Check tag matches package.json version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Build artefact with bundled node_modules
+        run: |
+          set -euo pipefail
+          # 1. Source layer via `npm pack` — respects package.json#files.
+          npm pack
+          TARBALL=$(ls ./*.tgz)
+
+          # 2. Extract to ./staging/package/ (npm tarball's top-level prefix).
+          mkdir staging
+          tar xzf "$TARBALL" -C staging
+
+          # 3. `npm pack` excludes package-lock.json; copy it in for a
+          # reproducible `npm ci`.
+          cp package-lock.json staging/package/
+
+          # 4. Install prod deps INSIDE the consumer base image so native
+          # bindings are musl-linked and match what runs in production.
+          docker run --rm \
+            -v "$PWD/staging/package:/work" -w /work \
+            "$ALPINE_NODE_IMAGE" \
+            npm ci --omit=dev --omit=optional --no-audit --no-fund
+
+          # 5. Repack, preserving the `package/` prefix the registry expects.
+          tar czf with-deps.tgz -C staging package
 
       - name: Upload to registry
         env:
           REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
         run: |
-          TARBALL=$(ls *.tgz)
+          set -euo pipefail
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           ENCODED_NAME=$(node -p "encodeURIComponent('${PACKAGE_NAME}')")
           curl -f -X POST \
-            "https://registry.example.com/api/v1/artefacts/${ENCODED_NAME}/versions" \
+            "${REGISTRY_URL}/api/v1/artefacts/${ENCODED_NAME}/versions" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
-            -F "file=@${TARBALL}"
+            -F "architecture=x64" \
+            -F "file=@with-deps.tgz"
 ```
+
+Then cut a release the usual way:
+
+```bash
+npm version patch        # bumps package.json + creates a vX.Y.Z tag
+git push --follow-tags
+```
+
+The `production` environment will pause the run until your reviewer approves; on approval the build pushes one `architecture=x64` tarball to the registry. Consumers running on `process.arch === 'x64'` pick it up automatically — the consumer-side `ensureArtefact` call defaults to `process.arch` when no architecture is passed.
+
+> **Building arm64 artefacts** uses the same workflow with `runs-on: ubuntu-24.04-arm` (or a self-hosted arm64 runner) — the `architecture=x64` form field becomes `architecture=arm64`. A multi-arch matrix is a straight extension of this recipe.
 
 ### Workflow example (file artefact)
 
@@ -105,6 +188,100 @@ jobs:
             -F "category=tileset" \
             -F 'title={"fr":"Terrain","en":"Terrain"}'
 ```
+
+---
+
+## Publishing a branch build to staging
+
+For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, use a **branch artefact**. A branch artefact carries a single mutable tarball — the registry's docker-tag analogue — replaced in place on each upload, never federated outward.
+
+Branch artefacts live under a distinct `_id` (operator-chosen), separate from the release artefact. By convention this is `<package-name>-<branch>`, so `@data-fair/processing-gpkg` would have a sibling `@data-fair/processing-gpkg-main` in staging. Naming is convention, not enforced — the registry just stores `packageName` from the manifest and `branchName` from the upload.
+
+### Step 1 — Create the staging upload API key
+
+In the **staging** registry UI, create a key (separate from the production one):
+
+- **Type:** `upload`
+- **Name:** `ci-<plugin>-staging`
+- **Allowed name:** `<package-name>-<branch>` (e.g. `@data-fair/processing-gpkg-main`)
+
+This key only authenticates against the staging registry. The production key from the tag flow above stays unchanged.
+
+### Step 2 — Create the `staging` environment and store the key
+
+Same UI flow as the production environment, but **without** the `v*` deployment-branch rule (the trigger here is `push` on `main`):
+
+```bash
+gh api -X PUT "repos/$OWNER/$REPO/environments/staging" \
+  --field deployment_branch_policy='{"protected_branches":false,"custom_branch_policies":true}'
+gh api -X POST "repos/$OWNER/$REPO/environments/staging/deployment-branch-policies" -f name='main'
+gh secret set REGISTRY_API_KEY --env staging
+```
+
+Required-reviewer protection is optional here — staging builds are typically auto-published.
+
+### Step 3 — Add the branch-publish workflow
+
+`.github/workflows/publish-main.yml`:
+
+```yaml
+name: Publish main to Staging Registry
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      REGISTRY_URL: https://staging-koumoul.com/registry
+      ALPINE_NODE_IMAGE: node:24.11.1-alpine3.22
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Build artefact with bundled node_modules
+        run: |
+          set -euo pipefail
+          npm pack
+          TARBALL=$(ls ./*.tgz)
+          mkdir staging
+          tar xzf "$TARBALL" -C staging
+          cp package-lock.json staging/package/
+          docker run --rm \
+            -v "$PWD/staging/package:/work" -w /work \
+            "$ALPINE_NODE_IMAGE" \
+            npm ci --omit=dev --omit=optional --no-audit --no-fund
+          tar czf with-deps.tgz -C staging package
+
+      - name: Upload branch build to staging
+        env:
+          REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+        run: |
+          set -euo pipefail
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          BRANCH_ARTEFACT_NAME="${PACKAGE_NAME}-main"
+          ENCODED_NAME=$(node -p "encodeURIComponent('${BRANCH_ARTEFACT_NAME}')")
+          curl -f -X POST \
+            "${REGISTRY_URL}/api/v1/artefacts/branch/${ENCODED_NAME}" \
+            -H "x-api-key: ${REGISTRY_API_KEY}" \
+            -F "branchName=main" \
+            -F "architecture=x64" \
+            -F "file=@with-deps.tgz"
+```
+
+Notes:
+
+- The build step is identical to the tag flow. Don't extract it into a reusable workflow yet — copy-paste stays readable until there's a third consumer.
+- No tag-vs-`package.json` version check here; there's no tag. The manifest's `version` is stored on the artefact doc for display only.
+- Consumers that pin to the branch artefact (e.g. a processing configured against `@data-fair/processing-gpkg-main`) pick up new uploads automatically via `dataUpdatedAt` cache invalidation in `@data-fair/lib-node-registry`'s `ensureBranchArtefact`.
 
 ---
 
@@ -242,11 +419,14 @@ This is inherently more secure than GitHub's default model — the protection is
 ### Minimal checklist
 
 - [ ] API key stored as a CI secret (never in code)
+- [ ] API key scoped with `allowedName` to the plugin's `package.json#name`
 - [ ] Publish job restricted to tag pushes on protected branches
 - [ ] **GitHub: secret stored in an environment (not repository level) with required reviewers**
 - [ ] **GitHub: environment restricted to specific branches/tags**
 - [ ] GitLab: variable marked as protected + masked
 - [ ] Tag creation restricted to maintainers
-- [ ] One key per project, named descriptively
+- [ ] One key per project per registry environment, named descriptively (a plugin publishing to both production and staging needs two keys)
 - [ ] Dependencies pinned via lockfile
+- [ ] `node_modules` built inside the same base image consumers run on
+- [ ] `architecture` form field set on upload (matches `process.arch` of the consumer)
 - [ ] Key rotation process documented for your team

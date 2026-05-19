@@ -19,12 +19,16 @@ export type Account = { type: string, id: string, department?: string }
  *   session. Such callers skip the access-grant requirement on downloads —
  *   only the artefact's own `public`/`privateAccess` gate applies. Always
  *   accompanied by `account`.
+ * - `viaReadKey: true` → the caller authenticated with a read-type API key.
+ *   This is the federation path: a remote registry mirroring artefacts from
+ *   this one. Branch artefacts are hidden from these callers so dev builds
+ *   never federate outward (see `artefactAccessFilter`).
  * - neither → anonymous. Only public artefacts are visible; no downloads.
  *
  * The same `Caller` shape is built from any auth path (session, read API
  * key, internal secret + `x-account`) by `resolveCaller(req)` in `auth.ts`.
  */
-export type Caller = { admin: boolean, account?: Account, internal?: boolean }
+export type Caller = { admin: boolean, account?: Account, internal?: boolean, viaReadKey?: boolean }
 
 /**
  * Mongo filter for *listing/reading* artefact metadata.
@@ -36,14 +40,18 @@ export type Caller = { admin: boolean, account?: Account, internal?: boolean }
  * who isn't on their `privateAccess` list.
  */
 export const artefactAccessFilter = (caller: Caller): Filter<Artefact> => {
-  if (caller.admin) return {}
+  // Sender-side federation filter: branch artefacts never federate. A read
+  // API key is the federation path, so we hide branch artefacts from those
+  // callers regardless of their access scope.
+  const base: Filter<Artefact> = caller.viaReadKey ? { format: { $ne: 'branch' } } : {}
+  if (caller.admin) return base
   const orClauses: Filter<Artefact>[] = [{ public: true }]
   if (caller.account) {
     orClauses.push({
       privateAccess: { $elemMatch: { type: caller.account.type, id: caller.account.id } }
     })
   }
-  return { $or: orClauses }
+  return { ...base, $or: orClauses }
 }
 
 /**

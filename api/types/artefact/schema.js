@@ -12,7 +12,9 @@ export default {
   properties: {
     _id: { type: 'string', readOnly: true },
     name: { type: 'string', readOnly: true },
-    format: { type: 'string', enum: ['npm', 'file'], readOnly: true },
+    format: { type: 'string', enum: ['npm', 'file', 'branch'], readOnly: true },
+    branchName: { type: 'string', readOnly: true },
+    architecture: { type: 'string', readOnly: true },
     latestMajor: {
       type: 'integer',
       readOnly: true,

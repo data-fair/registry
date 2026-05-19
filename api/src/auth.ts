@@ -119,7 +119,7 @@ export const resolveCaller = async (req: Request): Promise<Caller> => {
     return { admin: false, account: internal.account, internal: true }
   }
   const readAuth = await tryAuthenticateReadKey(req)
-  if (readAuth) return { admin: false, account: readAuth.owner }
+  if (readAuth) return { admin: false, account: readAuth.owner, viaReadKey: true }
   const session = reqSession(req)
   if (session.user?.adminMode) return { admin: true }
   if (session.account) return { admin: false, account: session.account }

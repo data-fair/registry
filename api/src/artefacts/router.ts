@@ -101,11 +101,11 @@ router.get('/', async (req, res, next) => {
     }
     // Format filter
     if (req.query.format) {
-      const allowedFormats = ['npm', 'file']
+      const allowedFormats = ['npm', 'file', 'branch']
       if (!allowedFormats.includes(req.query.format as string)) {
         throw httpError(400, `invalid format, must be one of: ${allowedFormats.join(', ')}`)
       }
-      filter.format = req.query.format as 'npm' | 'file'
+      filter.format = req.query.format as Artefact['format']
     }
 
     const [results, count] = await Promise.all([
@@ -123,13 +123,15 @@ router.get('/:id', async (req, res, next) => {
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
 
-    if (artefact.format === 'file') {
-      res.json(artefact)
-    } else {
+    if (artefact.format === 'npm') {
       const versions = await mongo.versions.find({ artefactId: artefact._id })
         .sort({ semverMajor: -1, semverMinor: -1, semverPatch: -1 })
         .toArray()
       res.json({ ...artefact, versions })
+    } else {
+      // file and branch artefacts carry their single tarball reference directly
+      // on the doc — no versions sub-collection.
+      res.json(artefact)
     }
   } catch (err) { next(err) }
 })
@@ -186,7 +188,7 @@ router.delete('/:id', async (req, res, next) => {
 
     // Delete DB state first so concurrent GETs fail cleanly with 404,
     // then best-effort remove files.
-    if (artefact.format === 'file') {
+    if (artefact.format === 'file' || artefact.format === 'branch') {
       await mongo.artefacts.deleteOne({ _id: artefact._id })
       if (artefact.filePath) await deleteFile(artefact.filePath)
     } else {
@@ -331,6 +333,7 @@ router.get('/:id/versions/:version', async (req, res, next) => {
     const filter = artefactAccessFilter(await resolveCaller(req))
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.format !== 'npm') throw httpError(404, 'version not found')
 
     const architecture = typeof req.query.architecture === 'string' ? req.query.architecture : undefined
     const { filter: vFilter, fallbackFilter, sort } = resolveVersionQuery(artefact._id, req.params.version, architecture)
@@ -350,6 +353,7 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
     const filter = artefactAccessFilter(caller)
     const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
     if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.format !== 'npm') throw httpError(404, 'version not found')
     // Download = public/privateAccess (already enforced by `filter` above) +
     // an access-grant — except admins and trusted internal callers, see canDownload.
     await assertDownloadAccess(caller, artefact)
@@ -476,6 +480,122 @@ router.post('/file/:name', async (req, res, next) => {
   }
 })
 
+// Upload a branch artefact (API key or internal secret auth, multipart).
+// A branch artefact holds a single mutable tarball replaced on each upload —
+// the docker-tag analogue for dev builds. Manifest is extracted so the doc
+// carries packageName/version/licence for display, but no version sub-doc is
+// created. Branch artefacts never federate (see resolveCaller / federation
+// filter in access.ts).
+router.post('/branch/:name', async (req, res, next) => {
+  const stagingPath = `_staging/${randomUUID()}.tgz`
+  let stagingStored = false
+  let newTarballPath: string | undefined
+  let storedOk = false
+  try {
+    const isInternal = tryInternalSecret(req)
+    let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
+    if (!isInternal) {
+      apiKey = await authenticateApiKey(req)
+      if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload branch builds')
+    }
+
+    const name = safeDecode(req.params.name)
+    if (apiKey?.allowedName && apiKey.allowedName !== name) {
+      throw httpError(403, `this API key is not allowed to upload "${name}"`)
+    }
+    const artefactId = name
+
+    const existing = await mongo.artefacts.findOne({ _id: artefactId })
+    if (existing?.origin) {
+      throw httpError(409, 'this artefact is managed by a remote registry')
+    }
+    // Prevent clobbering a release (npm) or file artefact at the same _id.
+    if (existing && existing.format !== 'branch') {
+      throw httpError(409, `this artefact already exists as a "${existing.format}" artefact`)
+    }
+
+    const fields = await streamFileUpload(req, (stream) => writeFile(stream, stagingPath))
+    stagingStored = true
+
+    const { body: manifestStream } = await readFile(stagingPath)
+    const manifest = await extractManifest(manifestStream, {
+      maxDecompressedBytes: config.maxDecompressedBytes,
+      maxTarEntries: config.maxTarEntries
+    })
+
+    const category = pickCategory(fields.category ?? manifest.category, npmCategories)
+    if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
+      throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
+    }
+
+    const title = fields.title ? parseLocalizedField(fields.title, 'title') : undefined
+    const description = fields.description ? parseLocalizedField(fields.description, 'description') : undefined
+    const architecture = fields.architecture || undefined
+    const branchName = fields.branchName || undefined
+
+    // Random-suffix path so a failed delete of the previous tarball can't
+    // clobber the fresh one (same pattern the file flow uses).
+    const tarballPath = `branch/${name}/${randomUUID()}.tgz`
+    await moveFile(stagingPath, tarballPath)
+    stagingStored = false
+    newTarballPath = tarballPath
+    const { size } = await fileStats(tarballPath)
+
+    const now = new Date().toISOString()
+    const $set: Record<string, unknown> = {
+      packageName: manifest.name,
+      version: manifest.version,
+      category,
+      filePath: tarballPath,
+      size,
+      uploadedBy: apiKey
+        ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+        : { internal: true },
+      updatedAt: now,
+      dataUpdatedAt: now
+    }
+    if (manifest.licence) $set.licence = manifest.licence
+    if (architecture) $set.architecture = architecture
+    if (branchName) $set.branchName = branchName
+    if (title !== undefined) $set.title = title
+    if (description !== undefined) $set.description = description
+
+    // Clear optional fields that the previous upload set but this one omits,
+    // so re-uploads can drop an architecture/branchName tag.
+    const $unset: Record<string, ''> = {}
+    if (!architecture) $unset.architecture = ''
+    if (!branchName) $unset.branchName = ''
+    if (!manifest.licence) $unset.licence = ''
+
+    const update: Record<string, unknown> = {
+      $set,
+      $setOnInsert: {
+        _id: artefactId,
+        name,
+        format: 'branch' as const,
+        public: false,
+        privateAccess: [],
+        createdAt: now
+      }
+    }
+    if (Object.keys($unset).length > 0) update.$unset = $unset
+
+    await mongo.artefacts.updateOne({ _id: artefactId }, update, { upsert: true })
+    storedOk = true
+
+    if (existing?.filePath && existing.filePath !== tarballPath) {
+      await deleteFile(existing.filePath).catch(() => {})
+    }
+
+    const artefact = await mongo.artefacts.findOne({ _id: artefactId })
+    res.status(201).json({ artefact })
+  } catch (err) {
+    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
+    if (newTarballPath && !storedOk) await deleteFile(newTarballPath).catch(() => {})
+    next(err)
+  }
+})
+
 // Download raw file
 router.get('/:id/download', async (req, res, next) => {
   try {
@@ -495,6 +615,35 @@ router.get('/:id/download', async (req, res, next) => {
     }
 
     res.set('Content-Type', 'application/octet-stream')
+    res.set('Content-Disposition', `attachment; filename="${filename}"`)
+    const { body, size, lastModified } = await readFile(artefact.filePath, req.get('If-Modified-Since'))
+    res.set('Last-Modified', lastModified.toUTCString())
+    res.set('Content-Length', String(size))
+    await pipeline(body, res).catch((err) => {
+      if (!res.headersSent) next(err)
+    })
+  } catch (err) { next(err) }
+})
+
+// Download branch tarball
+router.get('/:id/branch/tarball', async (req, res, next) => {
+  try {
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
+    const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+    if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.format !== 'branch') throw httpError(400, 'this artefact is not a branch-format artefact')
+    if (!artefact.filePath) throw httpError(404, 'no tarball uploaded for this branch')
+    await assertDownloadAccess(caller, artefact)
+
+    const filename = `${artefact.name}.tgz`
+    const signedUrl = await getDownloadUrl(artefact.filePath, { filename })
+    if (signedUrl) {
+      res.redirect(302, signedUrl)
+      return
+    }
+
+    res.set('Content-Type', 'application/gzip')
     res.set('Content-Disposition', `attachment; filename="${filename}"`)
     const { body, size, lastModified } = await readFile(artefact.filePath, req.get('If-Modified-Since'))
     res.set('Last-Modified', lastModified.toUTCString())
