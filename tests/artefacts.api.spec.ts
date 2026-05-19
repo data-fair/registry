@@ -139,6 +139,68 @@ test.describe('Artefacts', () => {
     })
   })
 
+  test.describe('Unified npm download', () => {
+    test.beforeEach(async () => {
+      await clean()
+      const admin = await superAdmin
+      const keyRes = await admin.post('/api/v1/api-keys', { type: 'upload', name: 'test-upload' })
+      uploadApiKey = keyRes.data.key
+
+      // Two arch slots for @test/pkg@1
+      const ax = axiosWithApiKey(uploadApiKey)
+      for (const arch of ['x64', 'arm64']) {
+        const form = new FormData()
+        form.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+        form.append('architecture', arch)
+        await ax.post(
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+          form,
+          { headers: form.getHeaders() }
+        )
+      }
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
+    })
+
+    test('download with explicit arch returns the matching slot', async () => {
+      const admin = await superAdmin
+      const res = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/tarball?architecture=x64',
+        { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
+      )
+      expect([200, 302]).toContain(res.status)
+    })
+
+    test('download with no arch on an arch-only artefact returns 404', async () => {
+      const admin = await superAdmin
+      try {
+        await admin.get('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/tarball')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
+
+    test('download falls back to noarch when arch slot is absent', async () => {
+      // Upload a noarch tarball for a different id
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form = new FormData()
+      form.append('file', await createTestTarball({ name: '@test/portable', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      await ax.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/portable@1'),
+        form,
+        { headers: form.getHeaders() }
+      )
+      const admin = await superAdmin
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/portable@1'), { public: true })
+
+      const res = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/portable@1') + '/tarball?architecture=x64',
+        { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
+      )
+      expect([200, 302]).toContain(res.status)
+    })
+  })
+
   test.describe('Upload', () => {
     test('upload a tarball with valid API key', async () => {
       const tarball = await createTestTarball({

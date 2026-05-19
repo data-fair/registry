@@ -542,6 +542,41 @@ router.get('/:id/download', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Download npm artefact tarball. Optional ?architecture=<x64|arm64|...>
+// resolves a specific slot; falls back to `noarch` if the requested arch is
+// absent.
+router.get('/:id/tarball', async (req, res, next) => {
+  try {
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
+    const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+    if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.format !== 'npm') throw httpError(400, 'this artefact is not an npm-format artefact')
+    await assertDownloadAccess(caller, artefact)
+
+    const requestedArch = typeof req.query.architecture === 'string' ? req.query.architecture : undefined
+    const tarballs = artefact.tarballs || {}
+    const slot = (requestedArch && tarballs[requestedArch]) || tarballs.noarch
+    if (!slot) throw httpError(404, 'no tarball for this architecture')
+
+    const filename = `${artefact.name}-${artefact.version || 'tarball'}.tgz`
+    const signedUrl = await getDownloadUrl(slot.path, { filename })
+    if (signedUrl) {
+      res.redirect(302, signedUrl)
+      return
+    }
+
+    res.set('Content-Type', 'application/gzip')
+    res.set('Content-Disposition', `attachment; filename="${filename}"`)
+    const { body, size, lastModified } = await readFile(slot.path, req.get('If-Modified-Since'))
+    res.set('Last-Modified', lastModified.toUTCString())
+    res.set('Content-Length', String(size))
+    await pipeline(body, res).catch((err) => {
+      if (!res.headersSent) next(err)
+    })
+  } catch (err) { next(err) }
+})
+
 // Download branch tarball
 router.get('/:id/branch/tarball', async (req, res, next) => {
   try {
