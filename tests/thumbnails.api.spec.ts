@@ -15,8 +15,9 @@ const createArtefact = async (name = '@test/pkg') => {
   const tarball = await createTestTarball({ name, version: '1.0.0' })
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-  await ax.post(`/api/v1/artefacts/${encodeURIComponent(name)}/versions`, form, { headers: form.getHeaders() })
-  return name
+  const artefactId = `${name}@1`
+  await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent(artefactId), form, { headers: form.getHeaders() })
+  return artefactId
 }
 
 const uploadThumb = async (ax: any, artefactId: string, buf: Buffer) => {

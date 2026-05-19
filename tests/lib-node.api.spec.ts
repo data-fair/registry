@@ -33,13 +33,13 @@ test.describe('lib-node-registry', () => {
     const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0', category: 'processing' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
-      artefactId: '@test/pkg',
+      artefactId: '@test/pkg@1',
       version: '1',
       cacheDir
     })
@@ -59,10 +59,10 @@ test.describe('lib-node-registry', () => {
     const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
 
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg', version: '1', cacheDir }
+    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', version: '1', cacheDir }
 
     const result1 = await ensureArtefact(opts)
     expect(result1.downloaded).toBe(true)
@@ -80,10 +80,10 @@ test.describe('lib-node-registry', () => {
     const tarball1 = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
     const form1 = new FormData()
     form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form1, { headers: form1.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form1, { headers: form1.getHeaders() })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
 
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg', version: '1', cacheDir }
+    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', version: '1', cacheDir }
 
     const result1 = await ensureArtefact(opts)
     expect(result1.version).toBe('1.0.0')
@@ -92,7 +92,7 @@ test.describe('lib-node-registry', () => {
     const tarball2 = await createTestTarball({ name: '@test/pkg', version: '1.1.0' })
     const form2 = new FormData()
     form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form2, { headers: form2.getHeaders() })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form2, { headers: form2.getHeaders() })
 
     const result2 = await ensureArtefact(opts)
     expect(result2.downloaded).toBe(true)

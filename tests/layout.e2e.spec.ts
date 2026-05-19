@@ -13,8 +13,8 @@ test.describe('App layout', () => {
     const tarball = await createTestTarball({ name: '@test/layout-pkg', version: '1.0.0', category: 'processing' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await upload.post('/api/v1/artefacts/%40test%2Flayout-pkg/versions', form, { headers: form.getHeaders() })
-    await ax.patch('/api/v1/artefacts/%40test%2Flayout-pkg', { public: true })
+    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/layout-pkg@1'), form, { headers: form.getHeaders() })
+    await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/layout-pkg@1'), { public: true })
   })
 
   test('home page shows app bar title and no breadcrumbs', async ({ page }) => {

@@ -163,7 +163,7 @@ test.describe('API Keys', () => {
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     try {
-      await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+      await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(401)
@@ -179,8 +179,8 @@ test.describe('API Keys', () => {
     const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await ax.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true, privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] })
+    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+    await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true, privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] })
 
     // Create a read key and use it
     await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })

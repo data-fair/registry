@@ -178,15 +178,13 @@ router.delete('/:id', async (req, res, next) => {
 
     // Delete DB state first so concurrent GETs fail cleanly with 404,
     // then best-effort remove files.
+    await mongo.artefacts.deleteOne({ _id: artefact._id })
     if (artefact.format === 'file' || artefact.format === 'branch') {
-      await mongo.artefacts.deleteOne({ _id: artefact._id })
       if (artefact.filePath) await deleteFile(artefact.filePath)
     } else {
-      const versions = await mongo.versions.find({ artefactId: artefact._id }).toArray()
-      await mongo.versions.deleteMany({ artefactId: artefact._id })
-      await mongo.artefacts.deleteOne({ _id: artefact._id })
-      for (const version of versions) {
-        await deleteFile(version.tarballPath)
+      // npm artefacts store tarballs inline in the `tarballs` map
+      for (const slot of Object.values(artefact.tarballs ?? {})) {
+        await deleteFile((slot as any).path).catch(() => {})
       }
     }
     await mongo.thumbnails.deleteMany({ artefactId: artefact._id })

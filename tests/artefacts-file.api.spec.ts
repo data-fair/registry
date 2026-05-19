@@ -96,8 +96,8 @@ test.describe('File artefacts', () => {
       const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0', category: 'processing' })
       const form2 = new FormData()
       form2.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form2, { headers: form2.getHeaders() })
-      await admin.patch('/api/v1/artefacts/%40test%2Fpkg', { public: true })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form2, { headers: form2.getHeaders() })
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
     })
 
     test('both formats appear in list', async () => {
@@ -123,9 +123,9 @@ test.describe('File artefacts', () => {
       expect(res.data.versions).toBeUndefined()
     })
 
-    test('detail returns npm artefact with versions array', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts/%40test%2Fpkg')
-      expect(res.data.versions).toHaveLength(1)
+    test('detail returns npm artefact with tarballs map', async () => {
+      const res = await anonymousAx.get('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'))
+      expect(res.data.tarballs).toBeTruthy()
     })
   })
 
@@ -210,7 +210,7 @@ test.describe('File artefacts', () => {
       const tarball = await createTestTarball({ name: '@test/data-pkg', version: '1.0.0' })
       const npmForm = new FormData()
       npmForm.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
-      const npmRes = await ax.post('/api/v1/artefacts/%40test%2Fdata-pkg/versions', npmForm, { headers: npmForm.getHeaders() })
+      const npmRes = await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/data-pkg@1'), npmForm, { headers: npmForm.getHeaders() })
       const initialNpmDataUpdatedAt = npmRes.data.artefact.dataUpdatedAt
       expect(initialNpmDataUpdatedAt).toBeTruthy()
       expect(initialNpmDataUpdatedAt).toBe(npmRes.data.artefact.updatedAt)
@@ -227,8 +227,8 @@ test.describe('File artefacts', () => {
       await new Promise(resolve => setTimeout(resolve, 5))
 
       // Metadata-only PATCH bumps updatedAt but not dataUpdatedAt
-      await admin.patch('/api/v1/artefacts/%40test%2Fdata-pkg', { public: true })
-      const npmAfterPatch = await admin.get('/api/v1/artefacts/%40test%2Fdata-pkg')
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/data-pkg@1'), { public: true })
+      const npmAfterPatch = await admin.get('/api/v1/artefacts/' + encodeURIComponent('@test/data-pkg@1'))
       expect(npmAfterPatch.data.dataUpdatedAt).toBe(initialNpmDataUpdatedAt)
       expect(npmAfterPatch.data.updatedAt).not.toBe(initialNpmDataUpdatedAt)
 
@@ -242,7 +242,7 @@ test.describe('File artefacts', () => {
       const tarball2 = await createTestTarball({ name: '@test/data-pkg', version: '1.0.1' })
       const npmForm2 = new FormData()
       npmForm2.append('file', tarball2, { filename: 'p.tgz', contentType: 'application/gzip' })
-      const npmRes2 = await ax.post('/api/v1/artefacts/%40test%2Fdata-pkg/versions', npmForm2, { headers: npmForm2.getHeaders() })
+      const npmRes2 = await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/data-pkg@1'), npmForm2, { headers: npmForm2.getHeaders() })
       expect(npmRes2.data.artefact.dataUpdatedAt > initialNpmDataUpdatedAt).toBe(true)
 
       // Re-upload bumps dataUpdatedAt for file
