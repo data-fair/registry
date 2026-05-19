@@ -24,6 +24,9 @@ router.post('/', async (req, res, next) => {
       if (body.allowedCategory) {
         throw httpError(400, 'allowedCategory is only valid for upload keys')
       }
+      if (body.allowedPackageName) {
+        throw httpError(400, 'allowedPackageName is only valid for upload keys')
+      }
       reqSessionAuthenticated(req)
       if (!body.owner) throw httpError(400, 'owner is required for read keys')
       // Check that the account has a grant
@@ -55,6 +58,7 @@ router.post('/', async (req, res, next) => {
       ...(body.owner ? { owner: body.owner } : {}),
       ...(body.allowedName ? { allowedName: body.allowedName } : {}),
       ...(body.allowedCategory ? { allowedCategory: body.allowedCategory } : {}),
+      ...(body.allowedPackageName ? { allowedPackageName: body.allowedPackageName } : {}),
       ...(body.expiresAt ? { expiresAt: body.expiresAt } : {})
     }
 

@@ -332,6 +332,10 @@ router.post('/npm/:id', async (req, res, next) => {
       throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
     }
 
+    if (apiKey?.allowedPackageName && apiKey.allowedPackageName !== manifest.name) {
+      throw httpError(403, `this API key is only allowed to upload package "${apiKey.allowedPackageName}"`)
+    }
+
     const category = pickCategory(uploadCategory ?? manifest.category, npmCategories)
     if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
       throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)

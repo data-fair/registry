@@ -36,6 +36,11 @@ export default {
       description: 'Restricts an upload key to a single artefact name (exact match). Missing means unrestricted.',
       minLength: 1
     },
+    allowedPackageName: {
+      type: 'string',
+      description: 'Restricts an upload key to a single package (manifest name). Missing means unrestricted.',
+      minLength: 1
+    },
     allowedCategory: {
       type: 'string',
       description: 'Restricts an upload key to a single artefact category. Missing means unrestricted.',

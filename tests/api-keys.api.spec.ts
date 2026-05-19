@@ -198,4 +198,73 @@ test.describe('API Keys', () => {
     const lastUsed = new Date(key.lastUsedAt).getTime()
     expect(Date.now() - lastUsed).toBeLessThan(5000)
   })
+
+  test.describe('allowedPackageName scoping', () => {
+    test('creates a key with allowedPackageName', async () => {
+      const ax = await superAdmin
+      const res = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'pkg-scoped',
+        allowedPackageName: '@data-fair/processing-gpkg'
+      })
+      expect(res.data.allowedPackageName).toBe('@data-fair/processing-gpkg')
+    })
+
+    test('rejects allowedPackageName on read keys', async () => {
+      const ax = await superAdmin
+      try {
+        await ax.post('/api/v1/api-keys', {
+          type: 'read',
+          name: 'bad',
+          owner: { type: 'organization', id: 'test1' },
+          allowedPackageName: '@some/pkg'
+        })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
+    test('upload rejected when manifest packageName mismatches allowedPackageName', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'pkg-scoped',
+        allowedPackageName: '@allowed/pkg'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+      const tarball = await createTestTarball({ name: '@other/pkg', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      try {
+        await upload.post(
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@other/pkg@1'),
+          form,
+          { headers: form.getHeaders() }
+        )
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('upload accepted when manifest packageName matches allowedPackageName', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'pkg-scoped',
+        allowedPackageName: '@allowed/pkg'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+      const tarball = await createTestTarball({ name: '@allowed/pkg', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      const res = await upload.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@allowed/pkg@1'),
+        form,
+        { headers: form.getHeaders() }
+      )
+      expect(res.status).toBe(201)
+    })
+  })
 })

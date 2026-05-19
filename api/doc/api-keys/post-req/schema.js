@@ -22,6 +22,11 @@ export default {
       description: 'Restricts an upload key to a single artefact name (exact match). Only valid for upload keys.',
       minLength: 1
     },
+    allowedPackageName: {
+      type: 'string',
+      description: 'Restricts an upload key to a single manifest package name. Only valid for upload keys.',
+      minLength: 1
+    },
     allowedCategory: {
       type: 'string',
       description: 'Restricts an upload key to a single artefact category. Only valid for upload keys.',
