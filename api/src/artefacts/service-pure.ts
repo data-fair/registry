@@ -13,6 +13,10 @@ export interface Manifest {
 }
 
 // Default caps protecting against tar bombs and malformed archives.
+// Decompressed output is bounded regardless of the compressed input size.
+// extractManifest accepts overrides via its opts arg (router wires them
+// from config so deployments with chunky pre-installed node_modules can
+// raise the entry count and decompressed-size ceilings without patching).
 export const MAX_DECOMPRESSED_BYTES = 1024 * 1024 * 1024
 export const MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 export const MAX_TAR_ENTRIES = 100_000
@@ -52,6 +56,9 @@ export const extractManifest = async (stream: Readable, opts: ExtractManifestOpt
       entryStream.resume()
       return
     }
+    // npm tarballs always put package.json at `package/package.json`.
+    // Accept only that exact path to avoid attacker-controlled overrides
+    // from deeper entries clobbering the real manifest.
     if (header.name === 'package/package.json') {
       if (header.size !== undefined && header.size > MAX_MANIFEST_BYTES) {
         next(httpError(413, `package.json exceeds ${MAX_MANIFEST_BYTES} bytes`))
@@ -76,6 +83,8 @@ export const extractManifest = async (stream: Readable, opts: ExtractManifestOpt
             licence: pkg.licence || pkg.license,
             category: pkg.registry?.category || 'other'
           }
+          // Abort the pipeline early; we've got what we need and don't want
+          // to keep processing a potentially malicious tarball.
           next(new ManifestFoundError())
         } catch (err) {
           manifestError = httpError(400, `invalid package.json: ${(err as Error).message}`)
