@@ -19,24 +19,29 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
   const localTarballs: Record<string, TarballSlot & { uploadedAt: string }> = local?.tarballs || {}
 
   const newTarballs: typeof localTarballs = {}
+  const pathsToDelete: string[] = []
   for (const [arch, remoteSlot] of Object.entries(remoteTarballs)) {
     const localSlot = localTarballs[arch]
     if (localSlot && localSlot.uploadedAt === remoteSlot.uploadedAt) {
       newTarballs[arch] = localSlot
       continue
     }
-    // Download the tarball for this arch slot — stream straight into storage.
+    // Download the tarball for this arch slot — stream straight into local storage
+    // using a UUID-based path so we never trust a remote-controlled path string.
+    const localPath = `npm/${artefactId}/${arch}-${randomUUID()}.tgz`
     const dlRes = await ax.get(
       `/api/v1/artefacts/${encodedId}/tarball?architecture=${encodeURIComponent(arch)}`,
       { responseType: 'stream' }
     )
-    await writeFile(dlRes.data, remoteSlot.path)
+    await writeFile(dlRes.data, localPath)
     newTarballs[arch] = {
-      path: remoteSlot.path,
+      path: localPath,
       size: remoteSlot.size ?? 0,
       uploadedAt: remoteSlot.uploadedAt,
       ...(remoteSlot.uploadedBy ? { uploadedBy: remoteSlot.uploadedBy } : {})
     }
+    // Track the old local path (if any) for post-upsert cleanup.
+    if (localSlot?.path) pathsToDelete.push(localSlot.path)
   }
 
   // Delete local arch slots pruned upstream.
@@ -75,6 +80,11 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
     },
     { upsert: true }
   )
+
+  // Best-effort delete previously-local tarballs that were replaced by fresh downloads.
+  for (const oldPath of pathsToDelete) {
+    await deleteFile(oldPath).catch(() => {})
+  }
 }
 
 const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
