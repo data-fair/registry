@@ -137,7 +137,7 @@
       v-if="artefact.format === 'npm'"
       class="mb-4"
     >
-      <v-card-title class="text-h6">
+      <v-card-title>
         {{ t('tarballs') }}
         <span class="text-medium-emphasis text-body-2 ml-2">({{ Object.keys(artefact.tarballs ?? {}).length }})</span>
       </v-card-title>
@@ -153,12 +153,12 @@
           </thead>
           <tbody>
             <tr
-              v-for="(slot, arch) in artefact.tarballs ?? {}"
+              v-for="(entry, arch) in artefact.tarballs ?? {}"
               :key="arch"
             >
               <td><code>{{ arch }}</code></td>
-              <td>{{ typeof slot.size === 'number' ? formatBytes(slot.size, locale) : '-' }}</td>
-              <td>{{ dayjs(slot.uploadedAt).format('L LT') }}</td>
+              <td>{{ typeof entry.size === 'number' ? formatBytes(entry.size, locale) : '-' }}</td>
+              <td>{{ dayjs(entry.uploadedAt).format('L LT') }}</td>
               <td
                 v-if="hasGrant"
                 class="text-right"
