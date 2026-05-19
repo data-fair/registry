@@ -30,33 +30,6 @@
       </v-card-text>
     </v-card>
 
-    <!-- Download latest npm version -->
-    <v-card
-      v-if="hasGrant && artefact.format !== 'file' && versions.length > 0"
-      class="mb-4"
-    >
-      <v-card-title>{{ t('downloadLatest') }}</v-card-title>
-      <v-card-text>
-        <div class="d-flex align-center">
-          <span class="text-body-1 mr-4">{{ latestVersion?.version }}</span>
-          <span
-            v-if="typeof latestVersion?.size === 'number'"
-            class="text-medium-emphasis text-body-2 mr-4"
-          >
-            {{ formatBytes(latestVersion.size, locale) }}
-          </span>
-          <v-btn
-            color="primary"
-            variant="flat"
-            :prepend-icon="mdiDownload"
-            :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/versions/${latestVersion?.version}/tarball`"
-          >
-            {{ t('download') }}
-          </v-btn>
-        </div>
-      </v-card-text>
-    </v-card>
-
     <!-- No access alert -->
     <v-alert
       v-if="!hasGrant && session.state.account"
@@ -159,58 +132,48 @@
       </v-card-text>
     </v-card>
 
-    <!-- Versions table (npm only) -->
+    <!-- Tarballs (npm only) -->
     <v-card
-      v-if="artefact.format !== 'file'"
+      v-if="artefact.format === 'npm'"
       class="mb-4"
     >
-      <v-card-title>
-        {{ t('versions') }}
-        <span class="text-medium-emphasis text-body-2 ml-2">({{ versions.length }})</span>
+      <v-card-title class="text-h6">
+        {{ t('tarballs') }}
+        <span class="text-medium-emphasis text-body-2 ml-2">({{ Object.keys(artefact.tarballs ?? {}).length }})</span>
       </v-card-title>
-      <v-table density="compact">
-        <thead>
-          <tr>
-            <th>{{ t('version') }}</th>
-            <th>{{ t('architecture') }}</th>
-            <th>{{ t('size') }}</th>
-            <th>{{ t('uploadedAt') }}</th>
-            <th v-if="hasGrant" />
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="v in versions"
-            :key="v._id"
-          >
-            <td>
-              <code>{{ v.version }}</code>
-              <v-chip
-                v-if="v.semverPrerelease"
-                size="x-small"
-                color="orange"
-                class="ml-2"
-              >
-                pre
-              </v-chip>
-            </td>
-            <td>{{ v.architecture || '-' }}</td>
-            <td>{{ v.size != null ? formatBytes(v.size, locale) : '-' }}</td>
-            <td>{{ dayjs(v.uploadedAt).format('L LT') }}</td>
-            <td
-              v-if="hasGrant"
-              class="text-right"
+      <v-card-text>
+        <v-table density="compact">
+          <thead>
+            <tr>
+              <th>{{ t('architecture') }}</th>
+              <th>{{ t('size') }}</th>
+              <th>{{ t('uploadedAt') }}</th>
+              <th v-if="hasGrant" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(slot, arch) in artefact.tarballs ?? {}"
+              :key="arch"
             >
-              <v-btn
-                :icon="mdiDownload"
-                size="small"
-                variant="text"
-                :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/versions/${v.version}/tarball`"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
+              <td><code>{{ arch }}</code></td>
+              <td>{{ typeof slot.size === 'number' ? formatBytes(slot.size, locale) : '-' }}</td>
+              <td>{{ dayjs(slot.uploadedAt).format('L LT') }}</td>
+              <td
+                v-if="hasGrant"
+                class="text-right"
+              >
+                <v-btn
+                  :icon="mdiDownload"
+                  size="small"
+                  variant="text"
+                  :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/tarball?architecture=${arch}`"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card-text>
     </v-card>
   </v-container>
 
@@ -228,13 +191,11 @@ fr:
   licence: Licence
   category: "Cat\xE9gorie"
   description: Description
-  versions: Versions
-  version: Version
+  tarballs: Tarballs
   architecture: Architecture
   size: Taille
   dataUpdatedAt: "Donn\xE9es mises \xE0 jour le"
   uploadedAt: "T\xE9l\xE9vers\xE9 le"
-  downloadLatest: "T\xE9l\xE9charger la derni\xE8re version"
   download: "T\xE9l\xE9charger"
   noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
   loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
@@ -246,13 +207,11 @@ en:
   licence: Licence
   category: Category
   description: Description
-  versions: Versions
-  version: Version
+  tarballs: Tarballs
   architecture: Architecture
   size: Size
   dataUpdatedAt: Data updated
   uploadedAt: Uploaded
-  downloadLatest: Download Latest
   download: Download
   noAccessGrant: Contact your administrator for download access.
   loginRequired: Log in to access downloads.
@@ -264,7 +223,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { mdiDownload } from '@mdi/js'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
-import type { Artefact, Version } from '#api/types'
+import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
 const route = useRoute('/artefacts/[id]')
@@ -279,11 +238,8 @@ useBreadcrumbs().setForPage(() => [
   { title: t('artefacts'), to: '/artefacts' },
   { title: (artefact.value?.title as any)?.[locale.value] || artefact.value?.name || artefactId.value, disabled: true }
 ])
-const versions = ref<Version[]>([])
 const fetchLoading = ref(true)
 const hasGrant = ref(false)
-
-const latestVersion = computed(() => versions.value.length > 0 ? versions.value[0] : null)
 
 const description = computed(() => {
   if (!artefact.value) return null
@@ -297,7 +253,6 @@ async function fetchArtefact () {
   try {
     const data = await $fetch(`/v1/artefacts/${encodeURIComponent(artefactId.value)}`)
     artefact.value = data
-    versions.value = data.versions || []
   } finally {
     fetchLoading.value = false
   }

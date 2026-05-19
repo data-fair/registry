@@ -226,55 +226,47 @@
       </v-card-text>
     </v-card>
 
-    <!-- Version list (npm only) -->
+    <!-- Tarballs (npm only) -->
     <v-card
-      v-if="artefact.format !== 'file'"
+      v-if="artefact.format === 'npm'"
       class="mb-4"
     >
-      <v-card-title>
-        {{ t('versions') }}
-        <span class="text-medium-emphasis text-body-2 ml-2">({{ versions.length }})</span>
+      <v-card-title class="text-h6">
+        {{ t('tarballs') }}
+        <span class="text-medium-emphasis text-body-2 ml-2">({{ Object.keys(artefact.tarballs ?? {}).length }})</span>
       </v-card-title>
-      <v-table density="compact">
-        <thead>
-          <tr>
-            <th>{{ t('version') }}</th>
-            <th>{{ t('architecture') }}</th>
-            <th>{{ t('size') }}</th>
-            <th>{{ t('uploadedAt') }}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="v in versions"
-            :key="v._id"
-          >
-            <td>
-              <code>{{ v.version }}</code>
-              <v-chip
-                v-if="v.semverPrerelease"
-                size="x-small"
-                color="orange"
-                class="ml-2"
-              >
-                pre
-              </v-chip>
-            </td>
-            <td>{{ v.architecture || '-' }}</td>
-            <td>{{ v.size != null ? formatBytes(v.size, locale) : '-' }}</td>
-            <td>{{ dayjs(v.uploadedAt).format('L LT') }}</td>
-            <td class="text-right">
-              <v-btn
-                :icon="mdiDownload"
-                size="small"
-                variant="text"
-                :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/versions/${v.version}/tarball`"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
+      <v-card-text>
+        <v-table density="compact">
+          <thead>
+            <tr>
+              <th>{{ t('architecture') }}</th>
+              <th>{{ t('size') }}</th>
+              <th>{{ t('uploadedAt') }}</th>
+              <th>{{ t('uploadedBy') }}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(slot, arch) in artefact.tarballs ?? {}"
+              :key="arch"
+            >
+              <td><code>{{ arch }}</code></td>
+              <td>{{ typeof slot.size === 'number' ? formatBytes(slot.size, locale) : '-' }}</td>
+              <td>{{ dayjs(slot.uploadedAt).format('L LT') }}</td>
+              <td>{{ slot.uploadedBy?.apiKeyName ?? (slot.uploadedBy?.internal ? 'internal' : '') }}</td>
+              <td class="text-right">
+                <v-btn
+                  :icon="mdiDownload"
+                  size="small"
+                  variant="text"
+                  :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/tarball?architecture=${arch}`"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card-text>
     </v-card>
 
     <!-- Delete -->
@@ -349,14 +341,14 @@ fr:
   editableMetadata: Métadonnées éditables
   save: Enregistrer
   size: Taille
-  versions: Versions
-  version: Version
+  tarballs: Tarballs
   architecture: Architecture
   uploadedAt: Téléversé le
+  uploadedBy: Téléversé par
   dangerZone: Zone de danger
   deleteArtefact: Supprimer l'artefact
   confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: "Voulez-vous vraiment supprimer l'artefact \"{name}\" et toutes ses versions ?"
+  confirmDeleteText: "Voulez-vous vraiment supprimer l'artefact \"{name}\" et ses données ?"
   cancel: Annuler
   delete: Supprimer
   deleted: Artefact supprimé
@@ -384,14 +376,14 @@ en:
   editableMetadata: Editable Metadata
   save: Save
   size: Size
-  versions: Versions
-  version: Version
+  tarballs: Tarballs
   architecture: Architecture
   uploadedAt: Uploaded
+  uploadedBy: Uploaded by
   dangerZone: Danger Zone
   deleteArtefact: Delete Artefact
   confirmDeleteTitle: Confirm Deletion
-  confirmDeleteText: "Are you sure you want to delete artefact \"{name}\" and all its versions?"
+  confirmDeleteText: "Are you sure you want to delete artefact \"{name}\" and its data?"
   cancel: Cancel
   delete: Delete
   deleted: Artefact deleted
@@ -406,7 +398,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { mdiImage, mdiDownload } from '@mdi/js'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
-import type { Artefact, Version } from '#api/types'
+import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -421,7 +413,6 @@ if (!session.state.user?.adminMode) {
 const artefactId = computed(() => decodeURIComponent(route.params.id as string))
 
 const artefact = ref<Artefact | null>(null)
-const versions = ref<Version[]>([])
 
 useBreadcrumbs().setForPage(() => [
   { title: t('admin'), disabled: true },
@@ -453,7 +444,6 @@ async function fetchArtefact () {
   try {
     const data = await $fetch(`/v1/artefacts/${encodeURIComponent(artefactId.value)}`)
     artefact.value = data
-    versions.value = data.versions || []
     editData.value = {
       title: data.title || {},
       description: data.description || {},
