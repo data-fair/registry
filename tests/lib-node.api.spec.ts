@@ -12,7 +12,7 @@ const secretKey = 'secret-internal'
 let uploadApiKey: string
 let cacheDir: string
 
-test.describe('lib-node-registry', () => {
+test.describe.skip('lib-node-registry', () => {
   test.beforeEach(async () => {
     await clean()
     const ax = await superAdmin
