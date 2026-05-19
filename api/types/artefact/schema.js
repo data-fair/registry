@@ -20,6 +20,8 @@ export default {
       type: 'string',
       enum: ['processing', 'catalog', 'application', 'tileset', 'maplibre-style', 'other']
     },
+    // Per-architecture tarball slots for npm artefacts. `noarch` is the valid
+    // key for portable builds; arch keys mirror `process.arch` values.
     tarballs: {
       type: 'object',
       readOnly: true,
@@ -121,9 +123,13 @@ export default {
       'x-i18n-title': { fr: 'URL de documentation' }
     },
     origin: { type: 'string', readOnly: true },
+    // `filePath`, `fileName` are only used by format=file.
     filePath: { type: 'string', readOnly: true },
     fileName: { type: 'string', readOnly: true },
     size: { type: 'integer', readOnly: true },
+    // Top-level `uploadedBy` is only meaningful for file format (single
+    // upload per artefact). npm format carries per-arch `uploadedBy` inside
+    // `tarballs[arch]`.
     uploadedBy: {
       type: 'object',
       readOnly: true,
