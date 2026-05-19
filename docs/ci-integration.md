@@ -37,7 +37,7 @@ In the registry UI (see [API Key Setup](#api-key-setup) above), create a key for
 
 - **Type:** `upload`
 - **Name:** `ci-<plugin>-prod` (e.g. `ci-processing-gpkg-prod`)
-- **Allowed name:** the exact `package.json#name` (e.g. `@data-fair/processing-gpkg`)
+- **Allowed package name:** the exact `package.json#name` (e.g. `@data-fair/processing-gpkg`) — covers every ref of the plugin (`@1`, `@2`, `@main`, etc.)
 
 Copy the key immediately — it is shown once.
 
@@ -194,16 +194,16 @@ jobs:
 
 ## Publishing a branch build to staging
 
-For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, upload to an npm artefact whose ref is the branch name (e.g. `@data-fair/processing-gpkg@main`). It carries a single mutable tarball — the registry's docker-tag analogue — replaced in place on each upload, never federated outward.
+For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, upload to an npm artefact whose ref is the branch name (e.g. `@data-fair/processing-gpkg@main`). It carries one mutable tarball per architecture slot — the registry's docker-tag analogue — replaced in place on each upload.
 
 Two registries, two artefacts:
 
 | Production registry | Staging registry |
 |--------------------|------------------|
-| `@data-fair/processing-gpkg@1` (npm, versioned) | `@data-fair/processing-gpkg@1` (npm, mirrored from prod via federation, read-only) |
-|  | `@data-fair/processing-gpkg@main` (npm, local) |
+| `@data-fair/processing-gpkg@1` (npm release ref) | `@data-fair/processing-gpkg@1` (npm, mirrored from prod via federation, read-only) |
+|  | `@data-fair/processing-gpkg@main` (npm dev ref, local) |
 
-Dev-build artefacts are filtered out of the federation feed, so the production registry never sees them.
+The registry doesn't distinguish dev refs from release refs at the federation layer — operators decide which artefacts each downstream registry mirrors via `selectedArtefacts`. If you don't list `@plugin@main` in a remote's selection it simply isn't pulled.
 
 ### Step 1 — Create the staging upload API key
 
