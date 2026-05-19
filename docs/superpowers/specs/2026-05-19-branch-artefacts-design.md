@@ -276,3 +276,12 @@ key for main pushes.
   naming a branch artefact something unrelated to the package name (e.g.
   `gpkg-dev`). UI grouping by `packageName` (from manifest) is the
   mitigation; documenting the convention is the other.
+
+---
+
+## Superseded
+
+The `branch` format described above was absorbed into a unified `npm`
+format on 2026-05-19. See
+[`2026-05-19-unified-npm-format-design.md`](2026-05-19-unified-npm-format-design.md).
+This spec is kept as historical context.

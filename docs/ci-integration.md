@@ -8,7 +8,7 @@ Upload API keys are created by a superadmin in the registry UI ("Admin → API k
 
 - **Type:** `upload`.
 - **Name:** something you can audit — e.g. `ci-<plugin>-<env>` (`ci-processing-gpkg-prod`).
-- **Allowed name:** the exact `package.json#name` of the plugin (e.g. `@data-fair/processing-gpkg`). Scoping to one package means a leaked key can only overwrite that package's versions.
+- **Allowed package name:** the `package.json#name` (e.g. `@data-fair/processing-gpkg`) — covers `@1`, `@2`, `@main`, etc.
 - **Allowed category:** optional, but recommended for tileset-style file uploads (`tileset`, `maplibre-style`).
 
 The raw key is displayed **once** at creation time — copy it immediately and store it as a CI secret. It is never retrievable again (only a SHA-512 hash is stored server-side).
@@ -20,7 +20,7 @@ You need **one key per registry environment**. A key issued by `koumoul.com/regi
 All upload requests use the `x-api-key` HTTP header:
 
 ```bash
-curl -X POST https://registry.example.com/api/v1/artefacts/<name>/versions \
+curl -X POST https://registry.example.com/api/v1/artefacts/npm/<id> \
   -H "x-api-key: $REGISTRY_API_KEY" \
   -F file=@package.tgz
 ```
@@ -135,9 +135,10 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE_NAME=$(node -p "require('./package.json').name")
-          ENCODED_NAME=$(node -p "encodeURIComponent('${PACKAGE_NAME}')")
+          PACKAGE_MAJOR=$(node -p "require('./package.json').version.split('.')[0]")
+          ENCODED_ID=$(node -p "encodeURIComponent('${PACKAGE_NAME}@${PACKAGE_MAJOR}')")
           curl -f -X POST \
-            "${REGISTRY_URL}/api/v1/artefacts/${ENCODED_NAME}/versions" \
+            "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
             -F "architecture=x64" \
             -F "file=@with-deps.tgz"
@@ -193,18 +194,16 @@ jobs:
 
 ## Publishing a branch build to staging
 
-For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, use a **branch artefact**. A branch artefact carries a single mutable tarball — the registry's docker-tag analogue — replaced in place on each upload, never federated outward.
-
-A branch artefact lives at its own `_id`, distinct from the release artefact and chosen by you (the operator). The recommended convention is `<package-name>-<branch>`, so the source package `@data-fair/processing-gpkg` would have a sibling branch artefact `@data-fair/processing-gpkg-main` in staging. The registry doesn't enforce the convention — it stores the `packageName` extracted from `package.json` separately from the artefact `_id`, plus the `branchName` you send as a form field.
+For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, upload to an npm artefact whose ref is the branch name (e.g. `@data-fair/processing-gpkg@main`). It carries a single mutable tarball — the registry's docker-tag analogue — replaced in place on each upload, never federated outward.
 
 Two registries, two artefacts:
 
 | Production registry | Staging registry |
 |--------------------|------------------|
-| `@data-fair/processing-gpkg` (npm, versioned) | `@data-fair/processing-gpkg` (npm, mirrored from prod via federation, read-only) |
-|  | `@data-fair/processing-gpkg-main` (branch, local) |
+| `@data-fair/processing-gpkg@1` (npm, versioned) | `@data-fair/processing-gpkg@1` (npm, mirrored from prod via federation, read-only) |
+|  | `@data-fair/processing-gpkg@main` (npm, local) |
 
-Branch artefacts are filtered out of the federation feed, so the production registry never sees them.
+Dev-build artefacts are filtered out of the federation feed, so the production registry never sees them.
 
 ### Step 1 — Create the staging upload API key
 
@@ -212,7 +211,7 @@ In the **staging** registry UI, create a key (separate from the production one):
 
 - **Type:** `upload`
 - **Name:** `ci-<plugin>-staging` (e.g. `ci-processing-gpkg-staging`)
-- **Allowed name:** the branch artefact's `_id`, **not** the package name (e.g. `@data-fair/processing-gpkg-main`). The URL path segment, the API key scope, and the artefact's stored `_id` must all agree.
+- **Allowed package name:** `@data-fair/processing-gpkg` — covers `@main`, `@1`, etc.
 
 This key only authenticates against the staging registry. The production key from the tag flow above stays unchanged.
 
@@ -249,9 +248,6 @@ jobs:
     env:
       REGISTRY_URL: https://staging-koumoul.com/registry
       ALPINE_NODE_IMAGE: node:24.11.1-alpine3.22
-      # Branch artefact id on the staging registry — must match `allowedName`
-      # on the staging upload key.
-      BRANCH_ARTEFACT_SUFFIX: -main
     steps:
       - uses: actions/checkout@v4
 
@@ -279,12 +275,10 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE_NAME=$(node -p "require('./package.json').name")
-          BRANCH_ARTEFACT_NAME="${PACKAGE_NAME}${BRANCH_ARTEFACT_SUFFIX}"
-          ENCODED_NAME=$(node -p "encodeURIComponent('${BRANCH_ARTEFACT_NAME}')")
+          ENCODED_ID=$(node -p "encodeURIComponent('${PACKAGE_NAME}@main')")
           curl -f -X POST \
-            "${REGISTRY_URL}/api/v1/artefacts/branch/${ENCODED_NAME}" \
+            "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
-            -F "branchName=${GITHUB_REF_NAME}" \
             -F "architecture=x64" \
             -F "file=@with-deps.tgz"
 ```
@@ -293,17 +287,16 @@ Notes:
 
 - The build step is byte-for-byte identical to the tag-flow build step. Don't extract it into a reusable workflow yet — copy-paste stays readable until there's a third consumer.
 - No tag-vs-`package.json` version check here; there's no tag. The manifest's `version` is stored on the artefact doc for display only.
-- `branchName` is informational — it shows up in the staging UI as a "dev: main" chip on the artefact and on any processing pointed at it. The registry doesn't parse it.
 
 ### Consumer side
 
 On the staging instance, when an operator creates a processing against the staging registry:
 
-1. The processings UI's plugin picker shows the branch artefact alongside the federated releases, with a `dev: main` chip.
-2. Picking it stores `pluginId = "<branch-artefact-id>"` on the processing — no `@major` suffix, because there are no versions to pin.
-3. The worker resolves it via `ensureBranchArtefact` on each run. The on-disk cache is keyed by the artefact's `dataUpdatedAt`, so every successful CI push triggers a fresh download on the next processing run.
+1. The processings UI's plugin picker shows the `@main` artefact alongside the federated releases, with a dev-build chip.
+2. Picking it stores `pluginId = "@data-fair/processing-gpkg@main"` on the processing.
+3. The worker resolves it via `ensureArtefact` on each run. The on-disk cache is keyed by the artefact's `dataUpdatedAt`, so every successful CI push triggers a fresh download on the next processing run.
 
-Consumer services need `@data-fair/lib-node-registry` **≥ 0.3.0** for `ensureBranchArtefact` to exist.
+Consumer services need `@data-fair/lib-node-registry` **≥ 0.4.0**.
 
 ---
 
@@ -332,9 +325,10 @@ publish:
     - |
       TARBALL=$(ls *.tgz)
       PACKAGE_NAME=$(node -p "require('./package.json').name")
-      ENCODED_NAME=$(node -p "encodeURIComponent('${PACKAGE_NAME}')")
+      PACKAGE_MAJOR=$(node -p "require('./package.json').version.split('.')[0]")
+      ENCODED_ID=$(node -p "encodeURIComponent('${PACKAGE_NAME}@${PACKAGE_MAJOR}')")
       curl -f -X POST \
-        "${REGISTRY_URL}/api/v1/artefacts/${ENCODED_NAME}/versions" \
+        "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
         -H "x-api-key: ${REGISTRY_API_KEY}" \
         -F "file=@${TARBALL}"
 ```
@@ -441,7 +435,7 @@ This is inherently more secure than GitHub's default model — the protection is
 ### Minimal checklist
 
 - [ ] API key stored as a CI secret (never in code)
-- [ ] API key scoped with `allowedName` — to the plugin's `package.json#name` for the tag flow, or to the operator-chosen `<package-name>-<branch>` artefact id for the branch flow
+- [ ] API key scoped with `allowedPackageName` — to the plugin's `package.json#name` (e.g. `@data-fair/processing-gpkg`) — covers both tag and branch flows
 - [ ] Publish job restricted to tag pushes on protected branches
 - [ ] **GitHub: secret stored in an environment (not repository level) with required reviewers**
 - [ ] **GitHub: environment restricted to specific branches/tags**
