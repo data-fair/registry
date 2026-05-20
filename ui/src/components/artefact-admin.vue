@@ -196,6 +196,8 @@ watch(() => artefact, () => {
   editData.value = {
     title: artefact.title || {},
     description: artefact.description || {},
+    group: artefact.group || {},
+    documentation: artefact.documentation ?? null,
     public: artefact.public ?? false,
     privateAccess: artefact.privateAccess ? [...artefact.privateAccess] : []
   }
@@ -207,6 +209,7 @@ const patchAction = useAsyncAction(
     const body = { ...editData.value }
     if (body.title && !body.title.fr && !body.title.en) body.title = null
     if (body.description && !body.description.fr && !body.description.en) body.description = null
+    if (body.group && !body.group.fr && !body.group.en) body.group = null
     if (body.privateAccess && body.privateAccess.length === 0) body.privateAccess = null
 
     await $fetch(`/v1/artefacts/${encodeURIComponent(artefact._id)}`, { method: 'PATCH', body })

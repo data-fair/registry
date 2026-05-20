@@ -142,24 +142,18 @@ jobs:
           ARTEFACT_ID="${PACKAGE_NAME//\//-}-${PACKAGE_MAJOR}"
           ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
           # `category` tags the artefact kind and must match the upload key's
-          # allowedCategory restriction. Capture status + body so a failed
-          # upload prints the registry's error message (`curl -f` hides it).
-          HTTP_CODE=$(curl -sS -X POST \
+          # allowedCategory restriction. `--fail-with-body` prints the
+          # registry's response body either way and still fails the step on an
+          # HTTP error, so a rejected upload shows the reason in the log.
+          curl -sS --fail-with-body -X POST \
             "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
             -F "architecture=x64" \
             -F "category=processing" \
-            -F "file=@with-deps.tgz" \
-            -o response.txt -w '%{http_code}')
-          echo "registry responded HTTP ${HTTP_CODE}"
-          cat response.txt
-          if [ "${HTTP_CODE}" -ge 400 ]; then
-            echo "::error::registry upload failed (HTTP ${HTTP_CODE})"
-            exit 1
-          fi
+            -F "file=@with-deps.tgz"
 ```
 
-> **Category & error handling.** The `category` form field tags the artefact's kind (`processing`, `catalog`, `application`, `other`). Send it explicitly so the artefact is filed correctly — even when `package.json` carries no `registry.category` — and so the upload satisfies any `allowedCategory` restriction on the key. For npm uploads the registry resolves the category as `category` form field → `package.json#registry.category` → `other`. The upload also captures the HTTP status and response body instead of passing `curl -f`, so a rejected upload prints the registry's error message in the job log rather than a bare `curl: (22)` exit.
+> **Category & error handling.** The `category` form field tags the artefact's kind (`processing`, `catalog`, `application`, `other`). Send it explicitly so the artefact is filed correctly — even when `package.json` carries no `registry.category` — and so the upload satisfies any `allowedCategory` restriction on the key. For npm uploads the registry resolves the category as `category` form field → `package.json#registry.category` → `other`. The upload uses `curl --fail-with-body` (curl ≥ 7.76) instead of `curl -f`: the registry's response body is always printed — including its error message when an upload is rejected — and the step still fails on an HTTP error.
 
 Then cut a release the usual way:
 
@@ -199,19 +193,12 @@ jobs:
         env:
           REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
         run: |
-          HTTP_CODE=$(curl -sS -X POST \
+          curl -sS --fail-with-body -X POST \
             "https://registry.example.com/api/v1/artefacts/file/my-tileset" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
             -F "file=@output/terrain.mbtiles" \
             -F "category=tileset" \
-            -F 'title={"fr":"Terrain","en":"Terrain"}' \
-            -o response.txt -w '%{http_code}')
-          echo "registry responded HTTP ${HTTP_CODE}"
-          cat response.txt
-          if [ "${HTTP_CODE}" -ge 400 ]; then
-            echo "::error::registry upload failed (HTTP ${HTTP_CODE})"
-            exit 1
-          fi
+            -F 'title={"fr":"Terrain","en":"Terrain"}'
 ```
 
 ---
@@ -303,21 +290,15 @@ jobs:
           ARTEFACT_ID="${PACKAGE_NAME//\//-}-${GITHUB_REF_NAME}"
           ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
           # `category` tags the artefact kind and must match the upload key's
-          # allowedCategory restriction. Capture status + body so a failed
-          # upload prints the registry's error message (`curl -f` hides it).
-          HTTP_CODE=$(curl -sS -X POST \
+          # allowedCategory restriction. `--fail-with-body` prints the
+          # registry's response body either way and still fails the step on an
+          # HTTP error, so a rejected upload shows the reason in the log.
+          curl -sS --fail-with-body -X POST \
             "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
             -F "architecture=x64" \
             -F "category=processing" \
-            -F "file=@with-deps.tgz" \
-            -o response.txt -w '%{http_code}')
-          echo "registry responded HTTP ${HTTP_CODE}"
-          cat response.txt
-          if [ "${HTTP_CODE}" -ge 400 ]; then
-            echo "::error::registry upload failed (HTTP ${HTTP_CODE})"
-            exit 1
-          fi
+            -F "file=@with-deps.tgz"
 ```
 
 Notes:
@@ -366,16 +347,12 @@ publish:
       ARTEFACT_ID="${PACKAGE_NAME//\//-}-${PACKAGE_MAJOR}"
       ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
       # `category` must match the upload key's allowedCategory restriction;
-      # capturing status + body surfaces the registry's error on failure.
-      HTTP_CODE=$(curl -sS -X POST \
+      # `--fail-with-body` prints the response body and fails the job on error.
+      curl -sS --fail-with-body -X POST \
         "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
         -H "x-api-key: ${REGISTRY_API_KEY}" \
         -F "category=processing" \
-        -F "file=@${TARBALL}" \
-        -o response.txt -w '%{http_code}')
-      echo "registry responded HTTP ${HTTP_CODE}"
-      cat response.txt
-      [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ] || exit 1
+        -F "file=@${TARBALL}"
 ```
 
 ### Pipeline example (file artefact)
@@ -390,16 +367,12 @@ publish-tileset:
   script:
     - ./build-tileset.sh
     - |
-      HTTP_CODE=$(curl -sS -X POST \
+      curl -sS --fail-with-body -X POST \
         "${REGISTRY_URL}/api/v1/artefacts/file/my-tileset" \
         -H "x-api-key: ${REGISTRY_API_KEY}" \
         -F "file=@output/terrain.mbtiles" \
         -F "category=tileset" \
-        -F 'title={"fr":"Terrain","en":"Terrain"}' \
-        -o response.txt -w '%{http_code}')
-      echo "registry responded HTTP ${HTTP_CODE}"
-      cat response.txt
-      [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ] || exit 1
+        -F 'title={"fr":"Terrain","en":"Terrain"}'
 ```
 
 ---
@@ -495,5 +468,5 @@ This is inherently more secure than GitHub's default model — the protection is
 - [ ] `node_modules` built inside the same base image consumers run on
 - [ ] `architecture` form field set on upload (matches `process.arch` of the consumer)
 - [ ] `category` form field set on npm uploads (matches the artefact kind and any `allowedCategory` on the key)
-- [ ] Upload step captures the HTTP status + response body (no silent `curl -f`)
+- [ ] Upload uses `curl --fail-with-body` so the registry's response is printed (no silent `curl -f`)
 - [ ] Key rotation process documented for your team
