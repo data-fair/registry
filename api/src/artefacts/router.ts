@@ -182,7 +182,7 @@ router.post('/file/:name', async (req, res, next) => {
     }
 
     const name = safeDecode(req.params.name)
-    if (apiKey?.allowedName && apiKey.allowedName !== name) {
+    if (apiKey?.allowedNamePrefix && !name.startsWith(apiKey.allowedNamePrefix)) {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
     const artefactId = name
@@ -242,7 +242,7 @@ router.post('/npm/:id', async (req, res, next) => {
     }
 
     const id = safeDecode(req.params.id)
-    if (apiKey?.allowedName && apiKey.allowedName !== id) {
+    if (apiKey?.allowedNamePrefix && !id.startsWith(apiKey.allowedNamePrefix)) {
       throw httpError(403, `this API key is not allowed to upload "${id}"`)
     }
 
@@ -261,10 +261,6 @@ router.post('/npm/:id', async (req, res, next) => {
 
     if (existing?.packageName && existing.packageName !== manifest.name) {
       throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
-    }
-
-    if (apiKey?.allowedPackageName && apiKey.allowedPackageName !== manifest.name) {
-      throw httpError(403, `this API key is only allowed to upload package "${apiKey.allowedPackageName}"`)
     }
 
     const category = pickCategory(uploadCategory ?? manifest.category, npmCategories)

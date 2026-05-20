@@ -45,7 +45,7 @@ async function main () {
   // --- API keys -----------------------------------------------------------
   const keySpecs: { name: string, body: Record<string, unknown> }[] = [
     { name: 'dev-upload-unrestricted', body: { type: 'upload', name: 'dev-upload-unrestricted' } },
-    { name: 'dev-upload-terrain', body: { type: 'upload', name: 'dev-upload-terrain', allowedName: 'terrain-france' } }
+    { name: 'dev-upload-terrain', body: { type: 'upload', name: 'dev-upload-terrain', allowedNamePrefix: 'terrain-' } }
   ]
 
   const existingKeys = await admin.get('/api/v1/api-keys')

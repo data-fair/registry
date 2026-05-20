@@ -18,14 +18,11 @@ router.post('/', async (req, res, next) => {
     if (body.type === 'upload') {
       await session.reqAdminMode(req)
     } else if (body.type === 'read') {
-      if (body.allowedName) {
-        throw httpError(400, 'allowedName is only valid for upload keys')
+      if (body.allowedNamePrefix) {
+        throw httpError(400, 'allowedNamePrefix is only valid for upload keys')
       }
       if (body.allowedCategory) {
         throw httpError(400, 'allowedCategory is only valid for upload keys')
-      }
-      if (body.allowedPackageName) {
-        throw httpError(400, 'allowedPackageName is only valid for upload keys')
       }
       reqSessionAuthenticated(req)
       if (!body.owner) throw httpError(400, 'owner is required for read keys')
@@ -56,9 +53,8 @@ router.post('/', async (req, res, next) => {
       },
       createdAt: now,
       ...(body.owner ? { owner: body.owner } : {}),
-      ...(body.allowedName ? { allowedName: body.allowedName } : {}),
+      ...(body.allowedNamePrefix ? { allowedNamePrefix: body.allowedNamePrefix } : {}),
       ...(body.allowedCategory ? { allowedCategory: body.allowedCategory } : {}),
-      ...(body.allowedPackageName ? { allowedPackageName: body.allowedPackageName } : {}),
       ...(body.expiresAt ? { expiresAt: body.expiresAt } : {})
     }
 

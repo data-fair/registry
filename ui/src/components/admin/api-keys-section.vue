@@ -36,21 +36,8 @@
             sm="3"
           >
             <v-text-field
-              v-model="newKey.allowedName"
-              :label="t('allowedName')"
-              density="compact"
-              hide-details
-              variant="outlined"
-              clearable
-            />
-          </v-col>
-          <v-col
-            cols="12"
-            sm="3"
-          >
-            <v-text-field
-              v-model="newKey.allowedPackageName"
-              :label="t('allowedPackageName')"
+              v-model="newKey.allowedNamePrefix"
+              :label="t('allowedNamePrefix')"
               density="compact"
               hide-details
               variant="outlined"
@@ -123,8 +110,7 @@
             <th>{{ t('prefix') }}</th>
             <th>{{ t('name') }}</th>
             <th>{{ t('allowedCategory') }}</th>
-            <th>{{ t('allowedName') }}</th>
-            <th>{{ t('allowedPackageName') }}</th>
+            <th>{{ t('allowedNamePrefix') }}</th>
             <th>{{ t('createdBy') }}</th>
             <th>{{ t('createdAt') }}</th>
             <th>{{ t('expiresAt') }}</th>
@@ -141,8 +127,7 @@
             <td><code>reg_{{ key.shortId }}</code></td>
             <td>{{ key.name }}</td>
             <td>{{ key.allowedCategory || '—' }}</td>
-            <td>{{ key.allowedName || '—' }}</td>
-            <td>{{ key.allowedPackageName || '—' }}</td>
+            <td>{{ key.allowedNamePrefix || '—' }}</td>
             <td>{{ key.createdBy.name || key.createdBy.id }}</td>
             <td>{{ dayjs(key.createdAt).format('L LT') }}</td>
             <td>{{ key.expiresAt ? dayjs(key.expiresAt).format('L LT') : '—' }}</td>
@@ -169,8 +154,7 @@ fr:
   createKey: Créer une clé d'upload
   name: Nom
   allowedCategory: Catégorie autorisée
-  allowedName: Nom autorisé
-  allowedPackageName: Paquet autorisé
+  allowedNamePrefix: Préfixe de nom autorisé
   create: Créer
   keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
   keyWarning: Cette clé ne sera plus affichée après fermeture.
@@ -185,8 +169,7 @@ en:
   createKey: Create upload key
   name: Name
   allowedCategory: Allowed category
-  allowedName: Allowed name
-  allowedPackageName: Allowed package
+  allowedNamePrefix: Allowed name prefix
   create: Create
   keyCreated: "Key created successfully. Copy it now:"
   keyWarning: This key will not be shown again after you close this.
@@ -220,11 +203,10 @@ const categoryItems = [
 type NewKey = {
   name: string
   allowedCategory: string | null
-  allowedName: string | null
-  allowedPackageName: string | null
+  allowedNamePrefix: string | null
   expiresAt: Date | null
 }
-const newKey = ref<NewKey>({ name: '', allowedCategory: null, allowedName: null, allowedPackageName: null, expiresAt: null })
+const newKey = ref<NewKey>({ name: '', allowedCategory: null, allowedNamePrefix: null, expiresAt: null })
 const createdKey = ref<string | null>(null)
 const deletingKeyId = ref<string | null>(null)
 
@@ -239,8 +221,7 @@ const createAction = useAsyncAction(
       name: newKey.value.name
     }
     if (newKey.value.allowedCategory) body.allowedCategory = newKey.value.allowedCategory
-    if (newKey.value.allowedName) body.allowedName = newKey.value.allowedName
-    if (newKey.value.allowedPackageName) body.allowedPackageName = newKey.value.allowedPackageName
+    if (newKey.value.allowedNamePrefix) body.allowedNamePrefix = newKey.value.allowedNamePrefix
     if (newKey.value.expiresAt) {
       const d = new Date(newKey.value.expiresAt)
       d.setHours(23, 59, 59)
@@ -248,7 +229,7 @@ const createAction = useAsyncAction(
     }
     const res = await $fetch('/v1/api-keys', { method: 'POST', body })
     createdKey.value = res.key
-    newKey.value = { name: '', allowedCategory: null, allowedName: null, allowedPackageName: null, expiresAt: null }
+    newKey.value = { name: '', allowedCategory: null, allowedNamePrefix: null, expiresAt: null }
     keysFetch.refresh()
   }
 )

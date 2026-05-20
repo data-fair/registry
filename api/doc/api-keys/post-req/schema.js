@@ -17,14 +17,9 @@ export default {
         id: { type: 'string' }
       }
     },
-    allowedName: {
+    allowedNamePrefix: {
       type: 'string',
-      description: 'Restricts an upload key to a single artefact name (exact match). Only valid for upload keys.',
-      minLength: 1
-    },
-    allowedPackageName: {
-      type: 'string',
-      description: 'Restricts an upload key to a single manifest package name. Only valid for upload keys.',
+      description: 'Restricts an upload key to artefact names starting with this prefix. Only valid for upload keys.',
       minLength: 1
     },
     allowedCategory: {
