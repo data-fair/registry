@@ -3,17 +3,18 @@ import { pipeline } from 'node:stream/promises'
 import type { Readable } from 'node:stream'
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import Busboy from 'busboy'
-import { ObjectId, type Filter } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
-import { assertReqInternalSecret, reqIsInternal } from '@data-fair/lib-express/req-origin.js'
+import { reqIsInternal } from '@data-fair/lib-express/req-origin.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import type { Artefact } from '#types/artefact/index.ts'
-import mongo from '#mongo'
 import config from '#config'
-import { authenticateApiKey, tryAuthenticateReadKey } from '../auth.ts'
-import { artefactAccessFilter, artefactAccessFilterForAccount, assertDownloadAccess, assertDownloadAccessForAccount } from '../access.ts'
-import { writeFile, readFile, getDownloadUrl, deleteFile, moveFile, fileStats } from '../files-storage/index.ts'
-import { extractManifest, parseSemver, resolveVersionQuery, pruneOldVersions } from './service.ts'
+import { authenticateApiKey, resolveCaller, tryInternalSecretWithAccount } from '../auth.ts'
+import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
+import { filesStorage } from '../files-storage/index.ts'
+import {
+  listArtefacts, getArtefact, getArtefactById, patchArtefact, deleteArtefact,
+  commitFileUpload, commitNpmUpload, extractStagedManifest, resolveDownload
+} from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
 
@@ -68,6 +69,8 @@ const safeDecode = (raw: string): string => {
   }
 }
 
+// Local internal-secret check used only by the upload endpoints (which don't
+// care about per-account scoping — uploads are admin-style operations).
 const tryInternalSecret = (req: import('express').Request): boolean => {
   if (!reqIsInternal(req)) return false
   const secretKey = req.get('x-secret-key')
@@ -81,15 +84,7 @@ const tryInternalSecret = (req: import('express').Request): boolean => {
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
-    let filter: Filter<Artefact>
-    if (tryInternalSecret(req)) {
-      filter = {}
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      filter = readAuth
-        ? await artefactAccessFilterForAccount(readAuth.owner)
-        : await artefactAccessFilter(req)
-    }
+    const filter = artefactAccessFilter(await resolveCaller(req))
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
     const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { dataUpdatedAt: -1 }
@@ -111,50 +106,37 @@ router.get('/', async (req, res, next) => {
       if (!allowedFormats.includes(req.query.format as string)) {
         throw httpError(400, `invalid format, must be one of: ${allowedFormats.join(', ')}`)
       }
-      filter.format = req.query.format as 'npm' | 'file'
+      filter.format = req.query.format as Artefact['format']
     }
 
-    const [results, count] = await Promise.all([
-      mongo.artefacts.find(filter).sort(sort).skip(skip).limit(size).toArray(),
-      mongo.artefacts.countDocuments(filter)
-    ])
+    const { results, count } = await listArtefacts(filter, { sort, skip, size })
     res.json({ results, count })
   } catch (err) { next(err) }
 })
 
-// Get artefact detail + versions
+// Get artefact detail
+// All formats carry their tarball references directly on the doc.
 router.get('/:id', async (req, res, next) => {
   try {
-    let filter: Filter<Artefact>
-    if (tryInternalSecret(req)) {
-      filter = {}
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      filter = readAuth
-        ? await artefactAccessFilterForAccount(readAuth.owner)
-        : await artefactAccessFilter(req)
-    }
-    const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
+    const filter = artefactAccessFilter(await resolveCaller(req))
+    const artefact = await getArtefact(req.params.id, filter)
     if (!artefact) throw httpError(404, 'artefact not found')
-
-    if (artefact.format === 'file') {
-      res.json(artefact)
-    } else {
-      const versions = await mongo.versions.find({ artefactId: artefact._id })
-        .sort({ semverMajor: -1, semverMinor: -1, semverPatch: -1 })
-        .toArray()
-      res.json({ ...artefact, versions })
-    }
+    res.json(artefact)
   } catch (err) { next(err) }
 })
 
-// Update editable metadata (superadmin)
+// Update editable metadata (superadmin OR internal-service)
+//
+// TEMPORARY: internal secret is accepted so the v6.0 first-boot migration
+// from the sister processings service can push title/description/public/
+// privateAccess from its legacy on-disk metadata.
 router.patch('/:id', async (req, res, next) => {
   try {
-    await session.reqAdminMode(req)
+    const internalAuth = tryInternalSecretWithAccount(req)
+    if (!internalAuth) await session.reqAdminMode(req)
     const body = patchReqBody.returnValid(req.body, { name: 'body' })
 
-    const existing = await mongo.artefacts.findOne({ _id: req.params.id })
+    const existing = await getArtefactById(req.params.id)
     if (!existing) throw httpError(404, 'artefact not found')
 
     if (existing.origin) {
@@ -165,21 +147,7 @@ router.patch('/:id', async (req, res, next) => {
       }
     }
 
-    // Remove null values (PATCH null = unset the field)
-    const $set: Record<string, unknown> = { updatedAt: new Date().toISOString() }
-    const $unset: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(body)) {
-      if (value === null) $unset[key] = ''
-      else $set[key] = value
-    }
-    const update: Record<string, unknown> = { $set }
-    if (Object.keys($unset).length > 0) update.$unset = $unset
-
-    const result = await mongo.artefacts.findOneAndUpdate(
-      { _id: req.params.id },
-      update,
-      { returnDocument: 'after' }
-    )
+    const result = await patchArtefact(req.params.id, body)
     if (!result) throw httpError(404, 'artefact not found')
     res.json(result)
   } catch (err) { next(err) }
@@ -189,208 +157,12 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     await session.reqAdminMode(req)
-    const artefact = await mongo.artefacts.findOne({ _id: req.params.id })
+    const artefact = await getArtefactById(req.params.id)
     if (!artefact) throw httpError(404, 'artefact not found')
     if (artefact.origin) throw httpError(403, 'mirrored artefact: unselect the mirror instead of deleting')
 
-    // Delete DB state first so concurrent GETs fail cleanly with 404,
-    // then best-effort remove files.
-    if (artefact.format === 'file') {
-      await mongo.artefacts.deleteOne({ _id: artefact._id })
-      if (artefact.filePath) await deleteFile(artefact.filePath)
-    } else {
-      const versions = await mongo.versions.find({ artefactId: artefact._id }).toArray()
-      await mongo.versions.deleteMany({ artefactId: artefact._id })
-      await mongo.artefacts.deleteOne({ _id: artefact._id })
-      for (const version of versions) {
-        await deleteFile(version.tarballPath)
-      }
-    }
-    await mongo.thumbnails.deleteMany({ artefactId: artefact._id })
+    await deleteArtefact(artefact)
     res.status(204).send()
-  } catch (err) { next(err) }
-})
-
-// Upload version (API key or internal secret auth, multipart)
-// TEMPORARY: internal secret is accepted for uploads to help manage the transition —
-// services that previously managed their plugins locally can upload to the registry
-// to switch to the new centralized mode.
-router.post('/:name/versions', async (req, res, next) => {
-  const stagingPath = `_staging/${randomUUID()}.tgz`
-  let stagingStored = false
-  let finalTarballPath: string | undefined
-  let storedOk = false
-  try {
-    const isInternal = tryInternalSecret(req)
-    let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
-    if (!isInternal) {
-      apiKey = await authenticateApiKey(req)
-      if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload versions')
-    }
-
-    const name = safeDecode(req.params.name)
-    if (apiKey?.allowedName && apiKey.allowedName !== name) {
-      throw httpError(403, `this API key is not allowed to upload "${name}"`)
-    }
-
-    // Stream the multipart file straight into the configured storage at a
-    // staging path — no local fs tmp needed even for the S3 backend.
-    const { architecture } = await streamTarballUpload(req, (stream) => writeFile(stream, stagingPath))
-    stagingStored = true
-
-    // Extract manifest by reading the staged object back (pipeline enforces decompression limits).
-    const { body: manifestStream } = await readFile(stagingPath)
-    const manifest = await extractManifest(manifestStream)
-    if (manifest.name !== name) {
-      throw httpError(400, `package name mismatch: URL says "${name}" but package.json says "${manifest.name}"`)
-    }
-
-    const category = pickCategory(manifest.category, npmCategories)
-    if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
-      throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
-    }
-
-    const semverParts = parseSemver(manifest.version)
-    const majorVersion = semverParts.semverMajor
-    const artefactId = `${name}@${majorVersion}`
-
-    const existingArtefact = await mongo.artefacts.findOne({ _id: artefactId })
-    if (existingArtefact?.origin) {
-      throw httpError(409, 'this artefact is managed by a remote registry')
-    }
-
-    // Promote staging to final path (server-side copy on S3, rename on fs).
-    const archSuffix = architecture ? `_${architecture}` : ''
-    const tarballPath = `${name}/${majorVersion}/${manifest.version}${archSuffix}.tgz`
-    await moveFile(stagingPath, tarballPath)
-    stagingStored = false
-    finalTarballPath = tarballPath
-    const { size } = await fileStats(tarballPath)
-
-    // Upsert artefact
-    const now = new Date().toISOString()
-    await mongo.artefacts.updateOne(
-      { _id: artefactId },
-      {
-        $set: {
-          packageName: manifest.name,
-          version: manifest.version,
-          licence: manifest.licence,
-          category,
-          ...(manifest.processingConfigSchema ? { processingConfigSchema: manifest.processingConfigSchema } : {}),
-          ...(manifest.applicationConfigSchema ? { applicationConfigSchema: manifest.applicationConfigSchema } : {}),
-          size,
-          updatedAt: now,
-          dataUpdatedAt: now
-        },
-        $setOnInsert: {
-          _id: artefactId,
-          name,
-          format: 'npm' as const,
-          majorVersion,
-          public: false,
-          privateAccess: [],
-          createdAt: now
-        }
-      },
-      { upsert: true }
-    )
-
-    // Create version doc
-    const versionId = new ObjectId().toString()
-    await mongo.versions.insertOne({
-      _id: versionId,
-      artefactId,
-      version: manifest.version,
-      ...(architecture ? { architecture } : {}),
-      ...semverParts,
-      tarballPath,
-      size,
-      uploadedAt: now,
-      uploadedBy: apiKey
-        ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
-        : { internal: true }
-    })
-    storedOk = true
-
-    // 2-deep retention: keep only the 2 most recent patches per minor branch
-    await pruneOldVersions(artefactId, semverParts.semverMajor, semverParts.semverMinor)
-
-    const artefact = await mongo.artefacts.findOne({ _id: artefactId })
-    res.status(201).json({ artefact, version: { _id: versionId, version: manifest.version } })
-  } catch (err) {
-    // Clean up any stored object depending on which step failed.
-    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
-    if (finalTarballPath && !storedOk) await deleteFile(finalTarballPath).catch(() => {})
-    next(err)
-  }
-})
-
-// Resolve version
-router.get('/:id/versions/:version', async (req, res, next) => {
-  try {
-    let filter: Filter<Artefact>
-    if (tryInternalSecret(req)) {
-      filter = {}
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      filter = readAuth
-        ? await artefactAccessFilterForAccount(readAuth.owner)
-        : await artefactAccessFilter(req)
-    }
-    const artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-    if (!artefact) throw httpError(404, 'artefact not found')
-
-    const { filter: vFilter, sort } = resolveVersionQuery(artefact._id, req.params.version)
-    const version = await mongo.versions.findOne(vFilter, { sort })
-    if (!version) throw httpError(404, 'version not found')
-    res.json(version)
-  } catch (err) { next(err) }
-})
-
-// Download tarball
-router.get('/:id/versions/:version/tarball', async (req, res, next) => {
-  try {
-    let artefact
-
-    // Three auth paths: internal secret, read API key, or session-based
-    const secretKey = req.get('x-secret-key')
-    if (secretKey) {
-      assertReqInternalSecret(req, config.secretKeys.internalServices!)
-      artefact = await mongo.artefacts.findOne({ _id: req.params.id })
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      if (readAuth) {
-        const filter = await artefactAccessFilterForAccount(readAuth.owner)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccessForAccount(readAuth.owner, artefact)
-      } else {
-        const filter = await artefactAccessFilter(req)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccess(req, artefact)
-      }
-    }
-
-    if (!artefact) throw httpError(404, 'artefact not found')
-
-    const { filter: vFilter, sort } = resolveVersionQuery(artefact._id, req.params.version)
-    const version = await mongo.versions.findOne(vFilter, { sort })
-    if (!version) throw httpError(404, 'version not found')
-
-    const filename = `${artefact.name}-${version.version}.tgz`
-    const signedUrl = await getDownloadUrl(version.tarballPath, { filename })
-    if (signedUrl) {
-      res.redirect(302, signedUrl)
-      return
-    }
-
-    res.set('Content-Type', 'application/gzip')
-    res.set('Content-Disposition', `attachment; filename="${filename}"`)
-    const { body, size } = await readFile(version.tarballPath)
-    res.set('Content-Length', String(size))
-    await pipeline(body, res).catch((err) => {
-      if (!res.headersSent) next(err)
-    })
   } catch (err) { next(err) }
 })
 
@@ -401,8 +173,6 @@ router.get('/:id/versions/:version/tarball', async (req, res, next) => {
 router.post('/file/:name', async (req, res, next) => {
   const stagingPath = `_staging/${randomUUID()}.bin`
   let stagingStored = false
-  let newFilePath: string | undefined
-  let storedOk = false
   try {
     const isInternal = tryInternalSecret(req)
     let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
@@ -412,19 +182,19 @@ router.post('/file/:name', async (req, res, next) => {
     }
 
     const name = safeDecode(req.params.name)
-    if (apiKey?.allowedName && apiKey.allowedName !== name) {
+    if (apiKey?.allowedNamePrefix && !name.startsWith(apiKey.allowedNamePrefix)) {
       throw httpError(403, `this API key is not allowed to upload "${name}"`)
     }
     const artefactId = name
 
-    const existingFileArtefact = await mongo.artefacts.findOne({ _id: artefactId })
+    const existingFileArtefact = await getArtefactById(artefactId)
     if (existingFileArtefact?.origin) {
       throw httpError(409, 'this artefact is managed by a remote registry')
     }
 
     // Stream the multipart file straight into the configured storage at a
     // staging path — no local fs tmp needed even for the S3 backend.
-    const fields = await streamFileUpload(req, (stream) => writeFile(stream, stagingPath))
+    const fields = await streamFileUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
     stagingStored = true
 
     // Parse optional JSON fields with explicit 400 on malformed input.
@@ -436,57 +206,83 @@ router.post('/file/:name', async (req, res, next) => {
       throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
     }
 
-    // Store NEW file first, then DB commit, then delete OLD — avoids a
-    // window where the artefact row points at a missing file.
-    const existing = await mongo.artefacts.findOne({ _id: artefactId })
-    const fileName = fields.fileName || name
-    // Namespace new writes with a random suffix so a failed delete of the
-    // old file doesn't clobber the fresh one.
-    const filePath = `files/${name}/${randomUUID()}-${fileName}`
-    await moveFile(stagingPath, filePath)
+    const artefact = await commitFileUpload({
+      artefactId,
+      name,
+      fileName: fields.fileName || name,
+      stagingPath,
+      category,
+      title,
+      description,
+      uploadedBy: apiKey
+        ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+        : { internal: true }
+    })
     stagingStored = false
-    newFilePath = filePath
-    const { size } = await fileStats(filePath)
-
-    const now = new Date().toISOString()
-    await mongo.artefacts.updateOne(
-      { _id: artefactId },
-      {
-        $set: {
-          filePath,
-          fileName,
-          size,
-          category,
-          ...(title !== undefined ? { title } : {}),
-          ...(description !== undefined ? { description } : {}),
-          uploadedBy: apiKey
-            ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
-            : { internal: true },
-          updatedAt: now,
-          dataUpdatedAt: now
-        },
-        $setOnInsert: {
-          _id: artefactId,
-          name,
-          format: 'file' as const,
-          public: false,
-          privateAccess: [],
-          createdAt: now
-        }
-      },
-      { upsert: true }
-    )
-    storedOk = true
-
-    if (existing?.filePath && existing.filePath !== filePath) {
-      await deleteFile(existing.filePath).catch(() => {})
-    }
-
-    const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     res.status(201).json({ artefact })
   } catch (err) {
-    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
-    if (newFilePath && !storedOk) await deleteFile(newFilePath).catch(() => {})
+    if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
+    next(err)
+  }
+})
+
+// Upload npm artefact (API key or internal secret auth, multipart).
+// Each artefact id holds a `tarballs: { [arch]: ... }` map; per-arch upload
+// updates one slot, leaves the others alone. `noarch` is the default arch
+// for portable builds.
+router.post('/npm/:id', async (req, res, next) => {
+  const stagingPath = `_staging/${randomUUID()}.tgz`
+  let stagingStored = false
+  try {
+    const isInternal = tryInternalSecret(req)
+    let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
+    if (!isInternal) {
+      apiKey = await authenticateApiKey(req)
+      if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload npm artefacts')
+    }
+
+    const id = safeDecode(req.params.id)
+    if (apiKey?.allowedNamePrefix && !id.startsWith(apiKey.allowedNamePrefix)) {
+      throw httpError(403, `this API key is not allowed to upload "${id}"`)
+    }
+
+    const existing = await getArtefactById(id)
+    if (existing?.origin) {
+      throw httpError(409, 'this artefact is managed by a remote registry')
+    }
+    if (existing && existing.format !== 'npm') {
+      throw httpError(409, `this artefact already exists as a "${existing.format}" artefact`)
+    }
+
+    const { architecture, category: uploadCategory } = await streamTarballUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
+    stagingStored = true
+
+    const manifest = await extractStagedManifest(stagingPath)
+
+    if (existing?.packageName && existing.packageName !== manifest.name) {
+      throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
+    }
+
+    const category = pickCategory(uploadCategory ?? manifest.category, npmCategories)
+    if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
+      throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
+    }
+
+    const artefact = await commitNpmUpload({
+      id,
+      arch: architecture || 'noarch',
+      stagingPath,
+      manifest,
+      category,
+      uploadedBy: apiKey
+        ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+        : { internal: true },
+      existing
+    })
+    stagingStored = false
+    res.status(201).json({ artefact })
+  } catch (err) {
+    if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
     next(err)
   }
 })
@@ -494,42 +290,60 @@ router.post('/file/:name', async (req, res, next) => {
 // Download raw file
 router.get('/:id/download', async (req, res, next) => {
   try {
-    let artefact
-
-    const secretKey = req.get('x-secret-key')
-    if (secretKey) {
-      assertReqInternalSecret(req, config.secretKeys.internalServices!)
-      artefact = await mongo.artefacts.findOne({ _id: req.params.id })
-    } else {
-      const readAuth = await tryAuthenticateReadKey(req)
-      if (readAuth) {
-        const filter = await artefactAccessFilterForAccount(readAuth.owner)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccessForAccount(readAuth.owner, artefact)
-      } else {
-        const filter = await artefactAccessFilter(req)
-        artefact = await mongo.artefacts.findOne({ _id: req.params.id, ...filter })
-        if (artefact) await assertDownloadAccess(req, artefact)
-      }
-    }
-
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
+    const artefact = await getArtefact(req.params.id, filter)
     if (!artefact) throw httpError(404, 'artefact not found')
+    await assertDownloadAccess(caller, artefact)
     if (artefact.format !== 'file') throw httpError(400, 'this artefact is not a file-format artefact')
     if (!artefact.filePath) throw httpError(404, 'no file uploaded for this artefact')
 
     const filename = artefact.fileName || artefact.name
-    const signedUrl = await getDownloadUrl(artefact.filePath, { filename })
-    if (signedUrl) {
-      res.redirect(302, signedUrl)
+    const download = await resolveDownload(artefact.filePath, filename, req.get('If-Modified-Since'))
+    if ('redirectUrl' in download) {
+      res.redirect(302, download.redirectUrl)
       return
     }
 
     res.set('Content-Type', 'application/octet-stream')
     res.set('Content-Disposition', `attachment; filename="${filename}"`)
-    const { body, size, lastModified } = await readFile(artefact.filePath, req.get('If-Modified-Since'))
-    res.set('Last-Modified', lastModified.toUTCString())
-    res.set('Content-Length', String(size))
-    await pipeline(body, res).catch((err) => {
+    res.set('Last-Modified', download.lastModified.toUTCString())
+    res.set('Content-Length', String(download.size))
+    await pipeline(download.body, res).catch((err) => {
+      if (!res.headersSent) next(err)
+    })
+  } catch (err) { next(err) }
+})
+
+// Download npm artefact tarball. Optional ?architecture=<x64|arm64|...>
+// resolves a specific slot; falls back to `noarch` if the requested arch is
+// absent.
+router.get('/:id/tarball', async (req, res, next) => {
+  try {
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
+    const artefact = await getArtefact(req.params.id, filter)
+    if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.format !== 'npm') throw httpError(400, 'this artefact is not an npm-format artefact')
+    await assertDownloadAccess(caller, artefact)
+
+    const requestedArch = typeof req.query.architecture === 'string' ? req.query.architecture : undefined
+    const tarballs = artefact.tarballs || {}
+    const slot = (requestedArch && tarballs[requestedArch]) || tarballs.noarch
+    if (!slot) throw httpError(404, 'no tarball for this architecture')
+
+    const filename = `${artefact.name}-${artefact.version || 'tarball'}.tgz`
+    const download = await resolveDownload(slot.path, filename, req.get('If-Modified-Since'))
+    if ('redirectUrl' in download) {
+      res.redirect(302, download.redirectUrl)
+      return
+    }
+
+    res.set('Content-Type', 'application/gzip')
+    res.set('Content-Disposition', `attachment; filename="${filename}"`)
+    res.set('Last-Modified', download.lastModified.toUTCString())
+    res.set('Content-Length', String(download.size))
+    await pipeline(download.body, res).catch((err) => {
       if (!res.headersSent) next(err)
     })
   } catch (err) { next(err) }
@@ -540,10 +354,10 @@ router.get('/:id/download', async (req, res, next) => {
 // `architecture` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.
 type StreamWriter = (stream: Readable) => Promise<void>
 
-function streamTarballUpload (req: import('express').Request, writer: StreamWriter): Promise<{ architecture?: string }> {
+function streamTarballUpload (req: import('express').Request, writer: StreamWriter): Promise<{ architecture?: string, category?: string }> {
   return new Promise((resolve, reject) => {
     let settled = false
-    const settle = (err: Error | null, result?: { architecture?: string }) => {
+    const settle = (err: Error | null, result?: { architecture?: string, category?: string }) => {
       if (settled) return
       settled = true
       if (err) reject(err)
@@ -551,6 +365,7 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
     }
 
     let architecture: string | undefined
+    let category: string | undefined
     let fileSeen = false
     let pendingWrite: Promise<void> | null = null
 
@@ -567,6 +382,11 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
 
     busboy.on('field', (name, val) => {
       if (name === 'architecture') architecture = val
+      // Optional override for the artefact category. Plugin tarballs from before
+      // the registry convention don't carry `package.json#registry.category`,
+      // so the migration sends it as a multipart field. New plugins should
+      // declare it in package.json.
+      if (name === 'category') category = val
     })
 
     busboy.on('file', (_name, stream) => {
@@ -596,7 +416,7 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
         return settle(err as Error)
       }
       if (settled) return
-      settle(null, { architecture })
+      settle(null, { architecture, category })
     })
 
     req.on('aborted', () => settle(httpError(400, 'upload aborted')))

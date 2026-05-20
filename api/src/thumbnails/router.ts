@@ -6,6 +6,7 @@ import { session } from '@data-fair/lib-express/index.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import mongo from '#mongo'
 import { resizeThumbnail } from './service.ts'
+import { tryInternalSecretWithAccount } from '../auth.ts'
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
@@ -60,7 +61,12 @@ export const artefactThumbnailRouter = Router({ mergeParams: true })
 
 artefactThumbnailRouter.post('/', async (req, res, next) => {
   try {
-    await session.reqAdminMode(req)
+    // Accept admin session OR internal-services secret. The latter is used
+    // by the v6 processings → registry migration to upload icons rendered
+    // from the legacy `metadata.icon` mdi name. Same temporary-internal
+    // pattern as the version-upload and access-grants endpoints.
+    const internalAuth = tryInternalSecretWithAccount(req)
+    if (!internalAuth) await session.reqAdminMode(req)
 
     const artefactId = decodeURIComponent((req.params as { id: string }).id)
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
@@ -109,7 +115,8 @@ artefactThumbnailRouter.post('/', async (req, res, next) => {
 
 artefactThumbnailRouter.delete('/', async (req, res, next) => {
   try {
-    await session.reqAdminMode(req)
+    const internalAuth = tryInternalSecretWithAccount(req)
+    if (!internalAuth) await session.reqAdminMode(req)
     const artefactId = decodeURIComponent((req.params as { id: string }).id)
     const artefact = await mongo.artefacts.findOne({ _id: artefactId })
     if (!artefact) throw httpError(404, 'artefact not found')

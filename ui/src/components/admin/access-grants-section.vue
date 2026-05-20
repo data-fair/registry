@@ -1,35 +1,27 @@
 <template>
-  <v-container data-iframe-height>
-    <admin-nav />
-
+  <div class="pa-4">
     <!-- Grant access -->
     <v-card class="mb-4">
       <v-card-title>{{ t('grantAccess') }}</v-card-title>
       <v-card-text>
-        <p class="text-body-2 text-medium-emphasis mb-4">
-          {{ t('grantAccessHelp') }}
-        </p>
         <v-row>
           <v-col
             cols="12"
-            sm="4"
+            sm="8"
           >
-            <v-select
-              v-model="newGrant.type"
-              :items="accountTypes"
-              :label="t('accountType')"
-              density="compact"
-              hide-details
-              variant="outlined"
-            />
-          </v-col>
-          <v-col
-            cols="12"
-            sm="4"
-          >
-            <v-text-field
-              v-model="newGrant.id"
-              :label="t('accountId')"
+            <v-autocomplete
+              v-model="selectedAccount"
+              v-model:search="accountSearch"
+              :items="accountItems"
+              :item-props="accountItemProps"
+              :loading="accountsFetch.loading.value"
+              :label="t('searchAccount')"
+              :no-data-text="t('noAccounts')"
+              item-title="title"
+              item-value="key"
+              return-object
+              no-filter
+              clearable
               density="compact"
               hide-details
               variant="outlined"
@@ -42,7 +34,7 @@
             <v-btn
               color="primary"
               variant="flat"
-              :disabled="!newGrant.id || !newGrant.type"
+              :disabled="!selectedAccount"
               :loading="grantAction.loading.value"
               @click="grantAction.execute()"
             >
@@ -85,7 +77,11 @@
               >
                 {{ grant.account.type }}
               </v-chip>
-              {{ grant.account.id }}
+              {{ grant.account.name || grant.account.id }}
+              <span
+                v-if="grant.account.name"
+                class="text-medium-emphasis text-body-2 ml-1"
+              >{{ grant.account.id }}</span>
             </td>
             <td>{{ grant.grantedBy.name || grant.grantedBy.id }}</td>
             <td>{{ dayjs(grant.grantedAt).format('L LT') }}</td>
@@ -103,29 +99,23 @@
         </tbody>
       </v-table>
     </v-card>
-  </v-container>
+  </div>
 </template>
 
 <i18n lang="yaml">
 fr:
-  admin: Administration
-  accessGrants: Accès accordés
   grantAccess: Accorder l'accès
-  grantAccessHelp: Autoriser des comptes à télécharger les ressources du registre qui leur sont visibles. La visibilité est contrôlée séparément sur chaque artefact (public ou restreint) ; un accès accordé ici permet ensuite le téléchargement effectif des artefacts auxquels le compte a accès.
-  accountType: Type de compte
-  accountId: Identifiant du compte
+  searchAccount: Rechercher un compte
+  noAccounts: Aucun compte trouvé
   grant: Accorder
   existingGrants: Accès accordés
   account: Compte
   grantedBy: Accordé par
   grantedAt: Accordé le
 en:
-  admin: Administration
-  accessGrants: Access Grants
   grantAccess: Grant Access
-  grantAccessHelp: Authorize accounts to download registry resources visible to them. Visibility is controlled separately on each artefact (public or restricted); a grant here enables the actual download of the artefacts the account can see.
-  accountType: Account Type
-  accountId: Account ID
+  searchAccount: Search an account
+  noAccounts: No account found
   grant: Grant
   existingGrants: Existing Grants
   account: Account
@@ -134,31 +124,53 @@ en:
 </i18n>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { mdiDelete } from '@mdi/js'
-import { useBreadcrumbs } from '~/composables/breadcrumbs'
+import { mdiDelete, mdiAccount, mdiDomain } from '@mdi/js'
+import { $sdUrl } from '~/context'
+
+type AccountItem = { type: string, id: string, name: string, title: string, key: string }
 
 const { t } = useI18n()
-const session = useSession()
 const { dayjs } = useLocaleDayjs()
 
-if (!session.state.user?.adminMode) {
-  throw new Error('Admin mode required')
-}
-
-useBreadcrumbs().setForPage(() => [
-  { title: t('admin'), disabled: true },
-  { title: t('accessGrants'), disabled: true }
-])
-
-const accountTypes = [
-  { title: 'Organization', value: 'organization' },
-  { title: 'User', value: 'user' }
-]
-
-const newGrant = ref({ type: 'organization', id: '' })
 const revokingGrantId = ref<string | null>(null)
+
+// --- account search (simple-directory, same endpoint as the privateAccess form) ---
+const selectedAccount = ref<AccountItem | null>(null)
+const accountSearch = ref('')
+const debouncedSearch = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(accountSearch, (value) => {
+  // Selecting an item sets the search text to its title — don't re-query for it.
+  if (selectedAccount.value && value === selectedAccount.value.title) return
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { debouncedSearch.value = value ?? '' }, 250)
+})
+
+const accountsFetch = useFetch<{ results: { type: string, id: string, name: string }[] }>(
+  computed(() => {
+    const params = new URLSearchParams({ size: '20' })
+    if (debouncedSearch.value) params.set('q', debouncedSearch.value)
+    return `${$sdUrl}/api/accounts?${params}`
+  })
+)
+
+const accountItems = computed<AccountItem[]>(() =>
+  (accountsFetch.data.value?.results ?? []).map((a) => ({
+    type: a.type,
+    id: a.id,
+    name: a.name,
+    title: `${a.name} (${a.id})`,
+    key: `${a.type}:${a.id}`
+  }))
+)
+
+const accountItemProps = (item: AccountItem) => ({
+  title: item.name,
+  subtitle: item.id,
+  prependIcon: item.type === 'organization' ? mdiDomain : mdiAccount
+})
 
 const grantsFetch = useFetch<{ results: any[], count: number }>(
   `${$apiPath}/v1/access-grants`
@@ -166,11 +178,19 @@ const grantsFetch = useFetch<{ results: any[], count: number }>(
 
 const grantAction = useAsyncAction(
   async () => {
+    if (!selectedAccount.value) return
     await $fetch('/v1/access-grants', {
       method: 'POST',
-      body: { account: { type: newGrant.value.type, id: newGrant.value.id } }
+      body: {
+        account: {
+          type: selectedAccount.value.type,
+          id: selectedAccount.value.id,
+          name: selectedAccount.value.name
+        }
+      }
     })
-    newGrant.value = { type: 'organization', id: '' }
+    selectedAccount.value = null
+    accountSearch.value = ''
     grantsFetch.refresh()
   }
 )

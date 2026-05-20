@@ -11,9 +11,7 @@ import accessGrantsRouter from './access-grants/router.ts'
 import { publicThumbnailsRouter } from './thumbnails/router.ts'
 import remoteRegistriesRouter from './remote-registries/router.ts'
 import mongo from '#mongo'
-import { cleanFiles } from './files-storage/index.ts'
-import { backfillSize } from './upgrades/backfill-size.ts'
-import { backfillDataUpdatedAt } from './upgrades/backfill-data-updated-at.ts'
+import { filesStorage } from './files-storage/index.ts'
 import config from '#config'
 
 export const app = express()
@@ -46,12 +44,13 @@ if (process.env.NODE_ENV === 'development') {
   app.delete('/api/test-env', async (req, res) => {
     assertReqInternal(req)
     await mongo.artefacts.deleteMany({})
-    await mongo.versions.deleteMany({})
     await mongo.apiKeys.deleteMany({})
-    await mongo.accessGrants.deleteMany({})
+    // Scoped delete: only grants for test accounts (test users/orgs are
+    // `test*`-prefixed) are wiped, so manually-created dev grants survive.
+    await mongo.accessGrants.deleteMany({ 'account.id': { $regex: /^test/ } })
     await mongo.thumbnails.deleteMany({})
     await mongo.remoteRegistries.deleteMany({})
-    await cleanFiles()
+    await filesStorage.clean()
     res.send()
   })
 
@@ -63,35 +62,6 @@ if (process.env.NODE_ENV === 'development') {
     } else {
       await mongo.artefacts.updateOne({ _id: req.params.id }, { $unset: { origin: '' } })
     }
-    res.send()
-  })
-
-  // TODO: remove with backfill-size upgrade
-  app.post('/api/test-env/backfill-size/reset', async (req, res) => {
-    assertReqInternal(req)
-    await mongo.artefacts.updateMany({}, { $unset: { size: '' } })
-    await mongo.versions.updateMany({}, { $unset: { size: '' } })
-    res.send()
-  })
-
-  // TODO: remove with backfill-size upgrade
-  app.post('/api/test-env/backfill-size/run', async (req, res) => {
-    assertReqInternal(req)
-    await backfillSize()
-    res.send()
-  })
-
-  // TODO: remove with backfill-data-updated-at upgrade
-  app.post('/api/test-env/backfill-data-updated-at/reset', async (req, res) => {
-    assertReqInternal(req)
-    await mongo.artefacts.updateMany({}, { $unset: { dataUpdatedAt: '' } })
-    res.send()
-  })
-
-  // TODO: remove with backfill-data-updated-at upgrade
-  app.post('/api/test-env/backfill-data-updated-at/run', async (req, res) => {
-    assertReqInternal(req)
-    await backfillDataUpdatedAt()
     res.send()
   })
 }

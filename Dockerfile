@@ -61,8 +61,16 @@ RUN npm -w ui run build
 ##########################
 FROM installer AS api-installer
 
-RUN npm ci -w api --prefer-offline --omit=dev --omit=optional --no-audit --no-fund && \
-    npx clean-modules --yes
+# `npm ci --omit=optional` + clean-modules drop sharp's platform-specific
+# binaries (@img/sharp-*). Stash the musl/x64 ones from the full install and
+# restore them afterwards so the runtime image can load sharp on alpine.
+RUN cp -rf node_modules/@img/sharp-linuxmusl-x64 /tmp/sharp-linuxmusl-x64 && \
+    cp -rf node_modules/@img/sharp-libvips-linuxmusl-x64 /tmp/sharp-libvips-linuxmusl-x64 && \
+    npm ci -w api --prefer-offline --omit=dev --omit=optional --no-audit --no-fund && \
+    npx clean-modules --yes && \
+    mkdir -p node_modules/@img && \
+    cp -rf /tmp/sharp-linuxmusl-x64 node_modules/@img/sharp-linuxmusl-x64 && \
+    cp -rf /tmp/sharp-libvips-linuxmusl-x64 node_modules/@img/sharp-libvips-linuxmusl-x64
 RUN mkdir -p /app/api/node_modules
 
 ##########################

@@ -31,9 +31,9 @@ export default {
         id: { type: 'string' }
       }
     },
-    allowedName: {
+    allowedNamePrefix: {
       type: 'string',
-      description: 'Restricts an upload key to a single artefact name (exact match). Missing means unrestricted.',
+      description: 'Restricts an upload key to artefact names starting with this prefix. Missing means unrestricted.',
       minLength: 1
     },
     allowedCategory: {

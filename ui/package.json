@@ -12,13 +12,13 @@
     "check-types": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@registry/shared": "*",
     "@data-fair/frame": "^0.18.0",
     "@data-fair/lib-vue": "^1.27.0",
-    "@data-fair/lib-vuetify": "^2.0.3",
+    "@data-fair/lib-vuetify": "^2.3.0",
     "@koumoul/vjsf": "^4.1.0",
     "@mdi/font": "^7.4.47",
     "@mdi/js": "^7.4.47",
+    "@registry/shared": "*",
     "@unhead/vue": "^2.1.10",
     "dayjs": "^1.11.19",
     "debug": "^4.4.3",

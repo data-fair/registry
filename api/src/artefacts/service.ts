@@ -1,34 +1,218 @@
+// Stateful artefact operations: MongoDB access and files-storage orchestration.
+// HTTP concerns (auth, request parsing, validation, responses) live in router.ts.
+// Pure, unit-testable helpers live in operations.ts.
+
+import { randomUUID } from 'node:crypto'
+import type { Readable } from 'node:stream'
+import type { Filter } from 'mongodb'
+import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
-import { deleteFile } from '../files-storage/index.ts'
-import { computePruneSet } from './service-pure.ts'
+import config from '#config'
+import { filesStorage } from '../files-storage/index.ts'
+import { extractManifest, type Manifest } from './operations.ts'
 
-export type { Manifest } from './service-pure.ts'
-export {
-  extractManifest,
-  parseSemver,
-  resolveVersionQuery,
-  computePruneSet,
-  MAX_DECOMPRESSED_BYTES,
-  MAX_MANIFEST_BYTES,
-  MAX_TAR_ENTRIES
-} from './service-pure.ts'
+export type { Manifest } from './operations.ts'
 
-/**
- * 2-deep retention: keep only the 2 most recent distinct patch values
- * (ignoring prereleases) per minor branch. All architecture variants for a
- * kept patch are retained; variants for pruned patches are fully deleted.
- */
-export const pruneOldVersions = async (artefactId: string, semverMajor: number, semverMinor: number) => {
-  const versions = await mongo.versions.find({
-    artefactId,
-    semverMajor,
-    semverMinor,
-    semverPrerelease: { $exists: false }
-  }).sort({ semverPatch: -1, architecture: 1 }).toArray()
+type UploadedBy = NonNullable<Artefact['uploadedBy']>
 
-  const toDelete = computePruneSet(versions)
-  for (const version of toDelete) {
-    await deleteFile(version.tarballPath)
-    await mongo.versions.deleteOne({ _id: version._id })
+// --- listing & reads ------------------------------------------------------
+
+export const listArtefacts = async (
+  filter: Filter<Artefact>,
+  opts: { sort: Record<string, 1 | -1>, skip: number, size: number }
+) => {
+  const [results, count] = await Promise.all([
+    mongo.artefacts.find(filter).sort(opts.sort).skip(opts.skip).limit(opts.size).toArray(),
+    mongo.artefacts.countDocuments(filter)
+  ])
+  return { results, count }
+}
+
+// Access-filtered single read, for the public-facing GET endpoints.
+export const getArtefact = (id: string, filter: Filter<Artefact>) =>
+  mongo.artefacts.findOne({ _id: id, ...filter })
+
+// Unfiltered single read, for the admin/upload paths that need the raw doc.
+export const getArtefactById = (id: string) =>
+  mongo.artefacts.findOne({ _id: id })
+
+// --- metadata patch -------------------------------------------------------
+
+export const patchArtefact = (id: string, body: Record<string, unknown>) => {
+  // Remove null values (PATCH null = unset the field)
+  const $set: Record<string, unknown> = { updatedAt: new Date().toISOString() }
+  const $unset: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(body)) {
+    if (value === null) $unset[key] = ''
+    else $set[key] = value
   }
+  const update: Record<string, unknown> = { $set }
+  if (Object.keys($unset).length > 0) update.$unset = $unset
+  return mongo.artefacts.findOneAndUpdate({ _id: id }, update, { returnDocument: 'after' })
+}
+
+// --- delete ---------------------------------------------------------------
+
+export const deleteArtefact = async (artefact: Artefact) => {
+  // Delete DB state first so concurrent GETs fail cleanly with 404,
+  // then best-effort remove files.
+  await mongo.artefacts.deleteOne({ _id: artefact._id })
+  if (artefact.format === 'file') {
+    if (artefact.filePath) await filesStorage.delete(artefact.filePath)
+  } else {
+    // npm artefacts store tarballs inline in the `tarballs` map
+    for (const slot of Object.values(artefact.tarballs ?? {})) {
+      await filesStorage.delete(slot.path).catch(() => {})
+    }
+  }
+  await mongo.thumbnails.deleteMany({ artefactId: artefact._id })
+}
+
+// --- npm upload -----------------------------------------------------------
+
+// Reads a staged tarball and extracts its npm manifest. Caps come from config.
+export const extractStagedManifest = async (stagingPath: string): Promise<Manifest> => {
+  const { body } = await filesStorage.readStream(stagingPath)
+  return extractManifest(body, {
+    maxDecompressedBytes: config.maxDecompressedBytes,
+    maxTarEntries: config.maxTarEntries
+  })
+}
+
+// Finalize a staged npm tarball into its per-arch slot: move the file into
+// place, upsert the artefact doc, then prune the previous occupant of the
+// slot. On a DB failure the freshly-moved tarball is removed before
+// rethrowing, so the artefact row never points at a missing file.
+export const commitNpmUpload = async (params: {
+  id: string
+  arch: string
+  stagingPath: string
+  manifest: Manifest
+  category: Artefact['category']
+  uploadedBy: UploadedBy
+  existing: Artefact | null
+}): Promise<Artefact> => {
+  const { id, arch, stagingPath, manifest, category, uploadedBy, existing } = params
+  const tarballPath = `npm/${id}/${arch}-${randomUUID()}.tgz`
+  await filesStorage.move(stagingPath, tarballPath)
+  try {
+    const { size } = await filesStorage.stats(tarballPath)
+    const now = new Date().toISOString()
+    const tarballEntry = { path: tarballPath, size, uploadedAt: now, uploadedBy }
+    await mongo.artefacts.updateOne(
+      { _id: id },
+      {
+        $set: {
+          packageName: manifest.name,
+          version: manifest.version,
+          ...(manifest.licence ? { licence: manifest.licence } : {}),
+          category,
+          [`tarballs.${arch}`]: tarballEntry,
+          size,
+          updatedAt: now,
+          dataUpdatedAt: now
+        },
+        $setOnInsert: {
+          _id: id,
+          name: id,
+          format: 'npm' as const,
+          public: false,
+          privateAccess: [],
+          createdAt: now
+        }
+      },
+      { upsert: true }
+    )
+  } catch (err) {
+    await filesStorage.delete(tarballPath).catch(() => {})
+    throw err
+  }
+
+  // Best-effort delete of the previous occupant of this arch slot.
+  const previousPath = existing?.tarballs?.[arch]?.path
+  if (previousPath && previousPath !== tarballPath) {
+    await filesStorage.delete(previousPath).catch(() => {})
+  }
+
+  return (await mongo.artefacts.findOne({ _id: id }))!
+}
+
+// --- file upload ----------------------------------------------------------
+
+// Finalize a staged raw file. Stores the NEW file first, then commits the DB
+// row, then deletes the OLD file — avoiding a window where the artefact row
+// points at a missing file. A failed DB write removes the new file.
+export const commitFileUpload = async (params: {
+  artefactId: string
+  name: string
+  fileName: string
+  stagingPath: string
+  category: Artefact['category']
+  title?: Artefact['title']
+  description?: Artefact['description']
+  uploadedBy: UploadedBy
+}): Promise<Artefact> => {
+  const { artefactId, name, fileName, stagingPath, category, title, description, uploadedBy } = params
+  const existing = await mongo.artefacts.findOne({ _id: artefactId })
+  // Namespace new writes with a random suffix so a failed delete of the
+  // old file doesn't clobber the fresh one.
+  const filePath = `files/${name}/${randomUUID()}-${fileName}`
+  await filesStorage.move(stagingPath, filePath)
+  try {
+    const { size } = await filesStorage.stats(filePath)
+    const now = new Date().toISOString()
+    await mongo.artefacts.updateOne(
+      { _id: artefactId },
+      {
+        $set: {
+          filePath,
+          fileName,
+          size,
+          category,
+          ...(title !== undefined ? { title } : {}),
+          ...(description !== undefined ? { description } : {}),
+          uploadedBy,
+          updatedAt: now,
+          dataUpdatedAt: now
+        },
+        $setOnInsert: {
+          _id: artefactId,
+          name,
+          format: 'file' as const,
+          public: false,
+          privateAccess: [],
+          createdAt: now
+        }
+      },
+      { upsert: true }
+    )
+  } catch (err) {
+    await filesStorage.delete(filePath).catch(() => {})
+    throw err
+  }
+
+  if (existing?.filePath && existing.filePath !== filePath) {
+    await filesStorage.delete(existing.filePath).catch(() => {})
+  }
+
+  return (await mongo.artefacts.findOne({ _id: artefactId }))!
+}
+
+// --- download -------------------------------------------------------------
+
+export type DownloadSource =
+  | { redirectUrl: string }
+  | { body: Readable, size: number, lastModified: Date }
+
+// Resolve a stored file into something the router can hand to the client:
+// a signed redirect URL when the backend offers one, otherwise a stream.
+export const resolveDownload = async (
+  path: string,
+  filename: string,
+  ifModifiedSince?: string
+): Promise<DownloadSource> => {
+  const signedUrl = await filesStorage.getDownloadUrl(path, { filename })
+  if (signedUrl) return { redirectUrl: signedUrl }
+  const { body, size, lastModified } = await filesStorage.readStream(path, ifModifiedSince)
+  return { body, size, lastModified }
 }

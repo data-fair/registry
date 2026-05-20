@@ -1,60 +1,56 @@
 import { randomUUID } from 'node:crypto'
-import { ObjectId } from 'mongodb'
 import locks from '@data-fair/lib-node/locks.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import type { AxiosInstance } from 'axios'
 import mongo from '#mongo'
 import { decipher } from '../cipher.ts'
-import { writeFile, deleteFile } from '../files-storage/index.ts'
+import { filesStorage } from '../files-storage/index.ts'
 import type { Artefact } from '#types/artefact/index.ts'
 
 const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
   const encodedId = encodeURIComponent(artefactId)
   const remoteRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
   const remoteArtefact = remoteRes.data
-  const remoteVersions: any[] = remoteArtefact.versions || []
+  type TarballSlot = NonNullable<Artefact['tarballs']>[string]
+  const remoteTarballs: Record<string, TarballSlot & { uploadedAt: string }> =
+    remoteArtefact.tarballs || {}
 
-  const localVersions = await mongo.versions.find({ artefactId }).toArray()
-  const localVersionKeys = new Set(localVersions.map(v => `${v.version}:${v.architecture || ''}`))
-  const remoteVersionKeys = new Set(remoteVersions.map((v: any) => `${v.version}:${v.architecture || ''}`))
+  const local = await mongo.artefacts.findOne({ _id: artefactId })
+  const localTarballs: Record<string, TarballSlot & { uploadedAt: string }> = local?.tarballs || {}
 
-  // Download missing versions — stream the remote response straight into our
-  // configured files-storage, no local fs detour.
-  for (const rv of remoteVersions) {
-    const key = `${rv.version}:${rv.architecture || ''}`
-    if (localVersionKeys.has(key)) continue
-
-    const dlRes = await ax.get(`/api/v1/artefacts/${encodedId}/versions/${rv.version}/tarball`, {
-      responseType: 'stream'
-    })
-    await writeFile(dlRes.data, rv.tarballPath)
-
-    await mongo.versions.insertOne({
-      _id: new ObjectId().toString(),
-      artefactId,
-      version: rv.version,
-      ...(rv.architecture ? { architecture: rv.architecture } : {}),
-      semverMajor: rv.semverMajor,
-      semverMinor: rv.semverMinor,
-      semverPatch: rv.semverPatch,
-      ...(rv.semverPrerelease ? { semverPrerelease: rv.semverPrerelease } : {}),
-      tarballPath: rv.tarballPath,
-      ...(typeof rv.size === 'number' ? { size: rv.size } : {}),
-      uploadedAt: rv.uploadedAt,
-      ...(rv.uploadedBy ? { uploadedBy: rv.uploadedBy } : {})
-    })
+  const newTarballs: typeof localTarballs = {}
+  const pathsToDelete: string[] = []
+  for (const [arch, remoteSlot] of Object.entries(remoteTarballs)) {
+    const localSlot = localTarballs[arch]
+    if (localSlot && localSlot.uploadedAt === remoteSlot.uploadedAt) {
+      newTarballs[arch] = localSlot
+      continue
+    }
+    // Download the tarball for this arch slot — stream straight into local storage
+    // using a UUID-based path so we never trust a remote-controlled path string.
+    const localPath = `npm/${artefactId}/${arch}-${randomUUID()}.tgz`
+    const dlRes = await ax.get(
+      `/api/v1/artefacts/${encodedId}/tarball?architecture=${encodeURIComponent(arch)}`,
+      { responseType: 'stream' }
+    )
+    await filesStorage.writeStream(dlRes.data, localPath)
+    newTarballs[arch] = {
+      path: localPath,
+      size: remoteSlot.size ?? 0,
+      uploadedAt: remoteSlot.uploadedAt,
+      ...(remoteSlot.uploadedBy ? { uploadedBy: remoteSlot.uploadedBy } : {})
+    }
+    // Track the old local path (if any) for post-upsert cleanup.
+    if (localSlot?.path) pathsToDelete.push(localSlot.path)
   }
 
-  // Delete local versions pruned upstream
-  for (const lv of localVersions) {
-    const key = `${lv.version}:${lv.architecture || ''}`
-    if (!remoteVersionKeys.has(key)) {
-      await deleteFile(lv.tarballPath).catch(() => {})
-      await mongo.versions.deleteOne({ _id: lv._id })
+  // Delete local arch slots pruned upstream.
+  for (const [arch, localSlot] of Object.entries(localTarballs)) {
+    if (!(arch in remoteTarballs)) {
+      await filesStorage.delete(localSlot.path).catch(() => {})
     }
   }
 
-  // Upsert artefact metadata
   const now = new Date().toISOString()
   await mongo.artefacts.updateOne(
     { _id: artefactId },
@@ -66,9 +62,9 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         category: remoteArtefact.category,
         ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
         ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
-        ...(remoteArtefact.processingConfigSchema ? { processingConfigSchema: remoteArtefact.processingConfigSchema } : {}),
-        ...(remoteArtefact.applicationConfigSchema ? { applicationConfigSchema: remoteArtefact.applicationConfigSchema } : {}),
+        ...(remoteArtefact.group ? { group: remoteArtefact.group } : {}),
         ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
+        tarballs: newTarballs,
         origin: remoteUrl,
         updatedAt: now,
         dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
@@ -77,7 +73,6 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         _id: artefactId,
         name: remoteArtefact.name,
         format: 'npm' as const,
-        majorVersion: remoteArtefact.majorVersion,
         public: false,
         privateAccess: [],
         createdAt: now
@@ -85,6 +80,11 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
     },
     { upsert: true }
   )
+
+  // Best-effort delete previously-local tarballs that were replaced by fresh downloads.
+  for (const oldPath of pathsToDelete) {
+    await filesStorage.delete(oldPath).catch(() => {})
+  }
 }
 
 const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
@@ -102,7 +102,7 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
 
     const fileName = remoteArtefact.fileName || remoteArtefact.name
     const filePath = `files/${remoteArtefact.name}/${randomUUID()}-${fileName}`
-    await writeFile(dlRes.data, filePath)
+    await filesStorage.writeStream(dlRes.data, filePath)
 
     const oldFilePath = local?.filePath
     const now = new Date().toISOString()
@@ -133,7 +133,7 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
     )
 
     if (oldFilePath && oldFilePath !== filePath) {
-      await deleteFile(oldFilePath).catch(() => {})
+      await filesStorage.delete(oldFilePath).catch(() => {})
     }
   } else {
     // Still ensure origin is set even if file unchanged

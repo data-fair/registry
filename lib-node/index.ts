@@ -3,66 +3,88 @@ import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, rename, stat, utimes } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
+import { arch as defaultArch } from 'node:process'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import type { Readable } from 'node:stream'
 
+export interface Account {
+  type: 'user' | 'organization'
+  id: string
+  department?: string
+}
+
 export interface EnsureArtefactOpts {
   registryUrl: string
   secretKey: string
   artefactId: string
-  version: string
   cacheDir: string
+  /**
+   * Architecture to request. Defaults to the running Node process arch.
+   * Pass an empty string to skip the arch query (registry returns the
+   * `noarch` slot if present).
+   */
+  architecture?: string
+  account?: Account
 }
 
 export interface EnsureArtefactResult {
   path: string
+  /** Manifest-extracted version from the artefact doc; display-only. */
   version: string
+  /** `dataUpdatedAt` of the artefact doc when this download happened. */
+  dataUpdatedAt: string
   downloaded: boolean
 }
 
 interface CacheMeta {
-  version: string
+  dataUpdatedAt: string
 }
 
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
-  const ax = axiosBuilder({
-    baseURL: opts.registryUrl,
-    headers: { 'x-secret-key': opts.secretKey }
-  })
+  const architecture = opts.architecture === undefined ? defaultArch : (opts.architecture || undefined)
+  const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
+  if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
+  const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
 
   const encodedId = encodeURIComponent(opts.artefactId)
-  const versionRes = await ax.get(`/api/v1/artefacts/${encodedId}/versions/${opts.version}`)
-  const resolvedVersion: string = versionRes.data.version
+  const detailRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
+  const artefact = detailRes.data
+  if (artefact.format !== 'npm') {
+    throw new Error(`artefact ${opts.artefactId} is not an npm artefact (format=${artefact.format})`)
+  }
+  const dataUpdatedAt: string = artefact.dataUpdatedAt || artefact.updatedAt
+  const version: string = artefact.version
 
   const artefactDir = join(opts.cacheDir, opts.artefactId)
-  const metaPath = join(artefactDir, '.current-version.json')
-  const extractDir = join(artefactDir, resolvedVersion)
+  const cacheKey = architecture ? `${architecture}` : 'noarch'
+  const extractDir = join(artefactDir, cacheKey)
+  const metaPath = join(extractDir, '.meta.json')
 
-  // Check cache
   try {
     const raw = await readFile(metaPath, 'utf-8')
     const meta: CacheMeta = JSON.parse(raw)
-    if (meta.version === resolvedVersion) {
-      return { path: extractDir, version: resolvedVersion, downloaded: false }
+    if (meta.dataUpdatedAt === dataUpdatedAt) {
+      return { path: extractDir, version, dataUpdatedAt, downloaded: false }
     }
   } catch {
-    // no cache or invalid metadata
+    // cold cache or invalid metadata
   }
 
-  // Download tarball
-  const tarballRes = await ax.get(
-    `/api/v1/artefacts/${encodedId}/versions/${resolvedVersion}/tarball`,
-    { responseType: 'stream' }
-  )
+  const params = architecture ? { architecture } : undefined
+  const tarballRes = await ax.get(`/api/v1/artefacts/${encodedId}/tarball`, {
+    responseType: 'stream',
+    params
+  })
 
-  // Extract to temp dir then atomic rename
   const tmpDir = `${extractDir}.tmp.${process.pid}`
   await rm(tmpDir, { recursive: true, force: true })
   await mkdir(tmpDir, { recursive: true })
   try {
     await extractTarball(tarballRes.data as Readable, tmpDir)
+    // Write meta inside tmpDir so it survives the rename atomically.
+    await writeFile(join(tmpDir, '.meta.json'), JSON.stringify({ dataUpdatedAt } satisfies CacheMeta))
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true })
     throw err
@@ -70,21 +92,7 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   await rm(extractDir, { recursive: true, force: true })
   await rename(tmpDir, extractDir)
 
-  // Clean up old version
-  try {
-    const raw = await readFile(metaPath, 'utf-8')
-    const oldMeta: CacheMeta = JSON.parse(raw)
-    if (oldMeta.version !== resolvedVersion) {
-      await rm(join(artefactDir, oldMeta.version), { recursive: true, force: true })
-    }
-  } catch {
-    // no old version to clean
-  }
-
-  // Write cache metadata
-  await writeFile(metaPath, JSON.stringify({ version: resolvedVersion } satisfies CacheMeta))
-
-  return { path: extractDir, version: resolvedVersion, downloaded: true }
+  return { path: extractDir, version, dataUpdatedAt, downloaded: true }
 }
 
 export interface EnsureArtefactFileOpts {

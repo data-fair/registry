@@ -20,10 +20,12 @@ test.describe('Access Grants', () => {
   test('superadmin can list grants', async () => {
     const ax = await superAdmin
     await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    await ax.post('/api/v1/access-grants', { account: { type: 'user', id: 'user1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'user', id: 'test-standalone1' } })
 
     const res = await ax.get('/api/v1/access-grants')
-    expect(res.data.results).toHaveLength(2)
+    // clean() only wipes test*-prefixed grants — manually-created dev grants persist
+    const testGrants = res.data.results.filter((g: any) => g.account.id.startsWith('test'))
+    expect(testGrants).toHaveLength(2)
   })
 
   test('superadmin can revoke a grant', async () => {
@@ -35,7 +37,9 @@ test.describe('Access Grants', () => {
     expect(deleteRes.status).toBe(204)
 
     const listRes = await ax.get('/api/v1/access-grants')
-    expect(listRes.data.results).toHaveLength(0)
+    // clean() only wipes test*-prefixed grants — manually-created dev grants persist
+    const testGrants = listRes.data.results.filter((g: any) => g.account.id.startsWith('test'))
+    expect(testGrants).toHaveLength(0)
   })
 
   test('duplicate grant returns 409', async () => {

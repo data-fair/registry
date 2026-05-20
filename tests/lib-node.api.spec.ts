@@ -12,6 +12,15 @@ const secretKey = 'secret-internal'
 let uploadApiKey: string
 let cacheDir: string
 
+const uploadNpm = async (id: string, manifest: { name: string, version: string }, architecture?: string) => {
+  const ax = axiosWithApiKey(uploadApiKey)
+  const tarball = await createTestTarball({ ...manifest, category: 'processing' })
+  const form = new FormData()
+  form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+  if (architecture) form.append('architecture', architecture)
+  return ax.post('/api/v1/artefacts/npm/' + encodeURIComponent(id), form, { headers: form.getHeaders() })
+}
+
 test.describe('lib-node-registry', () => {
   test.beforeEach(async () => {
     await clean()
@@ -26,88 +35,66 @@ test.describe('lib-node-registry', () => {
     await rm(cacheDir, { recursive: true, force: true })
   })
 
-  test('downloads and extracts artefact on first call', async () => {
-    const ax = axiosWithApiKey(uploadApiKey)
+  test('downloads and extracts on first call (noarch)', async () => {
+    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
     const admin = await superAdmin
-
-    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0', category: 'processing' })
-    const form = new FormData()
-    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
       artefactId: '@test/pkg@1',
-      version: '1',
-      cacheDir
+      cacheDir,
+      architecture: ''  // opt out, use noarch directly
     })
-
     expect(result.downloaded).toBe(true)
     expect(result.version).toBe('1.0.0')
-
     const pkg = JSON.parse(await readFile(join(result.path, 'package.json'), 'utf-8'))
     expect(pkg.name).toBe('@test/pkg')
-    expect(pkg.version).toBe('1.0.0')
   })
 
   test('returns cached result on second call', async () => {
-    const ax = axiosWithApiKey(uploadApiKey)
+    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
     const admin = await superAdmin
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
+    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', cacheDir, architecture: '' as const }
 
-    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
-    const form = new FormData()
-    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
-
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', version: '1', cacheDir }
-
-    const result1 = await ensureArtefact(opts)
-    expect(result1.downloaded).toBe(true)
-
-    const result2 = await ensureArtefact(opts)
-    expect(result2.downloaded).toBe(false)
-    expect(result2.version).toBe('1.0.0')
-    expect(result2.path).toBe(result1.path)
+    const r1 = await ensureArtefact(opts)
+    expect(r1.downloaded).toBe(true)
+    const r2 = await ensureArtefact(opts)
+    expect(r2.downloaded).toBe(false)
+    expect(r2.path).toBe(r1.path)
   })
 
-  test('downloads new version and cleans old one', async () => {
-    const ax = axiosWithApiKey(uploadApiKey)
+  test('re-downloads when dataUpdatedAt changes', async () => {
+    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
     const admin = await superAdmin
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
+    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', cacheDir, architecture: '' as const }
 
-    const tarball1 = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
-    const form1 = new FormData()
-    form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form1, { headers: form1.getHeaders() })
-    await admin.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true })
+    const r1 = await ensureArtefact(opts)
+    expect(r1.version).toBe('1.0.0')
 
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', version: '1', cacheDir }
+    await new Promise(resolve => setTimeout(resolve, 10))
+    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.1' })
 
-    const result1 = await ensureArtefact(opts)
-    expect(result1.version).toBe('1.0.0')
+    const r2 = await ensureArtefact(opts)
+    expect(r2.downloaded).toBe(true)
+    expect(r2.version).toBe('1.0.1')
+  })
 
-    // Upload new version
-    const tarball2 = await createTestTarball({ name: '@test/pkg', version: '1.1.0' })
-    const form2 = new FormData()
-    form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/%40test%2Fpkg/versions', form2, { headers: form2.getHeaders() })
+  test('serves arch-specific slot when requested', async () => {
+    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' }, 'x64')
+    const admin = await superAdmin
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
 
-    const result2 = await ensureArtefact(opts)
-    expect(result2.downloaded).toBe(true)
-    expect(result2.version).toBe('1.1.0')
-
-    const pkg = JSON.parse(await readFile(join(result2.path, 'package.json'), 'utf-8'))
-    expect(pkg.version).toBe('1.1.0')
-
-    // Old version directory should be cleaned up
-    const { access } = await import('node:fs/promises')
-    try {
-      await access(result1.path)
-      expect(true).toBe(false) // should not reach here
-    } catch (err: any) {
-      expect(err.code).toBe('ENOENT')
-    }
+    const result = await ensureArtefact({
+      registryUrl,
+      secretKey,
+      artefactId: '@test/pkg@1',
+      cacheDir,
+      architecture: 'x64'
+    })
+    expect(result.downloaded).toBe(true)
   })
 })

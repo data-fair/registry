@@ -45,7 +45,7 @@ async function main () {
   // --- API keys -----------------------------------------------------------
   const keySpecs: { name: string, body: Record<string, unknown> }[] = [
     { name: 'dev-upload-unrestricted', body: { type: 'upload', name: 'dev-upload-unrestricted' } },
-    { name: 'dev-upload-terrain', body: { type: 'upload', name: 'dev-upload-terrain', allowedName: 'terrain-france' } }
+    { name: 'dev-upload-terrain', body: { type: 'upload', name: 'dev-upload-terrain', allowedNamePrefix: 'terrain-' } }
   ]
 
   const existingKeys = await admin.get('/api/v1/api-keys')
@@ -149,7 +149,7 @@ async function main () {
     {
       id: '@koumoul/application-demo@1',
       body: {
-        privateAccess: [{ type: 'organization', id: 'test1' }],
+        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }],
         title: { fr: 'Application de démo', en: 'Demo application' }
       }
     },
@@ -165,7 +165,7 @@ async function main () {
     },
     {
       id: 'basemap-style',
-      body: { privateAccess: [{ type: 'organization', id: 'test1' }] }
+      body: { privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] }
     }
   ]
 

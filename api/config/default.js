@@ -5,11 +5,14 @@ export default {
   port: 8080,
   dataDir: '/data',
   maxUploadBytes: 200 * 1024 * 1024 * 1024,
+  maxDecompressedBytes: 1024 * 1024 * 1024,
+  maxTarEntries: 100_000,
   filesStorage: 'fs',
   s3: {
     region: '',
     endpoint: '',
     bucket: '',
+    rootDir: '',
     credentials: {
       accessKeyId: '',
       secretAccessKey: ''

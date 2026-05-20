@@ -2,7 +2,6 @@ import mongoLib from '@data-fair/lib-node/mongo.js'
 import type { Binary } from 'mongodb'
 import config from '#config'
 import type { Artefact } from '#types/artefact/index.ts'
-import type { Version } from '#types/version/index.ts'
 import type { ApiKey } from '#types/api-key/index.ts'
 import type { AccessGrant } from '#types/access-grant/index.ts'
 import type { RemoteRegistry } from '#types/remote-registry/index.ts'
@@ -31,10 +30,6 @@ export class RegistryMongo {
     return mongoLib.db.collection<Artefact>('artefacts')
   }
 
-  get versions () {
-    return mongoLib.db.collection<Version>('versions')
-  }
-
   get apiKeys () {
     return mongoLib.db.collection<ApiKey>('api-keys')
   }
@@ -59,11 +54,29 @@ export class RegistryMongo {
     await this.connect()
     await mongoLib.configure({
       artefacts: {
-        'name-major': [{ name: 1, majorVersion: 1 }, { unique: true }],
-        fulltext: { name: 'text' }
-      },
-      versions: {
-        'artefact-version-arch': [{ artefactId: 1, version: 1, architecture: 1 }, { unique: true }]
+        // _id is the package name, so uniqueness on name is already enforced
+        // by the primary key — no separate index needed. Fulltext spans the
+        // identifier plus the i18n display fields, with weights tuned so the
+        // technical handle dominates and description is a tiebreaker.
+        fulltext: [{
+          name: 'text',
+          'title.fr': 'text',
+          'title.en': 'text',
+          'group.fr': 'text',
+          'group.en': 'text',
+          'description.fr': 'text',
+          'description.en': 'text'
+        }, {
+          weights: {
+            name: 10,
+            'title.fr': 5,
+            'title.en': 5,
+            'group.fr': 3,
+            'group.en': 3,
+            'description.fr': 1,
+            'description.en': 1
+          }
+        }]
       },
       'api-keys': {
         'hashed-key': [{ hashedKey: 1 }, { unique: true }],

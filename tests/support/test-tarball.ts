@@ -8,8 +8,6 @@ export interface TarballOptions {
   version: string
   licence?: string
   category?: string
-  processingConfigSchema?: object
-  applicationConfigSchema?: object
 }
 
 export const createTestTarball = async (options: TarballOptions): Promise<Buffer> => {
@@ -19,9 +17,7 @@ export const createTestTarball = async (options: TarballOptions): Promise<Buffer
     version: options.version,
     ...(options.licence ? { licence: options.licence } : {}),
     registry: {
-      category: options.category || 'other',
-      ...(options.processingConfigSchema ? { processingConfigSchema: options.processingConfigSchema } : {}),
-      ...(options.applicationConfigSchema ? { applicationConfigSchema: options.applicationConfigSchema } : {})
+      category: options.category || 'other'
     }
   }
 

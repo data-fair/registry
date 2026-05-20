@@ -7,8 +7,13 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AccessGrantsSection: typeof import('./src/components/admin/access-grants-section.vue')['default']
     AdminNav: typeof import('./src/components/admin-nav.vue')['default']
+    ApiKeysSection: typeof import('./src/components/admin/api-keys-section.vue')['default']
+    ArtefactAdmin: typeof import('./src/components/artefact-admin.vue')['default']
+    ArtefactMetadata: typeof import('./src/components/artefact-metadata.vue')['default']
     DefaultLayout: typeof import('./src/components/default-layout.vue')['default']
+    RemoteRegistriesSection: typeof import('./src/components/admin/remote-registries-section.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     VjsfPatchReq: typeof import('./src/components/vjsf/vjsf-patch-req.vue')['default']

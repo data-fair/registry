@@ -56,25 +56,25 @@ test.describe('API Keys', () => {
     }
   })
 
-  test('superadmin can create an upload key with allowedName scope', async () => {
+  test('superadmin can create an upload key with allowedNamePrefix scope', async () => {
     const ax = await superAdmin
     const res = await ax.post('/api/v1/api-keys', {
       type: 'upload',
       name: 'scoped',
-      allowedName: 'terrain-france'
+      allowedNamePrefix: '@data-fair/'
     })
     expect(res.status).toBe(201)
-    expect(res.data.allowedName).toBe('terrain-france')
+    expect(res.data.allowedNamePrefix).toBe('@data-fair/')
   })
 
-  test('rejects allowedName on read keys', async () => {
+  test('rejects allowedNamePrefix on read keys', async () => {
     const ax = await superAdmin
     try {
       await ax.post('/api/v1/api-keys', {
         type: 'read',
         name: 'bad',
         owner: { type: 'organization', id: 'test1' },
-        allowedName: 'anything'
+        allowedNamePrefix: 'anything'
       })
       expect(true).toBe(false)
     } catch (err: any) {
@@ -163,7 +163,7 @@ test.describe('API Keys', () => {
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     try {
-      await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
+      await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(401)
@@ -179,8 +179,8 @@ test.describe('API Keys', () => {
     const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await upload.post('/api/v1/artefacts/%40test%2Fpkg/versions', form, { headers: form.getHeaders() })
-    await ax.patch('/api/v1/artefacts/%40test%2Fpkg%401', { public: true, privateAccess: [{ type: 'organization', id: 'test1' }] })
+    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+    await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true, privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] })
 
     // Create a read key and use it
     await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
@@ -197,5 +197,89 @@ test.describe('API Keys', () => {
     expect(key.lastUsedAt).toBeTruthy()
     const lastUsed = new Date(key.lastUsedAt).getTime()
     expect(Date.now() - lastUsed).toBeLessThan(5000)
+  })
+
+  test.describe('allowedNamePrefix scoping', () => {
+    test('npm upload accepted when artefact id starts with the prefix', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'prefix-scoped',
+        allowedNamePrefix: '@data-fair/processing-'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+      const tarball = await createTestTarball({ name: '@data-fair/processing-gpkg', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      const res = await upload.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@data-fair/processing-gpkg@1'),
+        form,
+        { headers: form.getHeaders() }
+      )
+      expect(res.status).toBe(201)
+    })
+
+    test('npm upload rejected when artefact id does not start with the prefix', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'prefix-scoped',
+        allowedNamePrefix: '@data-fair/processing-'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+      const tarball = await createTestTarball({ name: '@data-fair/catalog-x', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      try {
+        await upload.post(
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@data-fair/catalog-x@1'),
+          form,
+          { headers: form.getHeaders() }
+        )
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('file upload accepted when artefact name starts with the prefix', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'prefix-scoped',
+        allowedNamePrefix: 'terrain-'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+      const form = new FormData()
+      form.append('file', Buffer.from('hello'), { filename: 'data.bin', contentType: 'application/octet-stream' })
+      const res = await upload.post(
+        '/api/v1/artefacts/file/' + encodeURIComponent('terrain-france'),
+        form,
+        { headers: form.getHeaders() }
+      )
+      expect(res.status).toBe(201)
+    })
+
+    test('file upload rejected when artefact name does not start with the prefix', async () => {
+      const ax = await superAdmin
+      const keyRes = await ax.post('/api/v1/api-keys', {
+        type: 'upload',
+        name: 'prefix-scoped',
+        allowedNamePrefix: 'terrain-'
+      })
+      const upload = axiosWithApiKey(keyRes.data.key)
+      const form = new FormData()
+      form.append('file', Buffer.from('hello'), { filename: 'data.bin', contentType: 'application/octet-stream' })
+      try {
+        await upload.post(
+          '/api/v1/artefacts/file/' + encodeURIComponent('roads-france'),
+          form,
+          { headers: form.getHeaders() }
+        )
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
   })
 })

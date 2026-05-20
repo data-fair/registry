@@ -13,38 +13,51 @@ The registry is a centralized store for plugins and file artefacts used by servi
 
 ## Artefact formats
 
-### npm tarballs
+### npm artefacts
 
-Plugins are packaged as npm tarballs containing a `package.json` with registry-specific metadata (`registry.category`, `registry.processingConfigSchema`, etc.). Each upload creates an artefact scoped to a major version (e.g. `@test/plugin@1`) and a version document with parsed semver fields.
+Plugins are packaged as npm tarballs. Each artefact identifies a single
+*ref* (a release major or a dev branch), holding one mutable tarball per
+architecture under `tarballs: { [arch]: { path, size, uploadedAt, uploadedBy } }`.
+The convention for the artefact id is `<packageName>@<ref>` — for example
+`@data-fair/processing-gpkg@1` for the 1.x release line and
+`@data-fair/processing-gpkg@main` for a rolling dev build. The registry
+treats the id as opaque; the recommended convention is enforced only at
+the operator level.
 
-A **2-deep retention** policy keeps only the 2 most recent patch versions per minor branch, preventing unbounded storage growth while allowing a quick rollback.
+Each upload replaces the tarball in the named arch slot. Other arch slots
+are untouched. The artefact doc's `version` mirrors the manifest's
+`package.json#version` for display only — there is no semver parsing,
+resolver, or retention policy.
 
 ### File artefacts
 
-Raw files (e.g. `.mbtiles` tilesets) are uploaded directly. They have no versioning -- each upload replaces the previous file. The artefact ID is simply the name (e.g. `terrain`).
+Raw files (e.g. `.mbtiles` tilesets) are uploaded directly. They have no
+versioning — each upload replaces the previous file. The artefact id is
+simply the name.
 
 ## Plugin consumption by services
 
 Services use the `@data-fair/lib-node-registry` client library. The main entry point is `ensureArtefact()`:
 
-```ts
+```typescript
 import { ensureArtefact } from '@data-fair/lib-node-registry'
 
-const { path, version, downloaded } = await ensureArtefact({
+const { path, version, dataUpdatedAt, downloaded } = await ensureArtefact({
   registryUrl: 'https://registry.example.com',
   secretKey: process.env.REGISTRY_SECRET,
-  artefactId: '@scope/plugin@1',
-  version: '1.2',   // resolves to latest 1.2.x
+  artefactId: '@scope/plugin@1',  // ref id
+  architecture: process.arch,
   cacheDir: '/data/plugins'
 })
 ```
 
 The flow:
 
-1. Resolve the requested version via `GET /api/v1/artefacts/{id}/versions/{version}`
-2. Check the local cache (`cacheDir`) for a matching version
-3. If not cached, download the tarball and extract it
-4. Clean up old cached versions (keeps current + previous)
+1. Fetch `GET /api/v1/artefacts/<id>` to read the artefact doc.
+2. Compare `dataUpdatedAt` against the local cache. If unchanged, return
+   the cached extraction.
+3. Otherwise download `GET /api/v1/artefacts/<id>/tarball?architecture=<arch>`
+   (with noarch fallback) and extract to the cache.
 
 Authentication uses an internal secret passed as the `x-secret-key` header, configured in `config.secretKeys.internalServices`.
 
@@ -79,7 +92,7 @@ Admins configure remote registries, browse available artefacts on the upstream, 
 
 Mirrored artefacts carry an `origin` field set to the remote registry URL. Sync works differently by format:
 
-- **npm artefacts** -- Versions are compared by `version:architecture` key. Missing versions are downloaded; versions pruned upstream are deleted locally.
+- **npm artefacts** — Each `tarballs[arch]` slot is compared by `uploadedAt`. New/changed slots are downloaded; slots pruned upstream are deleted locally.
 - **file artefacts** -- The file is re-downloaded when the remote's `updatedAt` is more recent than the local copy.
 
 Sync runs automatically once per day and can be triggered on-demand via `POST /api/v1/remote-registries/:id/sync` (returns 202). A distributed lock (`@data-fair/lib-node/locks`) prevents concurrent syncs of the same remote.
@@ -134,15 +147,3 @@ Tarball and file storage is pluggable:
 
 Both backends implement the same interface: `writeStream`, `readStream`, `delete`, `exists`, `clean`.
 
-## Version resolution
-
-Version queries support multiple granularities:
-
-| Query | Resolves to |
-|-------|-------------|
-| `1.2.3` | Exact match |
-| `1.2` | Latest stable `1.2.x` |
-| `1` | Latest stable `1.x.y` |
-| `1.2.3-beta.1` | Exact prerelease match |
-
-Stable queries (`1.2`, `1`) exclude prerelease versions.
