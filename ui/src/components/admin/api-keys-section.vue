@@ -1,7 +1,5 @@
 <template>
-  <v-container data-iframe-height>
-    <admin-nav />
-
+  <div class="pa-4">
     <!-- Create new upload key -->
     <v-card class="mb-4">
       <v-card-title>{{ t('createKey') }}</v-card-title>
@@ -40,6 +38,19 @@
             <v-text-field
               v-model="newKey.allowedName"
               :label="t('allowedName')"
+              density="compact"
+              hide-details
+              variant="outlined"
+              clearable
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="3"
+          >
+            <v-text-field
+              v-model="newKey.allowedPackageName"
+              :label="t('allowedPackageName')"
               density="compact"
               hide-details
               variant="outlined"
@@ -113,6 +124,7 @@
             <th>{{ t('name') }}</th>
             <th>{{ t('allowedCategory') }}</th>
             <th>{{ t('allowedName') }}</th>
+            <th>{{ t('allowedPackageName') }}</th>
             <th>{{ t('createdBy') }}</th>
             <th>{{ t('createdAt') }}</th>
             <th>{{ t('expiresAt') }}</th>
@@ -130,6 +142,7 @@
             <td>{{ key.name }}</td>
             <td>{{ key.allowedCategory || '—' }}</td>
             <td>{{ key.allowedName || '—' }}</td>
+            <td>{{ key.allowedPackageName || '—' }}</td>
             <td>{{ key.createdBy.name || key.createdBy.id }}</td>
             <td>{{ dayjs(key.createdAt).format('L LT') }}</td>
             <td>{{ key.expiresAt ? dayjs(key.expiresAt).format('L LT') : '—' }}</td>
@@ -148,17 +161,16 @@
         </tbody>
       </v-table>
     </v-card>
-  </v-container>
+  </div>
 </template>
 
 <i18n lang="yaml">
 fr:
-  admin: Administration
-  apiKeys: Clés API
   createKey: Créer une clé d'upload
   name: Nom
   allowedCategory: Catégorie autorisée
   allowedName: Nom autorisé
+  allowedPackageName: Paquet autorisé
   create: Créer
   keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
   keyWarning: Cette clé ne sera plus affichée après fermeture.
@@ -169,14 +181,12 @@ fr:
   expiresAt: Expiration
   lastUsedAt: Dernière utilisation
   never: Jamais
-  deleted: Clé supprimée
 en:
-  admin: Administration
-  apiKeys: API Keys
   createKey: Create upload key
   name: Name
   allowedCategory: Allowed category
   allowedName: Allowed name
+  allowedPackageName: Allowed package
   create: Create
   keyCreated: "Key created successfully. Copy it now:"
   keyWarning: This key will not be shown again after you close this.
@@ -187,7 +197,6 @@ en:
   expiresAt: Expires
   lastUsedAt: Last used
   never: Never
-  deleted: Key deleted
 </i18n>
 
 <script setup lang="ts">
@@ -195,20 +204,9 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
 import { VDateInput } from 'vuetify/labs/VDateInput'
-import { useBreadcrumbs } from '~/composables/breadcrumbs'
 
 const { t } = useI18n()
-const session = useSession()
 const { dayjs } = useLocaleDayjs()
-
-if (!session.state.user?.adminMode) {
-  throw new Error('Admin mode required')
-}
-
-useBreadcrumbs().setForPage(() => [
-  { title: t('admin'), disabled: true },
-  { title: t('apiKeys'), disabled: true }
-])
 
 const categoryItems = [
   'processing',
@@ -223,9 +221,10 @@ type NewKey = {
   name: string
   allowedCategory: string | null
   allowedName: string | null
+  allowedPackageName: string | null
   expiresAt: Date | null
 }
-const newKey = ref<NewKey>({ name: '', allowedCategory: null, allowedName: null, expiresAt: null })
+const newKey = ref<NewKey>({ name: '', allowedCategory: null, allowedName: null, allowedPackageName: null, expiresAt: null })
 const createdKey = ref<string | null>(null)
 const deletingKeyId = ref<string | null>(null)
 
@@ -241,6 +240,7 @@ const createAction = useAsyncAction(
     }
     if (newKey.value.allowedCategory) body.allowedCategory = newKey.value.allowedCategory
     if (newKey.value.allowedName) body.allowedName = newKey.value.allowedName
+    if (newKey.value.allowedPackageName) body.allowedPackageName = newKey.value.allowedPackageName
     if (newKey.value.expiresAt) {
       const d = new Date(newKey.value.expiresAt)
       d.setHours(23, 59, 59)
@@ -248,7 +248,7 @@ const createAction = useAsyncAction(
     }
     const res = await $fetch('/v1/api-keys', { method: 'POST', body })
     createdKey.value = res.key
-    newKey.value = { name: '', allowedCategory: null, allowedName: null, expiresAt: null }
+    newKey.value = { name: '', allowedCategory: null, allowedName: null, allowedPackageName: null, expiresAt: null }
     keysFetch.refresh()
   }
 )

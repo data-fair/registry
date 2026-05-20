@@ -45,7 +45,9 @@ if (process.env.NODE_ENV === 'development') {
     assertReqInternal(req)
     await mongo.artefacts.deleteMany({})
     await mongo.apiKeys.deleteMany({})
-    await mongo.accessGrants.deleteMany({})
+    // Scoped delete: only grants for test accounts (test users/orgs are
+    // `test*`-prefixed) are wiped, so manually-created dev grants survive.
+    await mongo.accessGrants.deleteMany({ 'account.id': { $regex: /^test/ } })
     await mongo.thumbnails.deleteMany({})
     await mongo.remoteRegistries.deleteMany({})
     await cleanFiles()

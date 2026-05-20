@@ -1,7 +1,5 @@
 <template>
-  <v-container data-iframe-height>
-    <admin-nav />
-
+  <div class="pa-4">
     <!-- Add remote registry -->
     <v-card class="mb-4">
       <v-card-title>{{ t('addRemote') }}</v-card-title>
@@ -131,12 +129,11 @@
         </tbody>
       </v-table>
     </v-card>
-  </v-container>
+  </div>
 </template>
 
 <i18n lang="yaml">
 fr:
-  admin: Administration
   remoteRegistries: Registres distants
   addRemote: Ajouter un registre distant
   name: Nom
@@ -147,7 +144,6 @@ fr:
   neverSynced: Jamais synchronisé
   add: Ajouter
 en:
-  admin: Administration
   remoteRegistries: Remote Registries
   addRemote: Add Remote Registry
   name: Name
@@ -163,20 +159,9 @@ en:
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
-import { useBreadcrumbs } from '~/composables/breadcrumbs'
 
 const { t } = useI18n()
-const session = useSession()
 const { dayjs } = useLocaleDayjs()
-
-if (!session.state.user?.adminMode) {
-  throw new Error('Admin mode required')
-}
-
-useBreadcrumbs().setForPage(() => [
-  { title: t('admin'), disabled: true },
-  { title: t('remoteRegistries'), disabled: true }
-])
 
 const newRemote = ref({ name: '', url: '', apiKey: '' })
 const deletingId = ref<string | null>(null)

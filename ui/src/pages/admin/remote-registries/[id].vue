@@ -3,8 +3,6 @@
     v-if="registry"
     data-iframe-height
   >
-    <admin-nav />
-
     <!-- Config -->
     <v-card class="mb-4">
       <v-card-title>{{ t('config') }}</v-card-title>
@@ -237,7 +235,6 @@
 <i18n lang="yaml">
 fr:
   admin: Administration
-  remoteRegistries: Registres distants
   config: Configuration
   name: Nom
   apiKey: Clé API
@@ -264,7 +261,6 @@ fr:
   delete: Supprimer
 en:
   admin: Administration
-  remoteRegistries: Remote Registries
   config: Configuration
   name: Name
   apiKey: API Key
@@ -320,8 +316,7 @@ const selectingId = ref<string | null>(null)
 const unselectingId = ref<string | null>(null)
 
 useBreadcrumbs().setForPage(() => [
-  { title: t('admin'), disabled: true },
-  { title: t('remoteRegistries'), to: '/admin/remote-registries' },
+  { title: t('admin'), to: '/admin' },
   { title: registry.value?.name || registryId.value, disabled: true }
 ])
 
@@ -406,7 +401,7 @@ const deleteAction = useAsyncAction(
     await $fetch(`/v1/remote-registries/${encodeURIComponent(registryId.value)}`, {
       method: 'DELETE'
     })
-    router.push('/admin/remote-registries')
+    router.push('/admin')
   }
 )
 </script>
