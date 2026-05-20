@@ -93,6 +93,11 @@
         "region": { "type": "string" },
         "endpoint": { "type": "string" },
         "bucket": { "type": "string" },
+        "rootDir": {
+          "type": "string",
+          "default": "",
+          "description": "Optional root directory (key prefix) under which all objects are stored in the bucket. Lets a single bucket be shared between deployments."
+        },
         "credentials": {
           "type": "object",
           "additionalProperties": false,

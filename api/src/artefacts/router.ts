@@ -10,7 +10,7 @@ import type { Artefact } from '#types/artefact/index.ts'
 import config from '#config'
 import { authenticateApiKey, resolveCaller, tryInternalSecretWithAccount } from '../auth.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
-import { writeFile, deleteFile } from '../files-storage/index.ts'
+import { filesStorage } from '../files-storage/index.ts'
 import {
   listArtefacts, getArtefact, getArtefactById, patchArtefact, deleteArtefact,
   commitFileUpload, commitNpmUpload, extractStagedManifest, resolveDownload
@@ -194,7 +194,7 @@ router.post('/file/:name', async (req, res, next) => {
 
     // Stream the multipart file straight into the configured storage at a
     // staging path — no local fs tmp needed even for the S3 backend.
-    const fields = await streamFileUpload(req, (stream) => writeFile(stream, stagingPath))
+    const fields = await streamFileUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
     stagingStored = true
 
     // Parse optional JSON fields with explicit 400 on malformed input.
@@ -221,7 +221,7 @@ router.post('/file/:name', async (req, res, next) => {
     stagingStored = false
     res.status(201).json({ artefact })
   } catch (err) {
-    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
+    if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
     next(err)
   }
 })
@@ -254,7 +254,7 @@ router.post('/npm/:id', async (req, res, next) => {
       throw httpError(409, `this artefact already exists as a "${existing.format}" artefact`)
     }
 
-    const { architecture, category: uploadCategory } = await streamTarballUpload(req, (stream) => writeFile(stream, stagingPath))
+    const { architecture, category: uploadCategory } = await streamTarballUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
     stagingStored = true
 
     const manifest = await extractStagedManifest(stagingPath)
@@ -286,7 +286,7 @@ router.post('/npm/:id', async (req, res, next) => {
     stagingStored = false
     res.status(201).json({ artefact })
   } catch (err) {
-    if (stagingStored) await deleteFile(stagingPath).catch(() => {})
+    if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
     next(err)
   }
 })

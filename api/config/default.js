@@ -12,6 +12,7 @@ export default {
     region: '',
     endpoint: '',
     bucket: '',
+    rootDir: '',
     credentials: {
       accessKeyId: '',
       secretAccessKey: ''

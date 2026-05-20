@@ -32,6 +32,7 @@ export default {
     region: 'S3_REGION',
     endpoint: 'S3_ENDPOINT',
     bucket: 'S3_BUCKET',
+    rootDir: 'S3_ROOT_DIR',
     credentials: {
       accessKeyId: 'S3_ACCESS_KEY_ID',
       secretAccessKey: 'S3_SECRET_ACCESS_KEY'

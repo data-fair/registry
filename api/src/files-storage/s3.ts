@@ -23,9 +23,13 @@ import type { FileBackend } from './types.ts'
 export class S3Backend implements FileBackend {
   private dataClient: S3Client
   private metadataClient: S3Client
+  // Normalized root directory: '' or 'some/dir/' (no leading slash, single trailing slash).
+  private prefix: string
 
   constructor () {
     const s3Config = config.s3 as S3ClientConfig
+    const rootDir = config.s3?.rootDir
+    this.prefix = rootDir ? rootDir.replace(/^\/+|\/+$/g, '') + '/' : ''
     this.dataClient = new S3Client({
       ...s3Config,
       requestHandler: new NodeHttpHandler({
@@ -42,6 +46,11 @@ export class S3Backend implements FileBackend {
     })
   }
 
+  // Map a logical storage path to the bucket key, applying the root directory.
+  private key (path: string) {
+    return this.prefix + path
+  }
+
   async writeStream (stream: Readable, path: string) {
     // S3 caps multipart uploads at 10,000 parts. The SDK default part size
     // is 5 MB (50 GB ceiling) — too low for planet-scale tilesets. 32 MB
@@ -51,7 +60,7 @@ export class S3Backend implements FileBackend {
       partSize: 32 * 1024 * 1024,
       params: {
         Bucket: config.s3!.bucket,
-        Key: path,
+        Key: this.key(path),
         Body: stream
       }
     })
@@ -62,7 +71,7 @@ export class S3Backend implements FileBackend {
     const ifModifiedSinceDate = ifModifiedSince ? new Date(ifModifiedSince) : undefined
     const bucketParams = {
       Bucket: config.s3!.bucket,
-      Key: path,
+      Key: this.key(path),
       IfModifiedSince: ifModifiedSinceDate
     }
     try {
@@ -92,7 +101,7 @@ export class S3Backend implements FileBackend {
     const contentDisposition = `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`
     const command = new GetObjectCommand({
       Bucket: config.s3!.bucket,
-      Key: path,
+      Key: this.key(path),
       ResponseContentDisposition: contentDisposition
     })
     return getSignedUrl(this.dataClient, command, { expiresIn: config.s3?.downloadUrlExpirySeconds ?? 900 })
@@ -101,7 +110,7 @@ export class S3Backend implements FileBackend {
   async delete (path: string) {
     await this.metadataClient.send(new DeleteObjectCommand({
       Bucket: config.s3!.bucket,
-      Key: path
+      Key: this.key(path)
     }))
   }
 
@@ -109,7 +118,7 @@ export class S3Backend implements FileBackend {
     try {
       await this.metadataClient.send(new HeadObjectCommand({
         Bucket: config.s3!.bucket,
-        Key: path
+        Key: this.key(path)
       }))
       return true
     } catch {
@@ -120,7 +129,7 @@ export class S3Backend implements FileBackend {
   async stats (path: string) {
     const head = await this.metadataClient.send(new HeadObjectCommand({
       Bucket: config.s3!.bucket,
-      Key: path
+      Key: this.key(path)
     }))
     return { size: head.ContentLength!, lastModified: head.LastModified! }
   }
@@ -129,7 +138,7 @@ export class S3Backend implements FileBackend {
     await this.copy(srcPath, dstPath)
     await this.metadataClient.send(new DeleteObjectCommand({
       Bucket: config.s3!.bucket,
-      Key: srcPath
+      Key: this.key(srcPath)
     }))
   }
 
@@ -137,9 +146,11 @@ export class S3Backend implements FileBackend {
   // above 5GB — fall back to multipart UploadPartCopy past that threshold.
   private async copy (srcPath: string, dstPath: string) {
     const bucket = config.s3!.bucket
-    const copySource = `${bucket}/${encodeURI(srcPath)}`
+    const srcKey = this.key(srcPath)
+    const dstKey = this.key(dstPath)
+    const copySource = `${bucket}/${encodeURI(srcKey)}`
 
-    const head = await this.metadataClient.send(new HeadObjectCommand({ Bucket: bucket, Key: srcPath }))
+    const head = await this.metadataClient.send(new HeadObjectCommand({ Bucket: bucket, Key: srcKey }))
     const fileSize = head.ContentLength!
 
     const maxSingleCopySize = 5 * 1024 * 1024 * 1024
@@ -147,7 +158,7 @@ export class S3Backend implements FileBackend {
       await this.dataClient.send(new CopyObjectCommand({
         Bucket: bucket,
         CopySource: copySource,
-        Key: dstPath
+        Key: dstKey
       }))
       return
     }
@@ -156,7 +167,7 @@ export class S3Backend implements FileBackend {
     const totalParts = Math.ceil(fileSize / multipartChunkSize)
     const createResp = await this.dataClient.send(new CreateMultipartUploadCommand({
       Bucket: bucket,
-      Key: dstPath
+      Key: dstKey
     }))
     const uploadId = createResp.UploadId!
 
@@ -167,7 +178,7 @@ export class S3Backend implements FileBackend {
         const end = Math.min(partNumber * multipartChunkSize, fileSize) - 1
         copyParts.push(this.dataClient.send(new UploadPartCopyCommand({
           Bucket: bucket,
-          Key: dstPath,
+          Key: dstKey,
           CopySource: copySource,
           CopySourceRange: `bytes=${start}-${end}`,
           UploadId: uploadId,
@@ -177,7 +188,7 @@ export class S3Backend implements FileBackend {
       const responses = await Promise.all(copyParts)
       await this.dataClient.send(new CompleteMultipartUploadCommand({
         Bucket: bucket,
-        Key: dstPath,
+        Key: dstKey,
         UploadId: uploadId,
         MultipartUpload: {
           Parts: responses.map((r, i) => ({
@@ -189,7 +200,7 @@ export class S3Backend implements FileBackend {
     } catch (err) {
       await this.dataClient.send(new AbortMultipartUploadCommand({
         Bucket: bucket,
-        Key: dstPath,
+        Key: dstKey,
         UploadId: uploadId
       })).catch(() => {})
       throw err
@@ -197,9 +208,10 @@ export class S3Backend implements FileBackend {
   }
 
   async clean () {
+    // Scope deletion to the root directory so a shared bucket is not wiped.
     const pages = paginateListObjectsV2(
       { client: this.metadataClient, pageSize: 100 },
-      { Bucket: config.s3!.bucket }
+      { Bucket: config.s3!.bucket, Prefix: this.prefix }
     )
     for await (const page of pages) {
       if (!page.Contents) continue

@@ -8,7 +8,7 @@ import type { Filter } from 'mongodb'
 import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
 import config from '#config'
-import { readFile, getDownloadUrl, deleteFile, moveFile, fileStats } from '../files-storage/index.ts'
+import { filesStorage } from '../files-storage/index.ts'
 import { extractManifest, type Manifest } from './operations.ts'
 
 export type { Manifest } from './operations.ts'
@@ -58,11 +58,11 @@ export const deleteArtefact = async (artefact: Artefact) => {
   // then best-effort remove files.
   await mongo.artefacts.deleteOne({ _id: artefact._id })
   if (artefact.format === 'file') {
-    if (artefact.filePath) await deleteFile(artefact.filePath)
+    if (artefact.filePath) await filesStorage.delete(artefact.filePath)
   } else {
     // npm artefacts store tarballs inline in the `tarballs` map
     for (const slot of Object.values(artefact.tarballs ?? {})) {
-      await deleteFile(slot.path).catch(() => {})
+      await filesStorage.delete(slot.path).catch(() => {})
     }
   }
   await mongo.thumbnails.deleteMany({ artefactId: artefact._id })
@@ -72,7 +72,7 @@ export const deleteArtefact = async (artefact: Artefact) => {
 
 // Reads a staged tarball and extracts its npm manifest. Caps come from config.
 export const extractStagedManifest = async (stagingPath: string): Promise<Manifest> => {
-  const { body } = await readFile(stagingPath)
+  const { body } = await filesStorage.readStream(stagingPath)
   return extractManifest(body, {
     maxDecompressedBytes: config.maxDecompressedBytes,
     maxTarEntries: config.maxTarEntries
@@ -94,9 +94,9 @@ export const commitNpmUpload = async (params: {
 }): Promise<Artefact> => {
   const { id, arch, stagingPath, manifest, category, uploadedBy, existing } = params
   const tarballPath = `npm/${id}/${arch}-${randomUUID()}.tgz`
-  await moveFile(stagingPath, tarballPath)
+  await filesStorage.move(stagingPath, tarballPath)
   try {
-    const { size } = await fileStats(tarballPath)
+    const { size } = await filesStorage.stats(tarballPath)
     const now = new Date().toISOString()
     const tarballEntry = { path: tarballPath, size, uploadedAt: now, uploadedBy }
     await mongo.artefacts.updateOne(
@@ -124,14 +124,14 @@ export const commitNpmUpload = async (params: {
       { upsert: true }
     )
   } catch (err) {
-    await deleteFile(tarballPath).catch(() => {})
+    await filesStorage.delete(tarballPath).catch(() => {})
     throw err
   }
 
   // Best-effort delete of the previous occupant of this arch slot.
   const previousPath = existing?.tarballs?.[arch]?.path
   if (previousPath && previousPath !== tarballPath) {
-    await deleteFile(previousPath).catch(() => {})
+    await filesStorage.delete(previousPath).catch(() => {})
   }
 
   return (await mongo.artefacts.findOne({ _id: id }))!
@@ -157,9 +157,9 @@ export const commitFileUpload = async (params: {
   // Namespace new writes with a random suffix so a failed delete of the
   // old file doesn't clobber the fresh one.
   const filePath = `files/${name}/${randomUUID()}-${fileName}`
-  await moveFile(stagingPath, filePath)
+  await filesStorage.move(stagingPath, filePath)
   try {
-    const { size } = await fileStats(filePath)
+    const { size } = await filesStorage.stats(filePath)
     const now = new Date().toISOString()
     await mongo.artefacts.updateOne(
       { _id: artefactId },
@@ -187,12 +187,12 @@ export const commitFileUpload = async (params: {
       { upsert: true }
     )
   } catch (err) {
-    await deleteFile(filePath).catch(() => {})
+    await filesStorage.delete(filePath).catch(() => {})
     throw err
   }
 
   if (existing?.filePath && existing.filePath !== filePath) {
-    await deleteFile(existing.filePath).catch(() => {})
+    await filesStorage.delete(existing.filePath).catch(() => {})
   }
 
   return (await mongo.artefacts.findOne({ _id: artefactId }))!
@@ -211,8 +211,8 @@ export const resolveDownload = async (
   filename: string,
   ifModifiedSince?: string
 ): Promise<DownloadSource> => {
-  const signedUrl = await getDownloadUrl(path, { filename })
+  const signedUrl = await filesStorage.getDownloadUrl(path, { filename })
   if (signedUrl) return { redirectUrl: signedUrl }
-  const { body, size, lastModified } = await readFile(path, ifModifiedSince)
+  const { body, size, lastModified } = await filesStorage.readStream(path, ifModifiedSince)
   return { body, size, lastModified }
 }

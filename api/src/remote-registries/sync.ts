@@ -4,7 +4,7 @@ import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import type { AxiosInstance } from 'axios'
 import mongo from '#mongo'
 import { decipher } from '../cipher.ts'
-import { writeFile, deleteFile } from '../files-storage/index.ts'
+import { filesStorage } from '../files-storage/index.ts'
 import type { Artefact } from '#types/artefact/index.ts'
 
 const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
@@ -33,7 +33,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
       `/api/v1/artefacts/${encodedId}/tarball?architecture=${encodeURIComponent(arch)}`,
       { responseType: 'stream' }
     )
-    await writeFile(dlRes.data, localPath)
+    await filesStorage.writeStream(dlRes.data, localPath)
     newTarballs[arch] = {
       path: localPath,
       size: remoteSlot.size ?? 0,
@@ -47,7 +47,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
   // Delete local arch slots pruned upstream.
   for (const [arch, localSlot] of Object.entries(localTarballs)) {
     if (!(arch in remoteTarballs)) {
-      await deleteFile(localSlot.path).catch(() => {})
+      await filesStorage.delete(localSlot.path).catch(() => {})
     }
   }
 
@@ -83,7 +83,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
 
   // Best-effort delete previously-local tarballs that were replaced by fresh downloads.
   for (const oldPath of pathsToDelete) {
-    await deleteFile(oldPath).catch(() => {})
+    await filesStorage.delete(oldPath).catch(() => {})
   }
 }
 
@@ -102,7 +102,7 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
 
     const fileName = remoteArtefact.fileName || remoteArtefact.name
     const filePath = `files/${remoteArtefact.name}/${randomUUID()}-${fileName}`
-    await writeFile(dlRes.data, filePath)
+    await filesStorage.writeStream(dlRes.data, filePath)
 
     const oldFilePath = local?.filePath
     const now = new Date().toISOString()
@@ -133,7 +133,7 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
     )
 
     if (oldFilePath && oldFilePath !== filePath) {
-      await deleteFile(oldFilePath).catch(() => {})
+      await filesStorage.delete(oldFilePath).catch(() => {})
     }
   } else {
     // Still ensure origin is set even if file unchanged

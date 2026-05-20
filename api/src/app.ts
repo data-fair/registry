@@ -11,7 +11,7 @@ import accessGrantsRouter from './access-grants/router.ts'
 import { publicThumbnailsRouter } from './thumbnails/router.ts'
 import remoteRegistriesRouter from './remote-registries/router.ts'
 import mongo from '#mongo'
-import { cleanFiles } from './files-storage/index.ts'
+import { filesStorage } from './files-storage/index.ts'
 import config from '#config'
 
 export const app = express()
@@ -50,7 +50,7 @@ if (process.env.NODE_ENV === 'development') {
     await mongo.accessGrants.deleteMany({ 'account.id': { $regex: /^test/ } })
     await mongo.thumbnails.deleteMany({})
     await mongo.remoteRegistries.deleteMany({})
-    await cleanFiles()
+    await filesStorage.clean()
     res.send()
   })
 
