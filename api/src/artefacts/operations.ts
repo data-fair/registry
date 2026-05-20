@@ -14,9 +14,9 @@ export interface Manifest {
 
 // Default caps protecting against tar bombs and malformed archives.
 // Decompressed output is bounded regardless of the compressed input size.
-// extractManifest accepts overrides via its opts arg (router wires them
-// from config so deployments with chunky pre-installed node_modules can
-// raise the entry count and decompressed-size ceilings without patching).
+// extractManifest accepts overrides via its opts arg (the service layer
+// wires them from config so deployments with chunky pre-installed
+// node_modules can raise the ceilings without patching).
 export const MAX_DECOMPRESSED_BYTES = 1024 * 1024 * 1024
 export const MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 export const MAX_TAR_ENTRIES = 100_000

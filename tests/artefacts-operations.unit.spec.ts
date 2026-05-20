@@ -3,7 +3,7 @@ import { Readable, Writable } from 'node:stream'
 import { createGzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 import * as tar from 'tar-stream'
-import { extractManifest, MAX_DECOMPRESSED_BYTES } from '../api/src/artefacts/service-pure.ts'
+import { extractManifest, MAX_DECOMPRESSED_BYTES } from '../api/src/artefacts/operations.ts'
 
 const gzipBuffer = async (raw: Buffer): Promise<Buffer> => {
   const chunks: Buffer[] = []
