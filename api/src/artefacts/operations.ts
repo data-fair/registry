@@ -9,7 +9,6 @@ export interface Manifest {
   name: string
   version: string
   licence?: string
-  category?: string
 }
 
 // Default caps protecting against tar bombs and malformed archives.
@@ -80,8 +79,7 @@ export const extractManifest = async (stream: Readable, opts: ExtractManifestOpt
           manifest = {
             name: pkg.name,
             version: pkg.version,
-            licence: pkg.licence || pkg.license,
-            category: pkg.registry?.category || 'other'
+            licence: pkg.licence || pkg.license
           }
           // Abort the pipeline early; we've got what we need and don't want
           // to keep processing a potentially malicious tarball.

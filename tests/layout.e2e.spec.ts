@@ -11,7 +11,7 @@ test.beforeAll(async () => {
   const keyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'e2e-layout' })
   const upload = axiosWithApiKey(keyRes.data.key)
 
-  const tarball = await createTestTarball({ name: '@test/layout-pkg', version: '1.0.0', category: 'processing' })
+  const tarball = await createTestTarball({ name: '@test/layout-pkg', version: '1.0.0' })
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
   await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent(layoutPkgId), form, { headers: form.getHeaders() })

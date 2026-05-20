@@ -52,12 +52,12 @@ test.describe('extractManifest', () => {
     expect(result.licence).toBe('MIT')
   })
 
-  test('extracts registry.category', async () => {
+  test('does not extract a category from package.json (category comes from the upload form field)', async () => {
     const tarball = await packTarball([
       { name: 'package/package.json', content: manifest({ registry: { category: 'processing' } }) }
     ])
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.category).toBe('processing')
+    expect((result as { category?: unknown }).category).toBeUndefined()
   })
 
   test('rejects missing package.json', async () => {

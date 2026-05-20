@@ -14,7 +14,7 @@ let cacheDir: string
 
 const uploadNpm = async (id: string, manifest: { name: string, version: string }, architecture?: string) => {
   const ax = axiosWithApiKey(uploadApiKey)
-  const tarball = await createTestTarball({ ...manifest, category: 'processing' })
+  const tarball = await createTestTarball(manifest)
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
   if (architecture) form.append('architecture', architecture)

@@ -7,7 +7,6 @@ export interface TarballOptions {
   name: string
   version: string
   licence?: string
-  category?: string
 }
 
 export const createTestTarball = async (options: TarballOptions): Promise<Buffer> => {
@@ -15,10 +14,7 @@ export const createTestTarball = async (options: TarballOptions): Promise<Buffer
   const pkg = {
     name: options.name,
     version: options.version,
-    ...(options.licence ? { licence: options.licence } : {}),
-    registry: {
-      category: options.category || 'other'
-    }
+    ...(options.licence ? { licence: options.licence } : {})
   }
 
   const content = JSON.stringify(pkg, null, 2)

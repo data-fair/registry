@@ -13,14 +13,14 @@ test.describe('Account-facing access patterns', () => {
     uploadApiKey = keyRes.data.key
 
     // Upload a public artefact
-    const tarball1 = await createTestTarball({ name: '@test/public-pkg', version: '1.0.0', category: 'processing' })
+    const tarball1 = await createTestTarball({ name: '@test/public-pkg', version: '1.0.0' })
     const form1 = new FormData()
     form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/public-pkg@1'), form1, { headers: form1.getHeaders() })
     await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1'), { public: true })
 
     // Upload a private artefact with test1 org access
-    const tarball2 = await createTestTarball({ name: '@test/private-pkg', version: '2.0.0', category: 'catalog' })
+    const tarball2 = await createTestTarball({ name: '@test/private-pkg', version: '2.0.0' })
     const form2 = new FormData()
     form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/private-pkg@2'), form2, { headers: form2.getHeaders() })

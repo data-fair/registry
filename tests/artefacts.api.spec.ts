@@ -26,12 +26,12 @@ test.describe('Artefacts', () => {
       const tarball = await createTestTarball({
         name: '@data-fair/processing-gpkg',
         version: '1.2.3',
-        licence: 'MIT',
-        category: 'processing'
+        licence: 'MIT'
       })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
       form.append('architecture', 'x64')
+      form.append('category', 'processing')
 
       const ax = axiosWithApiKey(uploadApiKey)
       const res = await ax.post(

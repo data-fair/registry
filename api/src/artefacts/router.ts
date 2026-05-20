@@ -263,7 +263,7 @@ router.post('/npm/:id', async (req, res, next) => {
       throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
     }
 
-    const category = pickCategory(uploadCategory ?? manifest.category, npmCategories)
+    const category = pickCategory(uploadCategory, npmCategories)
     if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
       throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
     }
@@ -382,10 +382,9 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
 
     busboy.on('field', (name, val) => {
       if (name === 'architecture') architecture = val
-      // Optional override for the artefact category. Plugin tarballs from before
-      // the registry convention don't carry `package.json#registry.category`,
-      // so the migration sends it as a multipart field. New plugins should
-      // declare it in package.json.
+      // The artefact category comes solely from this multipart field; the
+      // package.json manifest is never inspected for one. Absent here, the
+      // category defaults to "other".
       if (name === 'category') category = val
     })
 

@@ -16,7 +16,7 @@ test.describe('Read API key access', () => {
     uploadApiKey = keyRes.data.key
 
     // Public artefact
-    const tarball1 = await createTestTarball({ name: '@test/public-pkg', version: '1.0.0', category: 'processing' })
+    const tarball1 = await createTestTarball({ name: '@test/public-pkg', version: '1.0.0' })
     const form1 = new FormData()
     form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/public-pkg@1'), form1, { headers: form1.getHeaders() })
@@ -26,7 +26,7 @@ test.describe('Read API key access', () => {
     })
 
     // Private artefact visible to test1
-    const tarball2 = await createTestTarball({ name: '@test/private-pkg', version: '2.0.0', category: 'catalog' })
+    const tarball2 = await createTestTarball({ name: '@test/private-pkg', version: '2.0.0' })
     const form2 = new FormData()
     form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/private-pkg@2'), form2, { headers: form2.getHeaders() })
@@ -35,7 +35,7 @@ test.describe('Read API key access', () => {
     })
 
     // Private artefact NOT visible to test1
-    const tarball3 = await createTestTarball({ name: '@test/other-pkg', version: '3.0.0', category: 'processing' })
+    const tarball3 = await createTestTarball({ name: '@test/other-pkg', version: '3.0.0' })
     const form3 = new FormData()
     form3.append('file', tarball3, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/other-pkg@3'), form3, { headers: form3.getHeaders() })

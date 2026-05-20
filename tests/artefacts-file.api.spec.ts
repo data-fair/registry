@@ -93,7 +93,7 @@ test.describe('File artefacts', () => {
       await admin.patch('/api/v1/artefacts/terrain', { public: true })
 
       // Upload an npm artefact
-      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0', category: 'processing' })
+      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
       const form2 = new FormData()
       form2.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
       await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form2, { headers: form2.getHeaders() })
