@@ -8,7 +8,7 @@ Upload API keys are created by a superadmin in the registry UI ("Admin → API k
 
 - **Type:** `upload`.
 - **Name:** something you can audit — e.g. `ci-<plugin>-<env>` (`ci-processing-gpkg-prod`).
-- **Allowed package name:** the `package.json#name` (e.g. `@data-fair/processing-gpkg`) — covers `@1`, `@2`, `@main`, etc.
+- **Allowed name prefix:** the artefact-id prefix the key may upload to — `@data-fair-processing-gpkg` covers every ref (`-1`, `-2`, `-main`, …). Keep it specific: a short prefix would also match sibling plugins that share it.
 - **Allowed category:** optional, but recommended for tileset-style file uploads (`tileset`, `maplibre-style`).
 
 The raw key is displayed **once** at creation time — copy it immediately and store it as a CI secret. It is never retrievable again (only a SHA-512 hash is stored server-side).
@@ -31,13 +31,15 @@ curl -X POST https://registry.example.com/api/v1/artefacts/npm/<id> \
 
 The recommended setup for an npm-format plugin (processing, catalog, application) is **one workflow file, triggered on `v*` tags, publishing a tarball that bundles `node_modules` built inside the same Alpine image consumers run**. Three steps end-to-end.
 
+> **Artefact id.** Throughout this guide the artefact id is the plugin's npm `package.json#name` with `/` flattened to `-`, plus a ref suffix — `-<major>` for releases (`@data-fair-processing-gpkg-1`), `-<branch>` for dev builds (`@data-fair-processing-gpkg-main`). The processings service stores this id verbatim on `processing.plugin`, and the v6 migration publishes legacy plugins under the same form, so CI must upload to the exact same id or builds land on an artefact nothing references.
+
 ### Step 1 — Create the upload API key
 
 In the registry UI (see [API Key Setup](#api-key-setup) above), create a key for the production registry (e.g. `https://koumoul.com/registry`):
 
 - **Type:** `upload`
 - **Name:** `ci-<plugin>-prod` (e.g. `ci-processing-gpkg-prod`)
-- **Allowed package name:** the exact `package.json#name` (e.g. `@data-fair/processing-gpkg`) — covers every ref of the plugin (`@1`, `@2`, `@main`, etc.)
+- **Allowed name prefix:** `@data-fair-processing-gpkg` (the `package.json#name` with `/` flattened to `-`) — a prefix match covering every ref of the plugin (`-1`, `-2`, `-main`, etc.)
 
 Copy the key immediately — it is shown once.
 
@@ -136,7 +138,9 @@ jobs:
           set -euo pipefail
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_MAJOR=$(node -p "require('./package.json').version.split('.')[0]")
-          ENCODED_ID=$(node -p "encodeURIComponent('${PACKAGE_NAME}@${PACKAGE_MAJOR}')")
+          # Artefact id: package name with '/' flattened to '-', plus '-<major>'.
+          ARTEFACT_ID="${PACKAGE_NAME//\//-}-${PACKAGE_MAJOR}"
+          ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
           curl -f -X POST \
             "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
@@ -194,16 +198,16 @@ jobs:
 
 ## Publishing a branch build to staging
 
-For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, upload to an npm artefact whose ref is the branch name (e.g. `@data-fair/processing-gpkg@main`). It carries one mutable tarball per architecture slot — the registry's docker-tag analogue — replaced in place on each upload.
+For development builds that should land in the **staging** registry (e.g. each push to `main`) without bumping a semver release, upload to an npm artefact whose ref is the branch name (e.g. `@data-fair-processing-gpkg-main`). It carries one mutable tarball per architecture slot — the registry's docker-tag analogue — replaced in place on each upload.
 
 Two registries, two artefacts:
 
 | Production registry | Staging registry |
 |--------------------|------------------|
-| `@data-fair/processing-gpkg@1` (npm release ref) | `@data-fair/processing-gpkg@1` (npm, mirrored from prod via federation, read-only) |
-|  | `@data-fair/processing-gpkg@main` (npm dev ref, local) |
+| `@data-fair-processing-gpkg-1` (npm release ref) | `@data-fair-processing-gpkg-1` (npm, mirrored from prod via federation, read-only) |
+|  | `@data-fair-processing-gpkg-main` (npm dev ref, local) |
 
-The registry doesn't distinguish dev refs from release refs at the federation layer — operators decide which artefacts each downstream registry mirrors via `selectedArtefacts`. If you don't list `@plugin@main` in a remote's selection it simply isn't pulled.
+The registry doesn't distinguish dev refs from release refs at the federation layer — operators decide which artefacts each downstream registry mirrors via `selectedArtefacts`. If you don't list the `-main` artefact in a remote's selection it simply isn't pulled.
 
 ### Step 1 — Create the staging upload API key
 
@@ -211,7 +215,7 @@ In the **staging** registry UI, create a key (separate from the production one):
 
 - **Type:** `upload`
 - **Name:** `ci-<plugin>-staging` (e.g. `ci-processing-gpkg-staging`)
-- **Allowed package name:** `@data-fair/processing-gpkg` — covers `@main`, `@1`, etc.
+- **Allowed name prefix:** `@data-fair-processing-gpkg` — covers `-main`, `-1`, etc.
 
 This key only authenticates against the staging registry. The production key from the tag flow above stays unchanged.
 
@@ -275,7 +279,9 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE_NAME=$(node -p "require('./package.json').name")
-          ENCODED_ID=$(node -p "encodeURIComponent('${PACKAGE_NAME}@main')")
+          # Artefact id: package name with '/' flattened to '-', plus '-<branch>'.
+          ARTEFACT_ID="${PACKAGE_NAME//\//-}-${GITHUB_REF_NAME}"
+          ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
           curl -f -X POST \
             "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
@@ -292,8 +298,8 @@ Notes:
 
 On the staging instance, when an operator creates a processing against the staging registry:
 
-1. The processings UI's plugin picker shows the `@main` artefact alongside the federated releases, with a dev-build chip.
-2. Picking it stores `pluginId = "@data-fair/processing-gpkg@main"` on the processing.
+1. The processings UI's plugin picker shows the `-main` artefact alongside the federated releases, with a dev-build chip.
+2. Picking it stores `plugin = "@data-fair-processing-gpkg-main"` on the processing.
 3. The worker resolves it via `ensureArtefact` on each run. The on-disk cache is keyed by the artefact's `dataUpdatedAt`, so every successful CI push triggers a fresh download on the next processing run.
 
 Consumer services need `@data-fair/lib-node-registry` **≥ 0.4.0**.
@@ -326,7 +332,8 @@ publish:
       TARBALL=$(ls *.tgz)
       PACKAGE_NAME=$(node -p "require('./package.json').name")
       PACKAGE_MAJOR=$(node -p "require('./package.json').version.split('.')[0]")
-      ENCODED_ID=$(node -p "encodeURIComponent('${PACKAGE_NAME}@${PACKAGE_MAJOR}')")
+      ARTEFACT_ID="${PACKAGE_NAME//\//-}-${PACKAGE_MAJOR}"
+      ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
       curl -f -X POST \
         "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
         -H "x-api-key: ${REGISTRY_API_KEY}" \
@@ -435,7 +442,7 @@ This is inherently more secure than GitHub's default model — the protection is
 ### Minimal checklist
 
 - [ ] API key stored as a CI secret (never in code)
-- [ ] API key scoped with `allowedPackageName` — to the plugin's `package.json#name` (e.g. `@data-fair/processing-gpkg`) — covers both tag and branch flows
+- [ ] API key scoped with `allowedNamePrefix` — to the plugin's flattened name (e.g. `@data-fair-processing-gpkg`) — covers both tag and branch flows
 - [ ] Publish job restricted to tag pushes on protected branches
 - [ ] **GitHub: secret stored in an environment (not repository level) with required reviewers**
 - [ ] **GitHub: environment restricted to specific branches/tags**
