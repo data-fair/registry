@@ -113,8 +113,8 @@ export const tryInternalSecret = (req: import('express').Request): boolean => {
   if (!secretKey || !config.secretKeys.internalServices) return false
   const received = Buffer.from(secretKey, 'utf-8')
   const expected = Buffer.from(config.secretKeys.internalServices, 'utf-8')
-  if (received.length !== expected.length) return false
-  return timingSafeEqual(received, expected)
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) return false
+  return true
 }
 
 /**
