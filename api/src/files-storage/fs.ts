@@ -61,4 +61,8 @@ export class FsBackend implements FileBackend {
   async clean () {
     await rm(basePath(), { recursive: true, force: true })
   }
+
+  async deleteDir (prefix: string) {
+    await rm(resolvePath(basePath(), prefix), { recursive: true, force: true })
+  }
 }

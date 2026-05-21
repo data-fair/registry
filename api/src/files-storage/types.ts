@@ -20,4 +20,5 @@ export interface FileBackend {
   stats (path: string): Promise<FileStats>
   move (srcPath: string, dstPath: string): Promise<void>
   clean (): Promise<void>
+  deleteDir (prefix: string): Promise<void>
 }

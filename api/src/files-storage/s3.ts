@@ -220,4 +220,18 @@ export class S3Backend implements FileBackend {
       ))
     }
   }
+
+  async deleteDir (prefix: string) {
+    const fullPrefix = this.key(prefix.endsWith('/') ? prefix : prefix + '/')
+    const pages = paginateListObjectsV2(
+      { client: this.metadataClient, pageSize: 100 },
+      { Bucket: config.s3!.bucket, Prefix: fullPrefix }
+    )
+    for await (const page of pages) {
+      if (!page.Contents) continue
+      await Promise.all(page.Contents.map((obj) =>
+        this.metadataClient.send(new DeleteObjectCommand({ Bucket: config.s3!.bucket, Key: obj.Key! }))
+      ))
+    }
+  }
 }
