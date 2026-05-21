@@ -178,7 +178,7 @@ The SPA must be built with the Vite `base` set to the path-only serving URL:
 /registry/apps/<packageName>/<major>.<minor>/
 ```
 
-For example `/registry/apps/@data-fair/app-charts/0.30/`. This makes the build host-agnostic: the same tarball can be served from any registry instance without rebuilding, including federated downstream registries.
+For example `/registry/apps/@data-fair/app-charts/0.30/`. The `/registry/` prefix comes from the reverse-proxy mount: the registry is served at `/registry/` in the public URL space, so the public asset path is `/registry/apps/…` while the registry app serves those same assets internally at `/apps/…`. This makes the build host-agnostic: the same tarball can be served from any registry instance without rebuilding, including federated downstream registries.
 
 #### Tarball shape
 
@@ -193,25 +193,46 @@ package/config-schema.json
 
 No `node_modules` are needed — this is a static SPA, not a server-side plugin.
 
-#### Upload step
+#### Workflow steps
+
+The job must first build the SPA (producing the `dist/` output that `npm pack` will bundle), then upload. Add these steps inside a job that declares `REGISTRY_URL` at the `env:` level, just like the npm workflow above:
 
 ```yaml
-- name: Publish base-application to the registry
-  env:
-    REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
-  run: |
-    set -euo pipefail
-    PACKAGE_NAME=$(node -p "require('./package.json').name")
-    MAJOR_MINOR=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-    ARTEFACT_ID="${PACKAGE_NAME}@${MAJOR_MINOR}"
-    ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
-    npm pack --pack-destination .
-    TARBALL=$(ls *.tgz)
-    curl -sS --fail-with-body -X POST \
-      "${REGISTRY_URL}/api/v1/artefacts/spa/${ENCODED_ID}" \
-      -H "x-api-key: ${REGISTRY_API_KEY}" \
-      -F "category=application" \
-      -F "file=@${TARBALL}"
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' && github.event_name == 'push'
+    environment: production
+    env:
+      REGISTRY_URL: https://koumoul.com/registry
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Build SPA
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish base-application to the registry
+        env:
+          REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+        run: |
+          set -euo pipefail
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          MAJOR_MINOR=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          ARTEFACT_ID="${PACKAGE_NAME}@${MAJOR_MINOR}"
+          ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
+          npm pack
+          TARBALL=$(ls ./*.tgz)
+          curl -sS --fail-with-body -X POST \
+            "${REGISTRY_URL}/api/v1/artefacts/spa/${ENCODED_ID}" \
+            -H "x-api-key: ${REGISTRY_API_KEY}" \
+            -F "category=application" \
+            -F "file=@${TARBALL}"
 ```
 
 > **Artefact id validation.** The registry derives the expected id from the tarball's `package.json` as `${name}@${major}.${minor}` and rejects the upload if the id in the URL doesn't match. This prevents accidentally uploading under the wrong ref.
