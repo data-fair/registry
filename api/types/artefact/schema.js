@@ -105,6 +105,13 @@ export default {
         height: { type: 'integer' }
       }
     },
+    deprecated: {
+      type: 'boolean',
+      title: 'Deprecated',
+      'x-i18n-title': { fr: 'Obsolète' },
+      layout: 'switch',
+      default: false
+    },
     public: {
       type: 'boolean',
       title: 'Public',

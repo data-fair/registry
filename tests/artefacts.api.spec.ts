@@ -296,4 +296,39 @@ test.describe('Artefacts', () => {
       }
     })
   })
+
+  test.describe('Deprecation', () => {
+    test.beforeEach(async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+    })
+
+    test('PATCH can set and unset the deprecated flag', async () => {
+      const ax = await superAdmin
+      const id = encodeURIComponent('@test/pkg@1')
+      const setRes = await ax.patch('/api/v1/artefacts/' + id, { deprecated: true })
+      expect(setRes.data.deprecated).toBe(true)
+      const unsetRes = await ax.patch('/api/v1/artefacts/' + id, { deprecated: false })
+      expect(unsetRes.data.deprecated).toBe(false)
+    })
+
+    test('deprecated artefacts are excluded from the default list', async () => {
+      const ax = await superAdmin
+      await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { deprecated: true })
+      const list = await ax.get('/api/v1/artefacts')
+      expect(list.data.count).toBe(0)
+      expect(list.data.results).toEqual([])
+    })
+
+    test('deprecated artefacts appear with includeDeprecated=true', async () => {
+      const ax = await superAdmin
+      await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { deprecated: true })
+      const list = await ax.get('/api/v1/artefacts?includeDeprecated=true')
+      expect(list.data.count).toBe(1)
+      expect(list.data.results[0]._id).toBe('@test/pkg@1')
+    })
+  })
 })

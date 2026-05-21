@@ -62,6 +62,15 @@
             </v-btn>
           </v-btn-toggle>
         </v-col>
+        <v-col cols="auto">
+          <v-checkbox
+            v-model="showDeprecated"
+            color="primary"
+            density="compact"
+            hide-details
+            :label="t('showDeprecated')"
+          />
+        </v-col>
       </v-row>
 
       <v-skeleton-loader
@@ -118,6 +127,14 @@
                   class="ml-2"
                 >
                   {{ t('mirror') }}
+                </v-chip>
+                <v-chip
+                  v-if="artefact.deprecated"
+                  size="x-small"
+                  color="warning"
+                  class="ml-2"
+                >
+                  {{ t('deprecated') }}
                 </v-chip>
                 <br>
                 <span class="text-medium-emphasis text-body-2">{{ artefact._id }}</span>
@@ -286,6 +303,8 @@ fr:
   size: Taille
   visibility: "Visibilit\xE9"
   mirror: miroir
+  deprecated: "obsol\xE8te"
+  showDeprecated: "Afficher les obsol\xE8tes"
   dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
   total: artefact(s)
   createKey: "Cr\xE9er une cl\xE9 de lecture"
@@ -308,6 +327,8 @@ en:
   size: Size
   visibility: Visibility
   mirror: mirror
+  deprecated: deprecated
+  showDeprecated: Show deprecated
   dataUpdatedAt: Data updated
   total: artefact(s)
   createKey: Create read key
@@ -345,6 +366,7 @@ const tab = ref('browse')
 const q = useStringSearchParam('q')
 const category = useStringSearchParam('category')
 const sort = ref('dataUpdatedAt')
+const showDeprecated = ref(false)
 const pageSize = 20
 const page = ref(1)
 
@@ -355,7 +377,8 @@ const fetchParams = computed(() => ({
   skip: (page.value - 1) * pageSize,
   sort: sort.value,
   ...(q.value ? { q: q.value } : {}),
-  ...(category.value ? { category: category.value } : {})
+  ...(category.value ? { category: category.value } : {}),
+  ...(showDeprecated.value ? { includeDeprecated: true } : {})
 }))
 
 const artefactsFetch = useFetch<{ results: Artefact[], count: number }>(

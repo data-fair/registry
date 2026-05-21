@@ -5,6 +5,7 @@ import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import mongo from '#mongo'
 import { cipher, decipher } from '../cipher.ts'
 import { syncRemoteRegistry } from './sync.ts'
+import { filterSuggestedArtefacts } from './operations.ts'
 import * as postReqBody from '#doc/remote-registries/post-req/index.ts'
 import * as patchReqBody from '#doc/remote-registries/patch-req/index.ts'
 
@@ -116,11 +117,14 @@ router.get('/:id/remote-artefacts', async (req, res, next) => {
 
     const size = Math.min(parseInt(req.query.size as string) || 100, 100)
     const skip = parseInt(req.query.skip as string) || 0
-    const params: Record<string, string> = { size: String(size), skip: String(skip) }
+    // Ask the remote for deprecated artefacts too, then drop the ones that are
+    // not already selected — a deprecated artefact is not suggested for new
+    // mirroring but stays visible if it is already mirrored.
+    const params: Record<string, string> = { size: String(size), skip: String(skip), includeDeprecated: 'true' }
     if (req.query.q) params.q = req.query.q as string
 
     const remote = await ax.get('/api/v1/artefacts', { params })
-    res.json(remote.data)
+    res.json(filterSuggestedArtefacts(remote.data, doc.selectedArtefacts))
   } catch (err) { next(err) }
 })
 

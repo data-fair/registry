@@ -199,6 +199,7 @@ watch(() => artefact, () => {
     description: artefact.description || {},
     group: artefact.group || {},
     documentation: artefact.documentation ?? null,
+    deprecated: artefact.deprecated ?? false,
     public: artefact.public ?? false,
     privateAccess: artefact.privateAccess ? [...artefact.privateAccess] : []
   }

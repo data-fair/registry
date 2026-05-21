@@ -13,6 +13,16 @@
       {{ t('mirroredFrom', { origin: artefact.origin }) }}
     </v-alert>
 
+    <!-- Deprecation notice -->
+    <v-alert
+      v-if="artefact.deprecated"
+      type="warning"
+      variant="tonal"
+      class="mb-4"
+    >
+      {{ t('deprecatedNotice') }}
+    </v-alert>
+
     <!-- Download file artefact -->
     <v-card
       v-if="hasGrant && artefact.format === 'file' && artefact.filePath"
@@ -134,6 +144,7 @@ fr:
   noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
   loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
   mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
+  deprecatedNotice: "Cet artefact est obsol\xE8te. Il reste disponible mais n'est plus recommand\xE9."
 en:
   artefacts: Artefacts
   tarballs: Tarballs
@@ -145,6 +156,7 @@ en:
   noAccessGrant: Contact your administrator for download access.
   loginRequired: Log in to access downloads.
   mirroredFrom: "This artefact is mirrored from remote registry: {origin}"
+  deprecatedNotice: "This artefact is deprecated. It remains available but is no longer recommended."
 </i18n>
 
 <script setup lang="ts">

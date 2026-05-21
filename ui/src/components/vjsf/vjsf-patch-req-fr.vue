@@ -224,7 +224,7 @@ return errors === 0;
 validate22.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
 const schema29 = {"$id":"export1","$ref":"https://github.com/data-fair/registry/artefact-patch#"};
-const schema27 = {"$id":"https://github.com/data-fair/registry/artefact-patch","x-exports":["validate","types","vjsf"],"x-vjsf":{"xI18n":true},"x-vjsf-locales":["en","fr"],"title":"Artefact patch","type":"object","additionalProperties":false,"layout":{"title":null},"properties":{"title":{"anyOf":[{"type":"object","additionalProperties":false,"properties":{"en":{"type":"string","title":"Titre - Anglais","layout":{"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Titre - Français","layout":{"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title","errorMessage":{}},"description":{"anyOf":[{"type":"object","additionalProperties":false,"properties":{"en":{"type":"string","title":"Description - Anglais","layout":{"comp":"textarea","props":{"autoGrow":true,"rows":3},"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Description - Français","layout":{"comp":"textarea","props":{"autoGrow":true,"rows":3},"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description","errorMessage":{}},"group":{"anyOf":[{"type":"object","additionalProperties":false,"properties":{"en":{"type":"string","title":"Groupe - Anglais","layout":{"comp":"combobox","cols":{"md":6},"getItems":{"url":{"type":"js-tpl","expr":"${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=en","pure":true,"dataAlias":"value","ref":2},"itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":3}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Groupe - Français","layout":{"comp":"combobox","cols":{"md":6},"getItems":{"url":{"type":"js-tpl","expr":"${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=fr","pure":true,"dataAlias":"value","ref":4},"itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":3}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group","errorMessage":{}},"public":{"anyOf":[{"type":"boolean","title":"Public","layout":"switch","default":false},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/public","errorMessage":{}},"privateAccess":{"anyOf":[{"type":"array","title":"Accès privés","layout":{"if":"!parent.data?.public"},"items":{"type":"object","title":"Compte","additionalProperties":false,"required":["type","id","name"],"properties":{"type":{"type":"string","enum":["user","organization"],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type","errorMessage":{}},"id":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id","errorMessage":{}},"name":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name","errorMessage":{}}},"layout":{"getItems":{"url":{"type":"js-tpl","expr":"/simple-directory/api/accounts?size=20","pure":true,"dataAlias":"value","ref":6},"qSearchParam":"q","itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":3},"itemTitle":{"type":"js-eval","expr":"`${item.name} (${item.id})`","pure":true,"dataAlias":"item","ref":7},"itemKey":{"type":"js-eval","expr":"`${item.type}:${item.id}`","pure":true,"dataAlias":"item","ref":8},"itemIcon":{"type":"js-eval","expr":"`/simple-directory/api/avatars/${item.type}/${item.id}/avatar.png`","pure":true,"dataAlias":"item","ref":9},"returnObjects":true}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items","errorMessage":{"required":{"type":"information obligatoire","id":"information obligatoire","name":"information obligatoire"}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess","errorMessage":{}},"documentation":{"anyOf":[{"type":"string","format":"uri","title":"URL de documentation"},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/documentation","errorMessage":{}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#","errorMessage":{}};
+const schema27 = {"$id":"https://github.com/data-fair/registry/artefact-patch","x-exports":["validate","types","vjsf"],"x-vjsf":{"xI18n":true},"x-vjsf-locales":["en","fr"],"title":"Artefact patch","type":"object","additionalProperties":false,"layout":{"title":null},"properties":{"title":{"anyOf":[{"type":"object","additionalProperties":false,"properties":{"en":{"type":"string","title":"Titre - Anglais","layout":{"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Titre - Français","layout":{"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title","errorMessage":{}},"description":{"anyOf":[{"type":"object","additionalProperties":false,"properties":{"en":{"type":"string","title":"Description - Anglais","layout":{"comp":"textarea","props":{"autoGrow":true,"rows":3},"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Description - Français","layout":{"comp":"textarea","props":{"autoGrow":true,"rows":3},"cols":{"md":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description","errorMessage":{}},"group":{"anyOf":[{"type":"object","additionalProperties":false,"properties":{"en":{"type":"string","title":"Groupe - Anglais","layout":{"comp":"combobox","cols":{"md":6},"getItems":{"url":{"type":"js-tpl","expr":"${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=en","pure":true,"dataAlias":"value","ref":2},"itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":3}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Groupe - Français","layout":{"comp":"combobox","cols":{"md":6},"getItems":{"url":{"type":"js-tpl","expr":"${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=fr","pure":true,"dataAlias":"value","ref":4},"itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":3}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group","errorMessage":{}},"deprecated":{"anyOf":[{"type":"boolean","title":"Obsolète","layout":"switch","default":false},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/deprecated","errorMessage":{}},"public":{"anyOf":[{"type":"boolean","title":"Public","layout":"switch","default":false},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/public","errorMessage":{}},"privateAccess":{"anyOf":[{"type":"array","title":"Accès privés","layout":{"if":"!parent.data?.public"},"items":{"type":"object","title":"Compte","additionalProperties":false,"required":["type","id","name"],"properties":{"type":{"type":"string","enum":["user","organization"],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type","errorMessage":{}},"id":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id","errorMessage":{}},"name":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name","errorMessage":{}}},"layout":{"getItems":{"url":{"type":"js-tpl","expr":"/simple-directory/api/accounts?size=20","pure":true,"dataAlias":"value","ref":6},"qSearchParam":"q","itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":3},"itemTitle":{"type":"js-eval","expr":"`${item.name} (${item.id})`","pure":true,"dataAlias":"item","ref":7},"itemKey":{"type":"js-eval","expr":"`${item.type}:${item.id}`","pure":true,"dataAlias":"item","ref":8},"itemIcon":{"type":"js-eval","expr":"`/simple-directory/api/avatars/${item.type}/${item.id}/avatar.png`","pure":true,"dataAlias":"item","ref":9},"returnObjects":true}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items","errorMessage":{"required":{"type":"information obligatoire","id":"information obligatoire","name":"information obligatoire"}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess","errorMessage":{}},"documentation":{"anyOf":[{"type":"string","format":"uri","title":"URL de documentation"},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/documentation","errorMessage":{}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#","errorMessage":{}};
 const formats0 = fullFormats.uri;
 
 function validate24(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
@@ -240,7 +240,7 @@ evaluated0.items = undefined;
 }
 if(data && typeof data == "object" && !Array.isArray(data)){
 for(const key0 in data){
-if(!((((((key0 === "title") || (key0 === "description")) || (key0 === "group")) || (key0 === "public")) || (key0 === "privateAccess")) || (key0 === "documentation"))){
+if(!(((((((key0 === "title") || (key0 === "description")) || (key0 === "group")) || (key0 === "deprecated")) || (key0 === "public")) || (key0 === "privateAccess")) || (key0 === "documentation"))){
 const err0 = {instancePath,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties",schema:false,parentSchema:schema27,data};
 if(vErrors === null){
 vErrors = [err0];
@@ -617,13 +617,13 @@ vErrors = emErrs8;
 errors = emErrs8.length;
 }
 }
-if(data.public !== undefined){
-let data9 = data.public;
+if(data.deprecated !== undefined){
+let data9 = data.deprecated;
 const _errs37 = errors;
 let valid8 = false;
 const _errs38 = errors;
 if(typeof data9 !== "boolean"){
-const err28 = {instancePath:instancePath+"/public",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/public/anyOf/0/type",keyword:"type",params:{type: "boolean"},message:"must be boolean",schema:schema27.properties.public.anyOf[0].type,parentSchema:schema27.properties.public.anyOf[0],data:data9};
+const err28 = {instancePath:instancePath+"/deprecated",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/deprecated/anyOf/0/type",keyword:"type",params:{type: "boolean"},message:"must be boolean",schema:schema27.properties.deprecated.anyOf[0].type,parentSchema:schema27.properties.deprecated.anyOf[0],data:data9};
 if(vErrors === null){
 vErrors = [err28];
 }
@@ -636,7 +636,7 @@ var _valid3 = _errs38 === errors;
 valid8 = valid8 || _valid3;
 const _errs40 = errors;
 if(data9 !== null){
-const err29 = {instancePath:instancePath+"/public",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/public/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null",schema:schema27.properties.public.anyOf[1].type,parentSchema:schema27.properties.public.anyOf[1],data:data9};
+const err29 = {instancePath:instancePath+"/deprecated",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/deprecated/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null",schema:schema27.properties.deprecated.anyOf[1].type,parentSchema:schema27.properties.deprecated.anyOf[1],data:data9};
 if(vErrors === null){
 vErrors = [err29];
 }
@@ -648,7 +648,7 @@ errors++;
 var _valid3 = _errs40 === errors;
 valid8 = valid8 || _valid3;
 if(!valid8){
-const err30 = {instancePath:instancePath+"/public",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/public/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf",schema:schema27.properties.public.anyOf,parentSchema:schema27.properties.public,data:data9};
+const err30 = {instancePath:instancePath+"/deprecated",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/deprecated/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf",schema:schema27.properties.deprecated.anyOf,parentSchema:schema27.properties.deprecated,data:data9};
 if(vErrors === null){
 vErrors = [err30];
 }
@@ -679,18 +679,13 @@ vErrors = emErrs9;
 errors = emErrs9.length;
 }
 }
-if(data.privateAccess !== undefined){
-let data10 = data.privateAccess;
+if(data.public !== undefined){
+let data10 = data.public;
 const _errs43 = errors;
 let valid9 = false;
 const _errs44 = errors;
-if(Array.isArray(data10)){
-const len0 = data10.length;
-for(let i0=0; i0<len0; i0++){
-let data11 = data10[i0];
-if(data11 && typeof data11 == "object" && !Array.isArray(data11)){
-if(data11.type === undefined){
-const err32 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'",schema:schema27.properties.privateAccess.anyOf[0].items.required,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data11};
+if(typeof data10 !== "boolean"){
+const err32 = {instancePath:instancePath+"/public",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/public/anyOf/0/type",keyword:"type",params:{type: "boolean"},message:"must be boolean",schema:schema27.properties.public.anyOf[0].type,parentSchema:schema27.properties.public.anyOf[0],data:data10};
 if(vErrors === null){
 vErrors = [err32];
 }
@@ -699,8 +694,11 @@ vErrors.push(err32);
 }
 errors++;
 }
-if(data11.id === undefined){
-const err33 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'",schema:schema27.properties.privateAccess.anyOf[0].items.required,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data11};
+var _valid4 = _errs44 === errors;
+valid9 = valid9 || _valid4;
+const _errs46 = errors;
+if(data10 !== null){
+const err33 = {instancePath:instancePath+"/public",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/public/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null",schema:schema27.properties.public.anyOf[1].type,parentSchema:schema27.properties.public.anyOf[1],data:data10};
 if(vErrors === null){
 vErrors = [err33];
 }
@@ -709,192 +707,15 @@ vErrors.push(err33);
 }
 errors++;
 }
-if(data11.name === undefined){
-const err34 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/required",keyword:"required",params:{missingProperty: "name"},message:"must have required property '"+"name"+"'",schema:schema27.properties.privateAccess.anyOf[0].items.required,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data11};
+var _valid4 = _errs46 === errors;
+valid9 = valid9 || _valid4;
+if(!valid9){
+const err34 = {instancePath:instancePath+"/public",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/public/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf",schema:schema27.properties.public.anyOf,parentSchema:schema27.properties.public,data:data10};
 if(vErrors === null){
 vErrors = [err34];
 }
 else {
 vErrors.push(err34);
-}
-errors++;
-}
-for(const key4 in data11){
-if(!(((key4 === "type") || (key4 === "id")) || (key4 === "name"))){
-const err35 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key4},message:"must NOT have additional properties",schema:false,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data11};
-if(vErrors === null){
-vErrors = [err35];
-}
-else {
-vErrors.push(err35);
-}
-errors++;
-}
-}
-if(data11.type !== undefined){
-let data12 = data11.type;
-if(typeof data12 !== "string"){
-const err36 = {instancePath:instancePath+"/privateAccess/" + i0+"/type",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.privateAccess.anyOf[0].items.properties.type.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.type,data:data12};
-if(vErrors === null){
-vErrors = [err36];
-}
-else {
-vErrors.push(err36);
-}
-errors++;
-}
-if(!((data12 === "user") || (data12 === "organization"))){
-const err37 = {instancePath:instancePath+"/privateAccess/" + i0+"/type",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type/enum",keyword:"enum",params:{allowedValues: schema27.properties.privateAccess.anyOf[0].items.properties.type.enum},message:"must be equal to one of the allowed values",schema:schema27.properties.privateAccess.anyOf[0].items.properties.type.enum,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.type,data:data12};
-if(vErrors === null){
-vErrors = [err37];
-}
-else {
-vErrors.push(err37);
-}
-errors++;
-}
-if(errors > 0){
-const emErrs10 = [];
-for(const err38 of vErrors){
-if(!err38.emUsed){
-emErrs10.push(err38);
-}
-}
-vErrors = emErrs10;
-errors = emErrs10.length;
-}
-}
-if(data11.id !== undefined){
-let data13 = data11.id;
-if(typeof data13 !== "string"){
-const err39 = {instancePath:instancePath+"/privateAccess/" + i0+"/id",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.privateAccess.anyOf[0].items.properties.id.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.id,data:data13};
-if(vErrors === null){
-vErrors = [err39];
-}
-else {
-vErrors.push(err39);
-}
-errors++;
-}
-if(errors > 0){
-const emErrs11 = [];
-for(const err40 of vErrors){
-if(!err40.emUsed){
-emErrs11.push(err40);
-}
-}
-vErrors = emErrs11;
-errors = emErrs11.length;
-}
-}
-if(data11.name !== undefined){
-let data14 = data11.name;
-if(typeof data14 !== "string"){
-const err41 = {instancePath:instancePath+"/privateAccess/" + i0+"/name",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.privateAccess.anyOf[0].items.properties.name.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.name,data:data14};
-if(vErrors === null){
-vErrors = [err41];
-}
-else {
-vErrors.push(err41);
-}
-errors++;
-}
-if(errors > 0){
-const emErrs12 = [];
-for(const err42 of vErrors){
-if(!err42.emUsed){
-emErrs12.push(err42);
-}
-}
-vErrors = emErrs12;
-errors = emErrs12.length;
-}
-}
-}
-else {
-const err43 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/type",keyword:"type",params:{type: "object"},message:"must be object",schema:schema27.properties.privateAccess.anyOf[0].items.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data11};
-if(vErrors === null){
-vErrors = [err43];
-}
-else {
-vErrors.push(err43);
-}
-errors++;
-}
-if(errors > 0){
-const emErrors0 = {"required":{"type":[],"id":[],"name":[]}};
-const templates0 = {required:{}};
-let emPropParams0;
-let emParamsErrors0;
-for(const err44 of vErrors){
-if((((((err44.keyword !== "errorMessage") && (!err44.emUsed)) && (err44.instancePath === instancePath+"/privateAccess/" + i0)) && (err44.keyword in emErrors0)) && (err44.schemaPath.indexOf("https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items") === 0)) && (/^\/[^\/]*$/.test(err44.schemaPath.slice(92)))){
-emPropParams0 = obj0[err44.keyword];
-emParamsErrors0 = emErrors0[err44.keyword][err44.params[emPropParams0]];
-if(emParamsErrors0){
-emParamsErrors0.push(err44);
-err44.emUsed = true;
-}
-}
-}
-for(const key5 in emErrors0){
-for(const keyProp0 in emErrors0[key5]){
-emParamsErrors0 = emErrors0[key5][keyProp0];
-if(emParamsErrors0.length){
-const tmpl0 = templates0[key5] && templates0[key5][keyProp0];
-const err45 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/errorMessage",keyword:"errorMessage",params:{errors: emParamsErrors0},message:tmpl0 ? tmpl0() : schema27.properties.privateAccess.anyOf[0].items.errorMessage[key5][keyProp0],schema:schema27.properties.privateAccess.anyOf[0].items.errorMessage,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data11};
-if(vErrors === null){
-vErrors = [err45];
-}
-else {
-vErrors.push(err45);
-}
-errors++;
-}
-}
-}
-const emErrs13 = [];
-for(const err46 of vErrors){
-if(!err46.emUsed){
-emErrs13.push(err46);
-}
-}
-vErrors = emErrs13;
-errors = emErrs13.length;
-}
-}
-}
-else {
-const err47 = {instancePath:instancePath+"/privateAccess",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/type",keyword:"type",params:{type: "array"},message:"must be array",schema:schema27.properties.privateAccess.anyOf[0].type,parentSchema:schema27.properties.privateAccess.anyOf[0],data:data10};
-if(vErrors === null){
-vErrors = [err47];
-}
-else {
-vErrors.push(err47);
-}
-errors++;
-}
-var _valid4 = _errs44 === errors;
-valid9 = valid9 || _valid4;
-const _errs55 = errors;
-if(data10 !== null){
-const err48 = {instancePath:instancePath+"/privateAccess",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null",schema:schema27.properties.privateAccess.anyOf[1].type,parentSchema:schema27.properties.privateAccess.anyOf[1],data:data10};
-if(vErrors === null){
-vErrors = [err48];
-}
-else {
-vErrors.push(err48);
-}
-errors++;
-}
-var _valid4 = _errs55 === errors;
-valid9 = valid9 || _valid4;
-if(!valid9){
-const err49 = {instancePath:instancePath+"/privateAccess",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf",schema:schema27.properties.privateAccess.anyOf,parentSchema:schema27.properties.privateAccess,data:data10};
-if(vErrors === null){
-vErrors = [err49];
-}
-else {
-vErrors.push(err49);
 }
 errors++;
 }
@@ -910,6 +731,189 @@ vErrors = null;
 }
 }
 if(errors > 0){
+const emErrs10 = [];
+for(const err35 of vErrors){
+if(!err35.emUsed){
+emErrs10.push(err35);
+}
+}
+vErrors = emErrs10;
+errors = emErrs10.length;
+}
+}
+if(data.privateAccess !== undefined){
+let data11 = data.privateAccess;
+const _errs49 = errors;
+let valid10 = false;
+const _errs50 = errors;
+if(Array.isArray(data11)){
+const len0 = data11.length;
+for(let i0=0; i0<len0; i0++){
+let data12 = data11[i0];
+if(data12 && typeof data12 == "object" && !Array.isArray(data12)){
+if(data12.type === undefined){
+const err36 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/required",keyword:"required",params:{missingProperty: "type"},message:"must have required property '"+"type"+"'",schema:schema27.properties.privateAccess.anyOf[0].items.required,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data12};
+if(vErrors === null){
+vErrors = [err36];
+}
+else {
+vErrors.push(err36);
+}
+errors++;
+}
+if(data12.id === undefined){
+const err37 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/required",keyword:"required",params:{missingProperty: "id"},message:"must have required property '"+"id"+"'",schema:schema27.properties.privateAccess.anyOf[0].items.required,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data12};
+if(vErrors === null){
+vErrors = [err37];
+}
+else {
+vErrors.push(err37);
+}
+errors++;
+}
+if(data12.name === undefined){
+const err38 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/required",keyword:"required",params:{missingProperty: "name"},message:"must have required property '"+"name"+"'",schema:schema27.properties.privateAccess.anyOf[0].items.required,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data12};
+if(vErrors === null){
+vErrors = [err38];
+}
+else {
+vErrors.push(err38);
+}
+errors++;
+}
+for(const key4 in data12){
+if(!(((key4 === "type") || (key4 === "id")) || (key4 === "name"))){
+const err39 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key4},message:"must NOT have additional properties",schema:false,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data12};
+if(vErrors === null){
+vErrors = [err39];
+}
+else {
+vErrors.push(err39);
+}
+errors++;
+}
+}
+if(data12.type !== undefined){
+let data13 = data12.type;
+if(typeof data13 !== "string"){
+const err40 = {instancePath:instancePath+"/privateAccess/" + i0+"/type",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.privateAccess.anyOf[0].items.properties.type.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.type,data:data13};
+if(vErrors === null){
+vErrors = [err40];
+}
+else {
+vErrors.push(err40);
+}
+errors++;
+}
+if(!((data13 === "user") || (data13 === "organization"))){
+const err41 = {instancePath:instancePath+"/privateAccess/" + i0+"/type",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type/enum",keyword:"enum",params:{allowedValues: schema27.properties.privateAccess.anyOf[0].items.properties.type.enum},message:"must be equal to one of the allowed values",schema:schema27.properties.privateAccess.anyOf[0].items.properties.type.enum,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.type,data:data13};
+if(vErrors === null){
+vErrors = [err41];
+}
+else {
+vErrors.push(err41);
+}
+errors++;
+}
+if(errors > 0){
+const emErrs11 = [];
+for(const err42 of vErrors){
+if(!err42.emUsed){
+emErrs11.push(err42);
+}
+}
+vErrors = emErrs11;
+errors = emErrs11.length;
+}
+}
+if(data12.id !== undefined){
+let data14 = data12.id;
+if(typeof data14 !== "string"){
+const err43 = {instancePath:instancePath+"/privateAccess/" + i0+"/id",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.privateAccess.anyOf[0].items.properties.id.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.id,data:data14};
+if(vErrors === null){
+vErrors = [err43];
+}
+else {
+vErrors.push(err43);
+}
+errors++;
+}
+if(errors > 0){
+const emErrs12 = [];
+for(const err44 of vErrors){
+if(!err44.emUsed){
+emErrs12.push(err44);
+}
+}
+vErrors = emErrs12;
+errors = emErrs12.length;
+}
+}
+if(data12.name !== undefined){
+let data15 = data12.name;
+if(typeof data15 !== "string"){
+const err45 = {instancePath:instancePath+"/privateAccess/" + i0+"/name",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.privateAccess.anyOf[0].items.properties.name.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items.properties.name,data:data15};
+if(vErrors === null){
+vErrors = [err45];
+}
+else {
+vErrors.push(err45);
+}
+errors++;
+}
+if(errors > 0){
+const emErrs13 = [];
+for(const err46 of vErrors){
+if(!err46.emUsed){
+emErrs13.push(err46);
+}
+}
+vErrors = emErrs13;
+errors = emErrs13.length;
+}
+}
+}
+else {
+const err47 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/type",keyword:"type",params:{type: "object"},message:"must be object",schema:schema27.properties.privateAccess.anyOf[0].items.type,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data12};
+if(vErrors === null){
+vErrors = [err47];
+}
+else {
+vErrors.push(err47);
+}
+errors++;
+}
+if(errors > 0){
+const emErrors0 = {"required":{"type":[],"id":[],"name":[]}};
+const templates0 = {required:{}};
+let emPropParams0;
+let emParamsErrors0;
+for(const err48 of vErrors){
+if((((((err48.keyword !== "errorMessage") && (!err48.emUsed)) && (err48.instancePath === instancePath+"/privateAccess/" + i0)) && (err48.keyword in emErrors0)) && (err48.schemaPath.indexOf("https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items") === 0)) && (/^\/[^\/]*$/.test(err48.schemaPath.slice(92)))){
+emPropParams0 = obj0[err48.keyword];
+emParamsErrors0 = emErrors0[err48.keyword][err48.params[emPropParams0]];
+if(emParamsErrors0){
+emParamsErrors0.push(err48);
+err48.emUsed = true;
+}
+}
+}
+for(const key5 in emErrors0){
+for(const keyProp0 in emErrors0[key5]){
+emParamsErrors0 = emErrors0[key5][keyProp0];
+if(emParamsErrors0.length){
+const tmpl0 = templates0[key5] && templates0[key5][keyProp0];
+const err49 = {instancePath:instancePath+"/privateAccess/" + i0,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/errorMessage",keyword:"errorMessage",params:{errors: emParamsErrors0},message:tmpl0 ? tmpl0() : schema27.properties.privateAccess.anyOf[0].items.errorMessage[key5][keyProp0],schema:schema27.properties.privateAccess.anyOf[0].items.errorMessage,parentSchema:schema27.properties.privateAccess.anyOf[0].items,data:data12};
+if(vErrors === null){
+vErrors = [err49];
+}
+else {
+vErrors.push(err49);
+}
+errors++;
+}
+}
+}
 const emErrs14 = [];
 for(const err50 of vErrors){
 if(!err50.emUsed){
@@ -920,14 +924,9 @@ vErrors = emErrs14;
 errors = emErrs14.length;
 }
 }
-if(data.documentation !== undefined){
-let data15 = data.documentation;
-const _errs58 = errors;
-let valid13 = false;
-const _errs59 = errors;
-if(typeof data15 === "string"){
-if(!(formats0(data15))){
-const err51 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf/0/format",keyword:"format",params:{format: "uri"},message:"must match format \""+"uri"+"\"",schema:"uri",parentSchema:schema27.properties.documentation.anyOf[0],data:data15};
+}
+else {
+const err51 = {instancePath:instancePath+"/privateAccess",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/type",keyword:"type",params:{type: "array"},message:"must be array",schema:schema27.properties.privateAccess.anyOf[0].type,parentSchema:schema27.properties.privateAccess.anyOf[0],data:data11};
 if(vErrors === null){
 vErrors = [err51];
 }
@@ -936,9 +935,11 @@ vErrors.push(err51);
 }
 errors++;
 }
-}
-else {
-const err52 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf/0/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.documentation.anyOf[0].type,parentSchema:schema27.properties.documentation.anyOf[0],data:data15};
+var _valid5 = _errs50 === errors;
+valid10 = valid10 || _valid5;
+const _errs61 = errors;
+if(data11 !== null){
+const err52 = {instancePath:instancePath+"/privateAccess",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null",schema:schema27.properties.privateAccess.anyOf[1].type,parentSchema:schema27.properties.privateAccess.anyOf[1],data:data11};
 if(vErrors === null){
 vErrors = [err52];
 }
@@ -947,11 +948,10 @@ vErrors.push(err52);
 }
 errors++;
 }
-var _valid5 = _errs59 === errors;
-valid13 = valid13 || _valid5;
-const _errs61 = errors;
-if(data15 !== null){
-const err53 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null",schema:schema27.properties.documentation.anyOf[1].type,parentSchema:schema27.properties.documentation.anyOf[1],data:data15};
+var _valid5 = _errs61 === errors;
+valid10 = valid10 || _valid5;
+if(!valid10){
+const err53 = {instancePath:instancePath+"/privateAccess",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf",schema:schema27.properties.privateAccess.anyOf,parentSchema:schema27.properties.privateAccess,data:data11};
 if(vErrors === null){
 vErrors = [err53];
 }
@@ -960,23 +960,11 @@ vErrors.push(err53);
 }
 errors++;
 }
-var _valid5 = _errs61 === errors;
-valid13 = valid13 || _valid5;
-if(!valid13){
-const err54 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf",schema:schema27.properties.documentation.anyOf,parentSchema:schema27.properties.documentation,data:data15};
-if(vErrors === null){
-vErrors = [err54];
-}
 else {
-vErrors.push(err54);
-}
-errors++;
-}
-else {
-errors = _errs58;
+errors = _errs49;
 if(vErrors !== null){
-if(_errs58){
-vErrors.length = _errs58;
+if(_errs49){
+vErrors.length = _errs49;
 }
 else {
 vErrors = null;
@@ -985,18 +973,34 @@ vErrors = null;
 }
 if(errors > 0){
 const emErrs15 = [];
-for(const err55 of vErrors){
-if(!err55.emUsed){
-emErrs15.push(err55);
+for(const err54 of vErrors){
+if(!err54.emUsed){
+emErrs15.push(err54);
 }
 }
 vErrors = emErrs15;
 errors = emErrs15.length;
 }
 }
+if(data.documentation !== undefined){
+let data16 = data.documentation;
+const _errs64 = errors;
+let valid14 = false;
+const _errs65 = errors;
+if(typeof data16 === "string"){
+if(!(formats0(data16))){
+const err55 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf/0/format",keyword:"format",params:{format: "uri"},message:"must match format \""+"uri"+"\"",schema:"uri",parentSchema:schema27.properties.documentation.anyOf[0],data:data16};
+if(vErrors === null){
+vErrors = [err55];
 }
 else {
-const err56 = {instancePath,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/type",keyword:"type",params:{type: "object"},message:"must be object",schema:schema27.type,parentSchema:schema27,data};
+vErrors.push(err55);
+}
+errors++;
+}
+}
+else {
+const err56 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf/0/type",keyword:"type",params:{type: "string"},message:"must be string",schema:schema27.properties.documentation.anyOf[0].type,parentSchema:schema27.properties.documentation.anyOf[0],data:data16};
 if(vErrors === null){
 vErrors = [err56];
 }
@@ -1005,15 +1009,73 @@ vErrors.push(err56);
 }
 errors++;
 }
+var _valid6 = _errs65 === errors;
+valid14 = valid14 || _valid6;
+const _errs67 = errors;
+if(data16 !== null){
+const err57 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf/1/type",keyword:"type",params:{type: "null"},message:"must be null",schema:schema27.properties.documentation.anyOf[1].type,parentSchema:schema27.properties.documentation.anyOf[1],data:data16};
+if(vErrors === null){
+vErrors = [err57];
+}
+else {
+vErrors.push(err57);
+}
+errors++;
+}
+var _valid6 = _errs67 === errors;
+valid14 = valid14 || _valid6;
+if(!valid14){
+const err58 = {instancePath:instancePath+"/documentation",schemaPath:"https://github.com/data-fair/registry/artefact-patch#/properties/documentation/anyOf",keyword:"anyOf",params:{},message:"must match a schema in anyOf",schema:schema27.properties.documentation.anyOf,parentSchema:schema27.properties.documentation,data:data16};
+if(vErrors === null){
+vErrors = [err58];
+}
+else {
+vErrors.push(err58);
+}
+errors++;
+}
+else {
+errors = _errs64;
+if(vErrors !== null){
+if(_errs64){
+vErrors.length = _errs64;
+}
+else {
+vErrors = null;
+}
+}
+}
 if(errors > 0){
 const emErrs16 = [];
-for(const err57 of vErrors){
-if(!err57.emUsed){
-emErrs16.push(err57);
+for(const err59 of vErrors){
+if(!err59.emUsed){
+emErrs16.push(err59);
 }
 }
 vErrors = emErrs16;
 errors = emErrs16.length;
+}
+}
+}
+else {
+const err60 = {instancePath,schemaPath:"https://github.com/data-fair/registry/artefact-patch#/type",keyword:"type",params:{type: "object"},message:"must be object",schema:schema27.type,parentSchema:schema27,data};
+if(vErrors === null){
+vErrors = [err60];
+}
+else {
+vErrors.push(err60);
+}
+errors++;
+}
+if(errors > 0){
+const emErrs17 = [];
+for(const err61 of vErrors){
+if(!err61.emUsed){
+emErrs17.push(err61);
+}
+}
+vErrors = emErrs17;
+errors = emErrs17.length;
 }
 validate24.errors = vErrors;
 return errors === 0;
@@ -1080,11 +1142,11 @@ const compiledLayout = {
       pointer: "https://github.com/data-fair/registry/artefact-patch#",
       refPointer: "https://github.com/data-fair/registry/artefact-patch#",
       pure: false,
-      propertyKeys: ["title", "description", "group", "public", "privateAccess", "documentation"],
+      propertyKeys: ["title", "description", "group", "deprecated", "public", "privateAccess", "documentation"],
       roPropertyKeys: [],
       nullable: false,
       required: true,
-      children: ["https://github.com/data-fair/registry/artefact-patch#/properties/title", "https://github.com/data-fair/registry/artefact-patch#/properties/description", "https://github.com/data-fair/registry/artefact-patch#/properties/group", "https://github.com/data-fair/registry/artefact-patch#/properties/public", "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess", "https://github.com/data-fair/registry/artefact-patch#/properties/documentation"]
+      children: ["https://github.com/data-fair/registry/artefact-patch#/properties/title", "https://github.com/data-fair/registry/artefact-patch#/properties/description", "https://github.com/data-fair/registry/artefact-patch#/properties/group", "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated", "https://github.com/data-fair/registry/artefact-patch#/properties/public", "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess", "https://github.com/data-fair/registry/artefact-patch#/properties/documentation"]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/title": {
@@ -1198,6 +1260,18 @@ const compiledLayout = {
       required: undefined
     },
 
+    "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated": {
+      title: "Obsolète",
+      key: "deprecated",
+      pointer: "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated/anyOf/0",
+      refPointer: "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated/anyOf/0",
+      pure: true,
+      propertyKeys: [],
+      roPropertyKeys: [],
+      nullable: true,
+      required: undefined
+    },
+
     "https://github.com/data-fair/registry/artefact-patch#/properties/public": {
       title: "Public",
       key: "public",
@@ -1296,6 +1370,8 @@ const compiledLayout = {
         key: "description"
       }, {
         key: "group"
+      }, {
+        key: "deprecated"
       }, {
         key: "public"
       }, {
@@ -1478,6 +1554,21 @@ const compiledLayout = {
       },
 
       label: "Groupe - Français"
+    },
+
+    "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated/anyOf/0": {
+      comp: "switch",
+      nullable: true,
+      label: "Obsolète",
+      defaultData: false,
+
+      getDefaultData: {
+        type: "js-eval",
+        expr: "layout.defaultData",
+        pure: true,
+        dataAlias: "value",
+        ref: 0
+      }
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/public/anyOf/0": {

@@ -109,6 +109,11 @@ router.get('/', async (req, res, next) => {
       }
       filter.format = req.query.format as Artefact['format']
     }
+    // Deprecated artefacts are hidden from the default listing; an explicit
+    // flag brings them back. `$ne: true` also matches docs missing the field.
+    if (req.query.includeDeprecated !== 'true') {
+      filter.deprecated = { $ne: true }
+    }
 
     const { results, count } = await listArtefacts(filter, { sort, skip, size })
     res.json({ results, count })
