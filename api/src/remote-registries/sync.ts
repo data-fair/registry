@@ -163,41 +163,56 @@ const syncSpaArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
     await filesStorage.writeStream(dlRes.data, tarballPath)
 
     const extractedPath = `spa/${artefactId}/files-${randomUUID()}`
-    await extractSpaTarball(tarballPath, extractedPath)
+    let extractOk = false
+    try {
+      await extractSpaTarball(tarballPath, extractedPath)
+      extractOk = true
+    } finally {
+      if (!extractOk) {
+        await filesStorage.delete(tarballPath).catch(() => {})
+        await filesStorage.deleteDir(extractedPath).catch(() => {})
+      }
+    }
 
     const oldTarballPath = local?.tarballPath
     const oldExtractedPath = local?.extractedPath
     const now = new Date().toISOString()
-    await mongo.artefacts.updateOne(
-      { _id: artefactId },
-      {
-        $set: {
-          packageName: remoteArtefact.packageName,
-          version: remoteArtefact.version,
-          ...(remoteArtefact.licence ? { licence: remoteArtefact.licence } : {}),
-          category: remoteArtefact.category,
-          deprecated: !!remoteArtefact.deprecated,
-          ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
-          ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
-          ...(remoteArtefact.group ? { group: remoteArtefact.group } : {}),
-          ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
-          tarballPath,
-          extractedPath,
-          origin: remoteUrl,
-          updatedAt: now,
-          dataUpdatedAt: remoteDataUpdatedAt
+    try {
+      await mongo.artefacts.updateOne(
+        { _id: artefactId },
+        {
+          $set: {
+            packageName: remoteArtefact.packageName,
+            version: remoteArtefact.version,
+            ...(remoteArtefact.licence ? { licence: remoteArtefact.licence } : {}),
+            category: remoteArtefact.category,
+            deprecated: !!remoteArtefact.deprecated,
+            ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
+            ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
+            ...(remoteArtefact.group ? { group: remoteArtefact.group } : {}),
+            ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
+            tarballPath,
+            extractedPath,
+            origin: remoteUrl,
+            updatedAt: now,
+            dataUpdatedAt: remoteDataUpdatedAt
+          },
+          $setOnInsert: {
+            _id: artefactId,
+            name: remoteArtefact.name,
+            format: 'spa' as const,
+            public: false,
+            privateAccess: [],
+            createdAt: now
+          }
         },
-        $setOnInsert: {
-          _id: artefactId,
-          name: remoteArtefact.name,
-          format: 'spa' as const,
-          public: false,
-          privateAccess: [],
-          createdAt: now
-        }
-      },
-      { upsert: true }
-    )
+        { upsert: true }
+      )
+    } catch (err) {
+      await filesStorage.delete(tarballPath).catch(() => {})
+      await filesStorage.deleteDir(extractedPath).catch(() => {})
+      throw err
+    }
 
     if (oldTarballPath) await filesStorage.delete(oldTarballPath).catch(() => {})
     if (oldExtractedPath) await filesStorage.deleteDir(oldExtractedPath).catch(() => {})
