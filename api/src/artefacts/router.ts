@@ -92,7 +92,7 @@ router.get('/', async (req, res, next) => {
     }
     // Format filter
     if (req.query.format) {
-      const allowedFormats = ['npm', 'file']
+      const allowedFormats = ['npm', 'file', 'spa']
       if (!allowedFormats.includes(req.query.format as string)) {
         throw httpError(400, `invalid format, must be one of: ${allowedFormats.join(', ')}`)
       }

@@ -197,6 +197,16 @@ test.describe('SPA artefacts', () => {
     })
   })
 
+  test.describe('Listing', () => {
+    test('format=spa filter returns spa artefacts', async () => {
+      await uploadSpa(uploadApiKey, spaId, { name: '@test/app-charts', version: '0.30.2' })
+      const admin = await superAdmin
+      const res = await admin.get('/api/v1/artefacts?format=spa')
+      expect(res.data.count).toBe(1)
+      expect(res.data.results[0].format).toBe('spa')
+    })
+  })
+
   test.describe('Tarball download', () => {
     test.beforeEach(async () => {
       await uploadSpa(uploadApiKey, spaId, { name: '@test/app-charts', version: '0.30.2' })
