@@ -35,6 +35,27 @@ Raw files (e.g. `.mbtiles` tilesets) are uploaded directly. They have no
 versioning — each upload replaces the previous file. The artefact id is
 simply the name.
 
+### spa artefacts
+
+`spa` artefacts store a single built-SPA tarball (npm-pack-shaped: files
+under a `package/` prefix). On upload the registry extracts the tarball into
+files-storage and serves the extracted content statically under:
+
+```
+/apps/<packageName>/<major>.<minor>/<...filePath>
+```
+
+**One artefact per maintained minor line.** The artefact id is `<packageName>@<major>.<minor>` — for example `@data-fair/app-charts@0.30` for the 0.30.x release line. Uploading a patch release replaces the tarball and the extracted tree in place (no version resolver, analogous to how `npm` replaces a per-arch slot).
+
+**Two-tier access:**
+
+- `index.html` and the bare directory path (`/apps/<packageName>/<major>.<minor>/`) require the internal `x-secret-key` header (`config.secretKeys.internalServices`). A request without the key receives a 404 so existence is not leaked.
+- All other files (JS, CSS, fonts, `config-schema.json`, …) are served publicly and unauthenticated. JS and CSS assets built by Vite with content-hashed names carry `Cache-Control: public, max-age=31536000, immutable`; other files use `max-age=300`.
+
+`public` / `privateAccess` / access grants gate listing, metadata management, and the `GET /api/v1/artefacts/:id/spa-tarball` download endpoint — they have no effect on the public static asset tier.
+
+**Federation** uses `GET /api/v1/artefacts/:id/spa-tarball` to download the raw tarball (authenticated like npm/file downloads), then re-extracts it locally so the downstream registry can serve the static files itself. The sync timestamp comparison uses `dataUpdatedAt` so an unchanged artefact is never re-downloaded.
+
 ## Plugin consumption by services
 
 Services use the `@data-fair/lib-node-registry` client library. The main entry point is `ensureArtefact()`:
@@ -94,6 +115,7 @@ Mirrored artefacts carry an `origin` field set to the remote registry URL. Sync 
 
 - **npm artefacts** — Each `tarballs[arch]` slot is compared by `uploadedAt`. New/changed slots are downloaded; slots pruned upstream are deleted locally.
 - **file artefacts** -- The file is re-downloaded when the remote's `updatedAt` is more recent than the local copy.
+- **spa artefacts** -- The tarball is downloaded via `GET /api/v1/artefacts/:id/spa-tarball` and re-extracted locally when the remote's `dataUpdatedAt` is more recent than the local copy.
 
 Sync runs automatically once per day and can be triggered on-demand via `POST /api/v1/remote-registries/:id/sync` (returns 202). A distributed lock (`@data-fair/lib-node/locks`) prevents concurrent syncs of the same remote.
 

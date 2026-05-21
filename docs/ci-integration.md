@@ -166,6 +166,66 @@ The `production` environment will pause the run until your reviewer approves; on
 
 > **Building arm64 artefacts** uses the same workflow with `runs-on: ubuntu-24.04-arm` (or a self-hosted arm64 runner) — the `architecture=x64` form field becomes `architecture=arm64`. A multi-arch matrix is a straight extension of this recipe.
 
+### Publishing a base-application
+
+A *base-application* is a built SPA published as a `spa` artefact. One artefact is maintained per minor line; the artefact id is `<packageName>@<major>.<minor>` — for example `@data-fair/app-charts@0.30` for the 0.30.x line.
+
+#### Build constraints
+
+The SPA must be built with the Vite `base` set to the path-only serving URL:
+
+```
+/registry/apps/<packageName>/<major>.<minor>/
+```
+
+For example `/registry/apps/@data-fair/app-charts/0.30/`. This makes the build host-agnostic: the same tarball can be served from any registry instance without rebuilding, including federated downstream registries.
+
+#### Tarball shape
+
+Use `npm pack` to produce the tarball. npm packs files under a `package/` prefix, so the registry expects:
+
+```
+package/package.json
+package/index.html
+package/assets/…
+package/config-schema.json
+```
+
+No `node_modules` are needed — this is a static SPA, not a server-side plugin.
+
+#### Upload step
+
+```yaml
+- name: Publish base-application to the registry
+  env:
+    REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+  run: |
+    set -euo pipefail
+    PACKAGE_NAME=$(node -p "require('./package.json').name")
+    MAJOR_MINOR=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+    ARTEFACT_ID="${PACKAGE_NAME}@${MAJOR_MINOR}"
+    ENCODED_ID=$(node -p "encodeURIComponent('${ARTEFACT_ID}')")
+    npm pack --pack-destination .
+    TARBALL=$(ls *.tgz)
+    curl -sS --fail-with-body -X POST \
+      "${REGISTRY_URL}/api/v1/artefacts/spa/${ENCODED_ID}" \
+      -H "x-api-key: ${REGISTRY_API_KEY}" \
+      -F "category=application" \
+      -F "file=@${TARBALL}"
+```
+
+> **Artefact id validation.** The registry derives the expected id from the tarball's `package.json` as `${name}@${major}.${minor}` and rejects the upload if the id in the URL doesn't match. This prevents accidentally uploading under the wrong ref.
+
+#### API key scope
+
+Create one upload key per application. Set **Allowed name prefix** to the package name — e.g. `@data-fair/app-charts`. Because the artefact id starts with the package name, this single prefix covers every minor line (`@data-fair/app-charts@0.30`, `@data-fair/app-charts@1.0`, etc.).
+
+#### Access notes
+
+Once uploaded, the built SPA's static assets (JS, CSS, `config-schema.json`, …) are served publicly and unauthenticated at `/apps/<packageName>/<major>.<minor>/…`. The `index.html` and the directory root are internal-only: they require an `x-secret-key` header so that internal services (e.g. data-fair) can render the app, but their existence is never exposed to anonymous clients.
+
+`public` / `privateAccess` / access grants control listing, metadata edits, and the `spa-tarball` download — not the public asset tier.
+
 ### Workflow example (file artefact)
 
 ```yaml
