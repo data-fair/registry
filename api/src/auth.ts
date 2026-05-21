@@ -104,6 +104,19 @@ export const tryInternalSecretWithAccount = (req: Request): InternalAuthResult =
   }
 }
 
+// Lightweight internal-secret check for endpoints that don't need per-account
+// scoping (uploads and the spa internal serving tier). Requires the request to
+// originate internally AND carry a matching x-secret-key.
+export const tryInternalSecret = (req: import('express').Request): boolean => {
+  if (!reqIsInternal(req)) return false
+  const secretKey = req.get('x-secret-key')
+  if (!secretKey || !config.secretKeys.internalServices) return false
+  const received = Buffer.from(secretKey, 'utf-8')
+  const expected = Buffer.from(config.secretKeys.internalServices, 'utf-8')
+  if (received.length !== expected.length) return false
+  return timingSafeEqual(received, expected)
+}
+
 /**
  * Resolve the caller's access context across all auth paths in one place.
  * Order of precedence: internal secret → read API key → session.

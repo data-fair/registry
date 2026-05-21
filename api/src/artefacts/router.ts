@@ -1,15 +1,14 @@
 import { Router } from 'express'
 import { pipeline } from 'node:stream/promises'
 import type { Readable } from 'node:stream'
-import { randomUUID, timingSafeEqual } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import * as semver from 'semver'
 import Busboy from 'busboy'
 import { session } from '@data-fair/lib-express/index.js'
-import { reqIsInternal } from '@data-fair/lib-express/req-origin.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import type { Artefact } from '#types/artefact/index.ts'
 import config from '#config'
-import { authenticateApiKey, resolveCaller, tryInternalSecretWithAccount } from '../auth.ts'
+import { authenticateApiKey, resolveCaller, tryInternalSecret, tryInternalSecretWithAccount } from '../auth.ts'
 import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { filesStorage } from '../files-storage/index.ts'
 import {
@@ -70,18 +69,6 @@ const safeDecode = (raw: string): string => {
   } catch {
     throw httpError(400, 'malformed URL path segment')
   }
-}
-
-// Local internal-secret check used only by the upload endpoints (which don't
-// care about per-account scoping — uploads are admin-style operations).
-const tryInternalSecret = (req: import('express').Request): boolean => {
-  if (!reqIsInternal(req)) return false
-  const secretKey = req.get('x-secret-key')
-  if (!secretKey || !config.secretKeys.internalServices) return false
-  const received = Buffer.from(secretKey, 'utf-8')
-  const expected = Buffer.from(config.secretKeys.internalServices, 'utf-8')
-  if (received.length !== expected.length) return false
-  return timingSafeEqual(received, expected)
 }
 
 // List artefacts (filtered by access)

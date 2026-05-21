@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, anonymousAx, axiosWithApiKey, clean, setArtefactOrigin } from './support/axios.ts'
+import { superAdmin, anonymousAx, axiosWithApiKey, axiosInternal, clean, setArtefactOrigin } from './support/axios.ts'
 import { createSpaTarball, createTestTarball } from './support/test-tarball.ts'
 
 const spaId = '@test/app-charts@0.30'
@@ -122,6 +122,77 @@ test.describe('SPA artefacts', () => {
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(409)
+      }
+    })
+  })
+
+  test.describe('Static serving', () => {
+    test.beforeEach(async () => {
+      await uploadSpa(uploadApiKey, spaId, {
+        name: '@test/app-charts',
+        version: '0.30.2',
+        files: {
+          'index.html': '<!doctype html><html><body>%APPLICATION%</body></html>',
+          'assets/app.js': 'console.log("spa")',
+          'config-schema.json': '{"type":"object"}'
+        }
+      })
+    })
+
+    test('serves a public asset file', async () => {
+      const res = await anonymousAx.get('/apps/@test/app-charts/0.30/assets/app.js')
+      expect(res.status).toBe(200)
+      expect(res.data).toContain('console.log')
+      expect(res.headers['content-type']).toContain('text/javascript')
+      expect(res.headers['cache-control']).toContain('immutable')
+    })
+
+    test('serves config-schema.json publicly', async () => {
+      const res = await anonymousAx.get('/apps/@test/app-charts/0.30/config-schema.json')
+      expect(res.status).toBe(200)
+      expect(res.data).toEqual({ type: 'object' })
+    })
+
+    test('index.html is not served anonymously', async () => {
+      try {
+        await anonymousAx.get('/apps/@test/app-charts/0.30/index.html')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
+
+    test('the directory root is not served anonymously', async () => {
+      try {
+        await anonymousAx.get('/apps/@test/app-charts/0.30/')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
+
+    test('index.html is served with the internal secret', async () => {
+      const ax = axiosInternal('secret-internal')
+      const res = await ax.get('/apps/@test/app-charts/0.30/index.html')
+      expect(res.status).toBe(200)
+      expect(res.data).toContain('%APPLICATION%')
+    })
+
+    test('unknown file returns 404', async () => {
+      try {
+        await anonymousAx.get('/apps/@test/app-charts/0.30/assets/missing.js')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
+
+    test('unknown artefact returns 404', async () => {
+      try {
+        await anonymousAx.get('/apps/@test/nope/9.9/assets/app.js')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
       }
     })
   })

@@ -10,6 +10,7 @@ import apiKeysRouter from './api-keys/router.ts'
 import accessGrantsRouter from './access-grants/router.ts'
 import { publicThumbnailsRouter } from './thumbnails/router.ts'
 import remoteRegistriesRouter from './remote-registries/router.ts'
+import spaArtefactsRouter from './artefacts/spa-router.ts'
 import mongo from '#mongo'
 import { filesStorage } from './files-storage/index.ts'
 import config from '#config'
@@ -38,6 +39,7 @@ app.use('/api/v1/api-keys', apiKeysRouter)
 app.use('/api/v1/access-grants', accessGrantsRouter)
 app.use('/api/v1/thumbnails', publicThumbnailsRouter)
 app.use('/api/v1/remote-registries', remoteRegistriesRouter)
+app.use('/apps', spaArtefactsRouter)
 app.use('/api/ping', (req, res) => res.send('ok'))
 
 if (process.env.NODE_ENV === 'development') {
