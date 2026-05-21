@@ -12,7 +12,7 @@ export default {
   properties: {
     _id: { type: 'string', readOnly: true },
     name: { type: 'string', readOnly: true },
-    format: { type: 'string', enum: ['npm', 'file'], readOnly: true },
+    format: { type: 'string', enum: ['npm', 'file', 'spa'], readOnly: true },
     packageName: { type: 'string', readOnly: true },
     version: { type: 'string', readOnly: true },
     licence: { type: 'string', readOnly: true },
@@ -46,6 +46,10 @@ export default {
         }
       }
     },
+    // format=spa: the single stored tarball (used for federation download and
+    // re-extraction) and the files-storage prefix its extracted files live under.
+    tarballPath: { type: 'string', readOnly: true },
+    extractedPath: { type: 'string', readOnly: true },
     title: {
       type: 'object',
       additionalProperties: false,
