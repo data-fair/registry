@@ -71,7 +71,8 @@ Applies to everyone, admin included.
   keeping an artefact only if `!artefact.deprecated ||
   doc.selectedArtefacts.includes(artefact._id)`. Recompute `count` as the
   filtered length. Acceptable because the browse UI is single-page (size 100,
-  no pagination controls).
+  no pagination controls). The filter is extracted as a pure helper in a new
+  `api/src/remote-registries/operations.ts`, so it can be unit-tested.
 
 ### 5. UI — browse list (`ui/src/pages/index.vue`)
 
@@ -89,16 +90,16 @@ Applies to everyone, admin included.
 
 ## Testing
 
-- `tests/artefacts.api.spec.ts`:
-  - a deprecated artefact is absent from the default `GET /artefacts`;
-  - it appears with `?includeDeprecated=true`;
-  - `PATCH /:id` can set and unset `deprecated`.
-- `tests/remote-registries.api.spec.ts`:
-  - a deprecated remote artefact not in `selectedArtefacts` is absent from
-    `GET /:id/remote-artefacts`;
-  - an already-selected deprecated remote artefact is still present there;
-  - sync still mirrors a selected deprecated artefact, and the mirror carries
-    `deprecated: true`.
+- `tests/artefacts.api.spec.ts` (api): a deprecated artefact is absent from the
+  default `GET /artefacts`; it appears with `?includeDeprecated=true`;
+  `PATCH /:id` can set and unset `deprecated`.
+- `tests/remote-registries-operations.unit.spec.ts` (unit): the suggestion
+  filter — non-deprecated artefacts are kept; a deprecated artefact is dropped
+  when not selected; a deprecated artefact is kept when already selected.
+- The `sync.ts` change is a one-line metadata copy placed alongside the
+  existing `category`/`title` copies. The codebase has no cross-registry sync
+  test harness, so it is verified by type-check, lint, and the manual UI check
+  — consistent with the existing (untested) sync of those sibling fields.
 
 ## Out of scope
 
