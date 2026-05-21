@@ -3,7 +3,7 @@ import { Readable, Writable } from 'node:stream'
 import { createGzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 import * as tar from 'tar-stream'
-import { extractManifest, MAX_DECOMPRESSED_BYTES } from '../api/src/artefacts/operations.ts'
+import { extractManifest, MAX_DECOMPRESSED_BYTES, sanitizeSpaEntryPath } from '../api/src/artefacts/operations.ts'
 
 const gzipBuffer = async (raw: Buffer): Promise<Buffer> => {
   const chunks: Buffer[] = []
@@ -122,5 +122,26 @@ test.describe('extractManifest', () => {
     entries.push({ name: 'package/package.json', content: manifest() })
     const tarball = await packTarball(entries)
     await expect(extractManifest(Readable.from(tarball), { maxTarEntries: cap })).rejects.toMatchObject({ status: 413 })
+  })
+})
+
+test.describe('sanitizeSpaEntryPath', () => {
+  test('strips the package/ prefix', () => {
+    expect(sanitizeSpaEntryPath('package/index.html')).toBe('index.html')
+    expect(sanitizeSpaEntryPath('package/assets/app-abc123.js')).toBe('assets/app-abc123.js')
+    expect(sanitizeSpaEntryPath('package/config-schema.json')).toBe('config-schema.json')
+  })
+  test('skips entries outside package/', () => {
+    expect(sanitizeSpaEntryPath('other/file.js')).toBeNull()
+    expect(sanitizeSpaEntryPath('package.json')).toBeNull()
+  })
+  test('skips directory entries and the prefix itself', () => {
+    expect(sanitizeSpaEntryPath('package/')).toBeNull()
+    expect(sanitizeSpaEntryPath('package/assets/')).toBeNull()
+  })
+  test('rejects path traversal and dot segments', () => {
+    expect(sanitizeSpaEntryPath('package/../etc/passwd')).toBeNull()
+    expect(sanitizeSpaEntryPath('package/assets/../../x')).toBeNull()
+    expect(sanitizeSpaEntryPath('package/./x')).toBeNull()
   })
 })

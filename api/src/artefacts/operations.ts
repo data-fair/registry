@@ -121,3 +121,17 @@ export const extractManifest = async (stream: Readable, opts: ExtractManifestOpt
 
   return result
 }
+
+// Map a raw tar entry name from an npm-packed SPA tarball to the path it
+// should be served at, relative to the SPA root. npm tarballs nest everything
+// under `package/`; entries outside that prefix are ignored. Returns null for
+// entries to skip: directory entries, the prefix itself, anything outside
+// `package/`, and paths containing empty or dot segments (traversal guard).
+export const sanitizeSpaEntryPath = (entryName: string): string | null => {
+  if (!entryName.startsWith('package/')) return null
+  const rel = entryName.slice('package/'.length)
+  if (rel === '' || rel.endsWith('/')) return null
+  const segments = rel.split('/')
+  if (segments.some(s => s === '' || s === '.' || s === '..')) return null
+  return segments.join('/')
+}
