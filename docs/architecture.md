@@ -50,7 +50,7 @@ files-storage and serves the extracted content statically under:
 **Two-tier access:**
 
 - `index.html` and the bare directory path (`/apps/<packageName>/<major>.<minor>/`) require the internal `x-secret-key` header (`config.secretKeys.internalServices`). A request without the key receives a 404 so existence is not leaked.
-- All other files (JS, CSS, fonts, `config-schema.json`, …) are served publicly and unauthenticated. JS and CSS assets built by Vite with content-hashed names carry `Cache-Control: public, max-age=31536000, immutable`; other files use `max-age=300`.
+- All other files (JS, CSS, fonts, `config-schema.json`, …) are served publicly and unauthenticated. Hashed JS/CSS/font/wasm assets (`.js`, `.mjs`, `.css`, `.woff`, `.woff2`, `.ttf`, `.wasm`) carry `Cache-Control: public, max-age=31536000, immutable`; `index.html` uses `no-cache, must-revalidate`; all other files use `max-age=300`.
 
 `public` / `privateAccess` / access grants gate listing, metadata management, and the `GET /api/v1/artefacts/:id/spa-tarball` download endpoint — they have no effect on the public static asset tier.
 
