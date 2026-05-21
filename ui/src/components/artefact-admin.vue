@@ -188,7 +188,8 @@ const vjsfOptions = computed<Partial<VjsfOptions>>(() => ({
   readOnlyPropertiesMode: 'hide',
   initialValidation: 'always',
   locale: locale.value,
-  xI18n: true
+  xI18n: true,
+  context: { category: artefact.category, apiPath: $apiPath }
 }))
 
 // Re-seed the edit form whenever the artefact is (re)loaded by the parent.

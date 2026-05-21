@@ -48,7 +48,10 @@ async function main () {
     { name: 'dev-upload-terrain', body: { type: 'upload', name: 'dev-upload-terrain', allowedNamePrefix: 'terrain-' } }
   ]
 
-  const existingKeys = await admin.get('/api/v1/api-keys')
+  // Upload keys carry no `owner`, so the list endpoint only returns them
+  // when explicitly filtered by type — without this the idempotency check
+  // below never matches and re-runs create duplicate keys.
+  const existingKeys = await admin.get('/api/v1/api-keys?type=upload')
   const existingKeyNames = new Set<string>(existingKeys.data.results.map((k: any) => k.name))
 
   for (const spec of keySpecs) {
@@ -89,30 +92,32 @@ async function main () {
   }
 
   // --- npm artefacts ------------------------------------------------------
-  const npmSpecs: { name: string, category: string, versions: string[] }[] = [
-    { name: '@koumoul/processing-hello', category: 'processing', versions: ['1.0.0', '1.0.1', '1.1.0'] },
-    { name: '@koumoul/application-demo', category: 'application', versions: ['1.0.0'] },
-    { name: '@test/catalog-sample', category: 'catalog', versions: ['2.0.0'] }
+  // In the unified model each artefact id is one major line; uploading to
+  // /npm/:id stores a single tarball (the `noarch` slot). The category is
+  // taken from the multipart form field, never from the package manifest.
+  const npmSpecs: { name: string, category: string, version: string }[] = [
+    { name: '@koumoul/processing-hello', category: 'processing', version: '1.1.0' },
+    { name: '@koumoul/application-demo', category: 'application', version: '1.0.0' },
+    { name: '@test/catalog-sample', category: 'catalog', version: '2.0.0' }
   ]
 
   for (const spec of npmSpecs) {
-    const major = spec.versions[spec.versions.length - 1].split('.')[0]
+    const major = spec.version.split('.')[0]
     const id = `${spec.name}@${major}`
     if (await artefactExists(id)) {
       console.log(`  ✓ npm ${id} (skipped)`)
       continue
     }
-    for (const version of spec.versions) {
-      const tarball = await createTestTarball({ name: spec.name, version, licence: 'MIT', category: spec.category })
-      const form = new FormData()
-      form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await upload.post(
-        `/api/v1/artefacts/${encodeURIComponent(spec.name)}/versions`,
-        form,
-        { headers: form.getHeaders() }
-      )
-    }
-    console.log(`  + npm ${id} (${spec.versions.length} versions)`)
+    const tarball = await createTestTarball({ name: spec.name, version: spec.version, licence: 'MIT' })
+    const form = new FormData()
+    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+    form.append('category', spec.category)
+    await upload.post(
+      `/api/v1/artefacts/npm/${encodeURIComponent(id)}`,
+      form,
+      { headers: form.getHeaders() }
+    )
+    console.log(`  + npm ${id}`)
   }
 
   // --- File artefacts -----------------------------------------------------

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosWithApiKey, clean } from './support/axios.ts'
+import { superAdmin, axiosWithApiKey, anonymousAx, clean } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -228,6 +228,72 @@ test.describe('Artefacts', () => {
 
       const listRes = await ax.get('/api/v1/artefacts')
       expect(listRes.data.count).toBe(0)
+    })
+  })
+
+  test.describe('Group suggestions', () => {
+    // Upload an npm artefact in a category, then set its group via PATCH
+    // (group is only settable through the patch endpoint).
+    const uploadWithGroup = async (name: string, category: string, group: { en?: string, fr?: string }) => {
+      const id = name + '@1'
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form = new FormData()
+      form.append('file', await createTestTarball({ name, version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      form.append('category', category)
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent(id), form, { headers: form.getHeaders() })
+      const admin = await superAdmin
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent(id), { group })
+    }
+
+    test('returns distinct sorted group values for a category and locale', async () => {
+      await uploadWithGroup('@test/proc-a', 'processing', { en: 'Statistics', fr: 'Statistiques' })
+      await uploadWithGroup('@test/proc-b', 'processing', { en: 'Geospatial', fr: 'Géospatial' })
+      await uploadWithGroup('@test/proc-c', 'processing', { en: 'Statistics', fr: 'Statistiques' })
+
+      const admin = await superAdmin
+      const en = await admin.get('/api/v1/artefacts/groups?category=processing&locale=en')
+      expect(en.data.results).toEqual(['Geospatial', 'Statistics'])
+
+      const fr = await admin.get('/api/v1/artefacts/groups?category=processing&locale=fr')
+      expect(fr.data.results).toEqual(['Géospatial', 'Statistiques'])
+    })
+
+    test('scopes suggestions to the requested category', async () => {
+      await uploadWithGroup('@test/proc-a', 'processing', { en: 'Statistics' })
+      await uploadWithGroup('@test/cat-a', 'catalog', { en: 'Catalogs' })
+
+      const admin = await superAdmin
+      const res = await admin.get('/api/v1/artefacts/groups?category=catalog&locale=en')
+      expect(res.data.results).toEqual(['Catalogs'])
+    })
+
+    test('rejects an invalid category', async () => {
+      const admin = await superAdmin
+      try {
+        await admin.get('/api/v1/artefacts/groups?category=nope&locale=en')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
+    test('rejects a missing locale', async () => {
+      const admin = await superAdmin
+      try {
+        await admin.get('/api/v1/artefacts/groups?category=processing')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
+    test('rejects a non-admin caller', async () => {
+      try {
+        await anonymousAx.get('/api/v1/artefacts/groups?category=processing&locale=en')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect([401, 403]).toContain(err.status)
+      }
     })
   })
 })

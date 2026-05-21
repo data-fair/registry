@@ -66,8 +66,32 @@ export default {
       type: 'object',
       additionalProperties: false,
       properties: {
-        en: { type: 'string', title: 'Group - English', 'x-i18n-title': { fr: 'Groupe - Anglais' }, layout: { cols: { md: 6 } } },
-        fr: { type: 'string', title: 'Group - French', 'x-i18n-title': { fr: 'Groupe - Français' }, layout: { cols: { md: 6 } } }
+        en: {
+          type: 'string',
+          title: 'Group - English',
+          'x-i18n-title': { fr: 'Groupe - Anglais' },
+          layout: {
+            comp: 'combobox',
+            cols: { md: 6 },
+            getItems: {
+              url: '${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=en',
+              itemsResults: 'data.results'
+            }
+          }
+        },
+        fr: {
+          type: 'string',
+          title: 'Group - French',
+          'x-i18n-title': { fr: 'Groupe - Français' },
+          layout: {
+            comp: 'combobox',
+            cols: { md: 6 },
+            getItems: {
+              url: '${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=fr',
+              itemsResults: 'data.results'
+            }
+          }
+        }
       }
     },
     thumbnail: {

@@ -79,6 +79,7 @@
               <th style="width: 56px;" />
               <th>{{ t('name') }}</th>
               <th>{{ t('category') }}</th>
+              <th>{{ t('group') }}</th>
               <th>{{ t('version') }}</th>
               <th>{{ t('size') }}</th>
               <th v-if="adminMode">
@@ -129,6 +130,7 @@
                   {{ categoryLabel(artefact.category, locale) }}
                 </v-chip>
               </td>
+              <td>{{ (artefact.group as any)?.[locale] || '-' }}</td>
               <td>{{ artefact.version || '-' }}</td>
               <td>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</td>
               <td v-if="adminMode">
@@ -277,6 +279,7 @@ fr:
   apiKeys: "Cl\xE9s API"
   search: Rechercher
   category: "Cat\xE9gorie"
+  group: Groupe
   recent: "R\xE9cents"
   name: Nom
   version: Version
@@ -298,6 +301,7 @@ en:
   apiKeys: API Keys
   search: Search
   category: Category
+  group: Group
   recent: Recent
   name: Name
   version: Version

@@ -13,7 +13,8 @@ import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { filesStorage } from '../files-storage/index.ts'
 import {
   listArtefacts, getArtefact, getArtefactById, patchArtefact, deleteArtefact,
-  commitFileUpload, commitNpmUpload, extractStagedManifest, resolveDownload
+  commitFileUpload, commitNpmUpload, extractStagedManifest, resolveDownload,
+  listGroupValues
 } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
@@ -111,6 +112,22 @@ router.get('/', async (req, res, next) => {
 
     const { results, count } = await listArtefacts(filter, { sort, skip, size })
     res.json({ results, count })
+  } catch (err) { next(err) }
+})
+
+// Distinct group values for a category — seeds the group combobox suggestions
+// in the admin form. Registered before GET /:id so it isn't swallowed as an id.
+router.get('/groups', async (req, res, next) => {
+  try {
+    await session.reqAdminMode(req)
+    const category = req.query.category as string
+    if (!category || !allCategories.includes(category)) {
+      throw httpError(400, `invalid category, must be one of: ${allCategories.join(', ')}`)
+    }
+    const locale = req.query.locale === 'fr' ? 'fr' : req.query.locale === 'en' ? 'en' : null
+    if (!locale) throw httpError(400, 'locale query param must be "en" or "fr"')
+    const results = await listGroupValues(category as Category, locale)
+    res.json({ results })
   } catch (err) { next(err) }
 })
 

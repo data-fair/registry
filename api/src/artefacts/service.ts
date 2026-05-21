@@ -36,6 +36,19 @@ export const getArtefact = (id: string, filter: Filter<Artefact>) =>
 export const getArtefactById = (id: string) =>
   mongo.artefacts.findOne({ _id: id })
 
+// Distinct, non-empty group values for one category + locale. Seeds the group
+// combobox suggestions in the admin form.
+export const listGroupValues = async (
+  category: Artefact['category'],
+  locale: 'en' | 'fr'
+): Promise<string[]> => {
+  const field = `group.${locale}`
+  const values = await mongo.artefacts.distinct(field, { category })
+  return (values as unknown[])
+    .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+    .sort((a, b) => a.localeCompare(b))
+}
+
 // --- metadata patch -------------------------------------------------------
 
 export const patchArtefact = (id: string, body: Record<string, unknown>) => {
