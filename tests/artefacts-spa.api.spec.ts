@@ -72,22 +72,33 @@ test.describe('SPA artefacts', () => {
     })
 
     test('re-upload replaces the tarball and removes stale files', async () => {
-      await uploadSpa(uploadApiKey, spaId, {
+      const res1 = await uploadSpa(uploadApiKey, spaId, {
         name: '@test/app-charts',
         version: '0.30.1',
         files: { 'index.html': '<html></html>', 'assets/old.js': 'old' }
       })
-      const res = await uploadSpa(uploadApiKey, spaId, {
+      const res2 = await uploadSpa(uploadApiKey, spaId, {
         name: '@test/app-charts',
         version: '0.30.2',
         files: { 'index.html': '<html></html>', 'assets/new.js': 'new' }
       })
-      expect(res.status).toBe(201)
-      expect(res.data.artefact.version).toBe('0.30.2')
+      expect(res2.status).toBe(201)
+      expect(res2.data.artefact.version).toBe('0.30.2')
+      expect(res2.data.artefact.extractedPath).not.toBe(res1.data.artefact.extractedPath)
+      expect(res2.data.artefact.tarballPath).not.toBe(res1.data.artefact.tarballPath)
 
       const admin = await superAdmin
       const list = await admin.get('/api/v1/artefacts')
       expect(list.data.count).toBe(1)
+    })
+
+    test('delete spa artefact removes it from the list', async () => {
+      await uploadSpa(uploadApiKey, spaId, { name: '@test/app-charts', version: '0.30.2' })
+      const admin = await superAdmin
+      const del = await admin.delete('/api/v1/artefacts/' + encodedSpaId)
+      expect(del.status).toBe(204)
+      const list = await admin.get('/api/v1/artefacts')
+      expect(list.data.count).toBe(0)
     })
 
     test('upload to a mirrored spa artefact returns 409', async () => {

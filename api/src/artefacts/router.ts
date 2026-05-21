@@ -28,7 +28,7 @@ router.use('/:id/thumbnail', artefactThumbnailRouter)
 const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
 const spaCategories = ['application', 'other'] as const
-const allCategories = [...new Set<string>([...npmCategories, ...fileCategories, ...spaCategories])]
+const allCategories = [...new Set<string>([...npmCategories, ...fileCategories])]
 
 const MAX_UPLOAD_BYTES = config.maxUploadBytes ?? 500 * 1024 * 1024
 

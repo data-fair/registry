@@ -76,6 +76,9 @@ export const deleteArtefact = async (artefact: Artefact) => {
   await mongo.artefacts.deleteOne({ _id: artefact._id })
   if (artefact.format === 'file') {
     if (artefact.filePath) await filesStorage.delete(artefact.filePath)
+  } else if (artefact.format === 'spa') {
+    if (artefact.tarballPath) await filesStorage.delete(artefact.tarballPath).catch(() => {})
+    if (artefact.extractedPath) await filesStorage.deleteDir(artefact.extractedPath).catch(() => {})
   } else {
     // npm artefacts store tarballs inline in the `tarballs` map
     for (const slot of Object.values(artefact.tarballs ?? {})) {
