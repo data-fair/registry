@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pipeline } from 'node:stream/promises'
 import type { Readable } from 'node:stream'
 import { randomUUID, timingSafeEqual } from 'node:crypto'
+import * as semver from 'semver'
 import Busboy from 'busboy'
 import { session } from '@data-fair/lib-express/index.js'
 import { reqIsInternal } from '@data-fair/lib-express/req-origin.js'
@@ -13,7 +14,7 @@ import { artefactAccessFilter, assertDownloadAccess } from '../access.ts'
 import { filesStorage } from '../files-storage/index.ts'
 import {
   listArtefacts, getArtefact, getArtefactById, patchArtefact, deleteArtefact,
-  commitFileUpload, commitNpmUpload, extractStagedManifest, resolveDownload,
+  commitFileUpload, commitNpmUpload, commitSpaUpload, extractStagedManifest, resolveDownload,
   listGroupValues
 } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
@@ -26,7 +27,8 @@ router.use('/:id/thumbnail', artefactThumbnailRouter)
 
 const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
-const allCategories = [...new Set<string>([...npmCategories, ...fileCategories])]
+const spaCategories = ['application', 'other'] as const
+const allCategories = [...new Set<string>([...npmCategories, ...fileCategories, ...spaCategories])]
 
 const MAX_UPLOAD_BYTES = config.maxUploadBytes ?? 500 * 1024 * 1024
 
@@ -293,6 +295,73 @@ router.post('/npm/:id', async (req, res, next) => {
     const artefact = await commitNpmUpload({
       id,
       arch: architecture || 'noarch',
+      stagingPath,
+      manifest,
+      category,
+      uploadedBy: apiKey
+        ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
+        : { internal: true },
+      existing
+    })
+    stagingStored = false
+    res.status(201).json({ artefact })
+  } catch (err) {
+    if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
+    next(err)
+  }
+})
+
+// Upload a built-SPA artefact (API key or internal secret auth, multipart).
+// One artefact per maintained minor line: the id must be `<name>@<major>.<minor>`
+// because the public serving router resolves an artefact from its URL by
+// reconstructing exactly that string.
+router.post('/spa/:id', async (req, res, next) => {
+  const stagingPath = `_staging/${randomUUID()}.tgz`
+  let stagingStored = false
+  try {
+    const isInternal = tryInternalSecret(req)
+    let apiKey: Awaited<ReturnType<typeof authenticateApiKey>> | null = null
+    if (!isInternal) {
+      apiKey = await authenticateApiKey(req)
+      if (apiKey.type !== 'upload') throw httpError(403, 'only upload API keys can upload spa artefacts')
+    }
+
+    const id = safeDecode(req.params.id)
+    if (apiKey?.allowedNamePrefix && !id.startsWith(apiKey.allowedNamePrefix)) {
+      throw httpError(403, `this API key is not allowed to upload "${id}"`)
+    }
+
+    const existing = await getArtefactById(id)
+    if (existing?.origin) {
+      throw httpError(409, 'this artefact is managed by a remote registry')
+    }
+    if (existing && existing.format !== 'spa') {
+      throw httpError(409, `this artefact already exists as a "${existing.format}" artefact`)
+    }
+
+    const { category: uploadCategory } = await streamTarballUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
+    stagingStored = true
+
+    const manifest = await extractStagedManifest(stagingPath)
+
+    if (existing?.packageName && existing.packageName !== manifest.name) {
+      throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
+    }
+
+    const parsed = semver.parse(manifest.version)
+    if (!parsed) throw httpError(400, `invalid semver version: ${manifest.version}`)
+    const expectedId = `${manifest.name}@${parsed.major}.${parsed.minor}`
+    if (id !== expectedId) {
+      throw httpError(400, `spa artefact id must be "${expectedId}" (got "${id}")`)
+    }
+
+    const category = pickCategory(uploadCategory || 'application', spaCategories)
+    if (apiKey?.allowedCategory && apiKey.allowedCategory !== category) {
+      throw httpError(403, `this API key is only allowed to upload "${apiKey.allowedCategory}" artefacts`)
+    }
+
+    const artefact = await commitSpaUpload({
+      id,
       stagingPath,
       manifest,
       category,

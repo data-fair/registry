@@ -3,13 +3,17 @@
 // Pure, unit-testable helpers live in operations.ts.
 
 import { randomUUID } from 'node:crypto'
-import type { Readable } from 'node:stream'
+import { PassThrough, type Readable } from 'node:stream'
+import { createGunzip } from 'node:zlib'
+import { pipeline } from 'node:stream/promises'
+import * as tar from 'tar-stream'
 import type { Filter } from 'mongodb'
 import type { Artefact } from '#types/artefact/index.ts'
 import mongo from '#mongo'
 import config from '#config'
 import { filesStorage } from '../files-storage/index.ts'
-import { extractManifest, type Manifest } from './operations.ts'
+import { extractManifest, sanitizeSpaEntryPath, type Manifest } from './operations.ts'
+import { httpError } from '@data-fair/lib-utils/http-errors.js'
 
 export type { Manifest } from './operations.ts'
 
@@ -209,6 +213,132 @@ export const commitFileUpload = async (params: {
   }
 
   return (await mongo.artefacts.findOne({ _id: artefactId }))!
+}
+
+// --- spa upload -----------------------------------------------------------
+
+// Extract a stored npm-packed SPA tarball into files-storage under `destPrefix`.
+// Each retained entry is written at `${destPrefix}/${relativePath}`. Returns
+// whether an index.html was present. Enforces decompressed-size and entry-count
+// caps so a malicious archive cannot exhaust storage.
+export const extractSpaTarball = async (
+  tarballStoragePath: string,
+  destPrefix: string
+): Promise<{ indexHtmlFound: boolean }> => {
+  const maxDecompressedBytes = config.maxDecompressedBytes ?? 1024 * 1024 * 1024
+  const maxTarEntries = config.maxTarEntries ?? 100_000
+  const { body } = await filesStorage.readStream(tarballStoragePath)
+
+  // Bound the decompressed byte count regardless of compressed input size.
+  let decompressedBytes = 0
+  const counter = new PassThrough()
+  counter.on('data', (chunk: Buffer) => {
+    decompressedBytes += chunk.length
+    if (decompressedBytes > maxDecompressedBytes) {
+      counter.destroy(httpError(413, `decompressed SPA exceeds ${maxDecompressedBytes} bytes`))
+    }
+  })
+
+  const extract = tar.extract()
+  let indexHtmlFound = false
+  let entryCount = 0
+
+  extract.on('entry', (header, entryStream, next) => {
+    entryCount++
+    if (entryCount > maxTarEntries) {
+      entryStream.on('end', () => next(httpError(413, `tarball exceeds ${maxTarEntries} entries`)))
+      entryStream.resume()
+      return
+    }
+    const rel = sanitizeSpaEntryPath(header.name)
+    if (!rel) {
+      entryStream.on('end', next)
+      entryStream.resume()
+      return
+    }
+    if (rel === 'index.html') indexHtmlFound = true
+    filesStorage.writeStream(entryStream, `${destPrefix}/${rel}`)
+      .then(() => next())
+      .catch(next)
+  })
+
+  await pipeline(body, createGunzip(), counter, extract)
+  return { indexHtmlFound }
+}
+
+// Finalize a staged SPA tarball: extract it into a fresh directory, move the
+// tarball into place, upsert the artefact doc, then prune the previous
+// tarball and extracted tree. On a failure after extraction the partial
+// outputs are removed so no orphaned state survives.
+export const commitSpaUpload = async (params: {
+  id: string
+  stagingPath: string
+  manifest: Manifest
+  category: Artefact['category']
+  uploadedBy: UploadedBy
+  existing: Artefact | null
+}): Promise<Artefact> => {
+  const { id, stagingPath, manifest, category, uploadedBy, existing } = params
+  const extractedPath = `spa/${id}/files-${randomUUID()}`
+  const tarballPath = `spa/${id}/tarball-${randomUUID()}.tgz`
+
+  let indexHtmlFound: boolean
+  try {
+    ({ indexHtmlFound } = await extractSpaTarball(stagingPath, extractedPath))
+  } catch (err) {
+    await filesStorage.deleteDir(extractedPath).catch(() => {})
+    throw err
+  }
+  if (!indexHtmlFound) {
+    await filesStorage.deleteDir(extractedPath).catch(() => {})
+    throw httpError(400, 'SPA tarball does not contain an index.html')
+  }
+
+  await filesStorage.move(stagingPath, tarballPath)
+  try {
+    const { size } = await filesStorage.stats(tarballPath)
+    const now = new Date().toISOString()
+    await mongo.artefacts.updateOne(
+      { _id: id },
+      {
+        $set: {
+          packageName: manifest.name,
+          version: manifest.version,
+          ...(manifest.licence ? { licence: manifest.licence } : {}),
+          category,
+          tarballPath,
+          extractedPath,
+          size,
+          uploadedBy,
+          updatedAt: now,
+          dataUpdatedAt: now
+        },
+        $setOnInsert: {
+          _id: id,
+          name: id,
+          format: 'spa' as const,
+          public: false,
+          privateAccess: [],
+          createdAt: now
+        }
+      },
+      { upsert: true }
+    )
+  } catch (err) {
+    await filesStorage.delete(tarballPath).catch(() => {})
+    await filesStorage.deleteDir(extractedPath).catch(() => {})
+    throw err
+  }
+
+  // Best-effort prune of the previous tarball and extracted tree.
+  if (existing?.tarballPath && existing.tarballPath !== tarballPath) {
+    await filesStorage.delete(existing.tarballPath).catch(() => {})
+  }
+  if (existing?.extractedPath && existing.extractedPath !== extractedPath) {
+    await filesStorage.deleteDir(existing.extractedPath).catch(() => {})
+  }
+
+  return (await mongo.artefacts.findOne({ _id: id }))!
 }
 
 // --- download -------------------------------------------------------------
