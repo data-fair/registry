@@ -427,6 +427,35 @@ router.get('/:id/tarball', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Download a spa artefact's raw tarball. Authenticated like the npm/file
+// downloads — used by federation to mirror the artefact.
+router.get('/:id/spa-tarball', async (req, res, next) => {
+  try {
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
+    const artefact = await getArtefact(req.params.id, filter)
+    if (!artefact) throw httpError(404, 'artefact not found')
+    if (artefact.format !== 'spa') throw httpError(400, 'this artefact is not a spa-format artefact')
+    await assertDownloadAccess(caller, artefact)
+    if (!artefact.tarballPath) throw httpError(404, 'no tarball for this artefact')
+
+    const filename = `${artefact.name}-${artefact.version || 'tarball'}.tgz`
+    const download = await resolveDownload(artefact.tarballPath, filename, req.get('If-Modified-Since'))
+    if ('redirectUrl' in download) {
+      res.redirect(302, download.redirectUrl)
+      return
+    }
+
+    res.set('Content-Type', 'application/gzip')
+    res.set('Content-Disposition', `attachment; filename="${filename}"`)
+    res.set('Last-Modified', download.lastModified.toUTCString())
+    res.set('Content-Length', String(download.size))
+    await pipeline(download.body, res).catch((err) => {
+      if (!res.headersSent) next(err)
+    })
+  } catch (err) { next(err) }
+})
+
 // Helper: stream a multipart upload containing a tarball to a caller-provided
 // sink (typically the configured files-storage backend), collecting the
 // `architecture` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.

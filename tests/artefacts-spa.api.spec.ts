@@ -196,4 +196,32 @@ test.describe('SPA artefacts', () => {
       }
     })
   })
+
+  test.describe('Tarball download', () => {
+    test.beforeEach(async () => {
+      await uploadSpa(uploadApiKey, spaId, { name: '@test/app-charts', version: '0.30.2' })
+    })
+
+    test('download the spa tarball with the internal secret', async () => {
+      const ax = axiosInternal('secret-internal')
+      const res = await ax.get('/api/v1/artefacts/' + encodedSpaId + '/spa-tarball', { responseType: 'arraybuffer' })
+      expect(res.status).toBe(200)
+      expect(res.headers['content-type']).toContain('gzip')
+      expect(Buffer.from(res.data).length).toBeGreaterThan(0)
+    })
+
+    test('spa-tarball on a non-spa artefact returns 400', async () => {
+      const tarball = await createTestTarball({ name: '@test/np', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
+      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/np@1'), form, { headers: form.getHeaders() })
+      const ax = axiosInternal('secret-internal')
+      try {
+        await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/np@1') + '/spa-tarball')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+  })
 })

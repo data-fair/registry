@@ -6,6 +6,7 @@ import mongo from '#mongo'
 import { decipher } from '../cipher.ts'
 import { filesStorage } from '../files-storage/index.ts'
 import type { Artefact } from '#types/artefact/index.ts'
+import { extractSpaTarball } from '../artefacts/service.ts'
 
 const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
   const encodedId = encodeURIComponent(artefactId)
@@ -146,6 +147,66 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
   }
 }
 
+const syncSpaArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
+  const encodedId = encodeURIComponent(artefactId)
+  const remoteRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
+  const remoteArtefact = remoteRes.data
+
+  const local = await mongo.artefacts.findOne({ _id: artefactId })
+  const remoteDataUpdatedAt: string = remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
+  const localDataUpdatedAt = local?.dataUpdatedAt || local?.updatedAt
+
+  if (!local || !localDataUpdatedAt || localDataUpdatedAt < remoteDataUpdatedAt) {
+    // Download the remote tarball into local storage, then extract it.
+    const tarballPath = `spa/${artefactId}/tarball-${randomUUID()}.tgz`
+    const dlRes = await ax.get(`/api/v1/artefacts/${encodedId}/spa-tarball`, { responseType: 'stream' })
+    await filesStorage.writeStream(dlRes.data, tarballPath)
+
+    const extractedPath = `spa/${artefactId}/files-${randomUUID()}`
+    await extractSpaTarball(tarballPath, extractedPath)
+
+    const oldTarballPath = local?.tarballPath
+    const oldExtractedPath = local?.extractedPath
+    const now = new Date().toISOString()
+    await mongo.artefacts.updateOne(
+      { _id: artefactId },
+      {
+        $set: {
+          packageName: remoteArtefact.packageName,
+          version: remoteArtefact.version,
+          ...(remoteArtefact.licence ? { licence: remoteArtefact.licence } : {}),
+          category: remoteArtefact.category,
+          deprecated: !!remoteArtefact.deprecated,
+          ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
+          ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
+          ...(remoteArtefact.group ? { group: remoteArtefact.group } : {}),
+          ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
+          tarballPath,
+          extractedPath,
+          origin: remoteUrl,
+          updatedAt: now,
+          dataUpdatedAt: remoteDataUpdatedAt
+        },
+        $setOnInsert: {
+          _id: artefactId,
+          name: remoteArtefact.name,
+          format: 'spa' as const,
+          public: false,
+          privateAccess: [],
+          createdAt: now
+        }
+      },
+      { upsert: true }
+    )
+
+    if (oldTarballPath) await filesStorage.delete(oldTarballPath).catch(() => {})
+    if (oldExtractedPath) await filesStorage.deleteDir(oldExtractedPath).catch(() => {})
+  } else {
+    // Unchanged — still ensure origin is set.
+    await mongo.artefacts.updateOne({ _id: artefactId }, { $set: { origin: remoteUrl } })
+  }
+}
+
 export const syncRemoteRegistry = async (remoteRegistryId: string) => {
   const lockId = `sync-remote-${remoteRegistryId}`
   const acquired = await locks.acquire(lockId)
@@ -175,8 +236,9 @@ export const syncRemoteRegistry = async (remoteRegistryId: string) => {
         const format: Artefact['format'] = detailRes.data.format
 
         if (format === 'npm') {
-          // We already fetched detail, but syncNpmArtefact re-fetches for simplicity
           await syncNpmArtefact(ax, remote._id, artefactId)
+        } else if (format === 'spa') {
+          await syncSpaArtefact(ax, remote._id, artefactId)
         } else {
           await syncFileArtefact(ax, remote._id, artefactId)
         }
