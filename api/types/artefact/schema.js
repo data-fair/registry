@@ -112,7 +112,7 @@ export default {
     deprecated: {
       type: 'boolean',
       title: 'Deprecated',
-      'x-i18n-title': { fr: 'Obsolète' },
+      'x-i18n-title': { fr: 'Déprécié' },
       layout: 'switch',
       default: false
     },

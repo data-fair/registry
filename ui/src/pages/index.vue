@@ -178,7 +178,10 @@
     <!-- API Keys tab -->
     <template v-if="tab === 'keys' && hasGrant">
       <!-- Create new read key -->
-      <v-card class="mb-4">
+      <v-card
+        v-if="canManageKeys"
+        class="mb-4"
+      >
         <v-card-title>{{ t('createKey') }}</v-card-title>
         <v-card-text>
           <v-row>
@@ -274,6 +277,7 @@
               <td>{{ key.expiresAt ? dayjs(key.expiresAt).format('L LT') : '—' }}</td>
               <td class="text-right">
                 <v-btn
+                  v-if="canManageKeys"
                   :icon="mdiDelete"
                   color="error"
                   size="small"
@@ -303,8 +307,8 @@ fr:
   size: Taille
   visibility: "Visibilit\xE9"
   mirror: miroir
-  deprecated: "obsol\xE8te"
-  showDeprecated: "Afficher les obsol\xE8tes"
+  deprecated: "d\xE9pr\xE9ci\xE9"
+  showDeprecated: "Afficher les versions d\xE9pr\xE9ci\xE9es"
   dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
   total: artefact(s)
   createKey: "Cr\xE9er une cl\xE9 de lecture"
@@ -353,6 +357,17 @@ const session = useSession()
 const { dayjs } = useLocaleDayjs()
 
 const adminMode = computed(() => !!session.state.user?.adminMode)
+
+// Read keys can only be managed by an admin of the owner account: a user for
+// their own account, or an organization admin at the organization root (a
+// department session does not qualify). Mirrors the API permission check.
+const canManageKeys = computed(() => {
+  if (session.state.user?.adminMode) return true
+  const account = session.state.account
+  if (!account) return false
+  if (account.type === 'user') return true
+  return !account.department && session.state.accountRole === 'admin'
+})
 
 // --- Grant check ---
 const hasGrant = ref(false)
@@ -403,10 +418,13 @@ const keysFetch = useFetch<{ results: any[], count: number }>(
 
 const createAction = useAsyncAction(
   async () => {
+    const account = session.state.account!
     const body: Record<string, unknown> = {
       type: 'read',
       name: newKeyName.value,
-      owner: session.state.account
+      // owner accepts only type/id/name — sending the whole session account
+      // (which also carries department fields) would be rejected by the schema.
+      owner: { type: account.type, id: account.id, name: account.name }
     }
     if (newKeyExpiresAt.value) {
       const d = new Date(newKeyExpiresAt.value)
