@@ -28,7 +28,8 @@ export default {
       required: ['type', 'id'],
       properties: {
         type: { type: 'string', enum: ['user', 'organization'] },
-        id: { type: 'string' }
+        id: { type: 'string' },
+        name: { type: 'string', description: 'Display name of the owner account.' }
       }
     },
     allowedNamePrefix: {

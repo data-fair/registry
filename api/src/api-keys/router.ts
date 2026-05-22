@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { ObjectId } from 'mongodb'
 import { session } from '@data-fair/lib-express/index.js'
-import { reqSession, reqSessionAuthenticated } from '@data-fair/lib-express/session.js'
+import { reqSession, reqSessionAuthenticated, getAccountRole } from '@data-fair/lib-express/session.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import mongo from '#mongo'
 import { hashApiKey, generateApiKey } from '../auth.ts'
@@ -24,8 +24,15 @@ router.post('/', async (req, res, next) => {
       if (body.allowedCategory) {
         throw httpError(400, 'allowedCategory is only valid for upload keys')
       }
-      reqSessionAuthenticated(req)
+      const sessionState = reqSessionAuthenticated(req)
       if (!body.owner) throw httpError(400, 'owner is required for read keys')
+      // Only an admin of the owner account may mint a read key for it. A user
+      // is always admin of their own account; for an organization this means
+      // an admin at the organization root — a department session does not
+      // qualify (getAccountRole rejects it unless acceptDepAsRoot is set).
+      if (getAccountRole(sessionState, body.owner) !== 'admin') {
+        throw httpError(403, 'only an admin of the owner account can create a read key for it')
+      }
       // Check that the account has a grant
       const grant = await mongo.accessGrants.findOne({
         'account.type': body.owner.type,
@@ -104,10 +111,11 @@ router.delete('/:id', async (req, res, next) => {
     if (!apiKey) throw httpError(404, 'API key not found')
 
     if (!sessionState.user.adminMode) {
-      // Non-admin can only delete their own read keys
+      // Non-superadmin: only an admin of the key's owner account may revoke
+      // it, and only read keys (upload keys are superadmin-managed). The
+      // org-root vs department distinction is enforced by getAccountRole.
       if (apiKey.type !== 'read' || !apiKey.owner ||
-          apiKey.owner.type !== sessionState.account.type ||
-          apiKey.owner.id !== sessionState.account.id) {
+          getAccountRole(sessionState, apiKey.owner) !== 'admin') {
         throw httpError(403, 'not authorized to delete this key')
       }
     }

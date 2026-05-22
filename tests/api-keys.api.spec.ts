@@ -282,4 +282,77 @@ test.describe('API Keys', () => {
       }
     })
   })
+
+  test.describe('read key owner permissions', () => {
+    test.beforeEach(async () => {
+      const ax = await superAdmin
+      await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    })
+
+    test('org admin can create a read key for their organization and the owner name is stored', async () => {
+      const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+      const res = await orgAx.post('/api/v1/api-keys', {
+        type: 'read',
+        name: 'federation-key',
+        owner: { type: 'organization', id: 'test1', name: 'Test Organization 1' }
+      })
+      expect(res.status).toBe(201)
+      expect(res.data.owner.name).toBe('Test Organization 1')
+    })
+
+    test('non-admin org member cannot create a read key', async () => {
+      const orgAx = await axiosAuth('test1-contrib1', { org: 'test1' })
+      try {
+        await orgAx.post('/api/v1/api-keys', {
+          type: 'read',
+          name: 'nope',
+          owner: { type: 'organization', id: 'test1' }
+        })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('a user cannot create a read key for an organization they do not administer', async () => {
+      const ax = await axiosAuth('dev-standalone1')
+      try {
+        await ax.post('/api/v1/api-keys', {
+          type: 'read',
+          name: 'nope',
+          owner: { type: 'organization', id: 'test1' }
+        })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('org admin can revoke their organization read key', async () => {
+      const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+      const created = await orgAx.post('/api/v1/api-keys', {
+        type: 'read',
+        name: 'federation-key',
+        owner: { type: 'organization', id: 'test1' }
+      })
+      const del = await orgAx.delete(`/api/v1/api-keys/${created.data._id}`)
+      expect(del.status).toBe(204)
+    })
+
+    test('non-admin org member cannot revoke an organization read key', async () => {
+      const orgAdmin = await axiosAuth('test1-admin1', { org: 'test1' })
+      const created = await orgAdmin.post('/api/v1/api-keys', {
+        type: 'read',
+        name: 'federation-key',
+        owner: { type: 'organization', id: 'test1' }
+      })
+      const contrib = await axiosAuth('test1-contrib1', { org: 'test1' })
+      try {
+        await contrib.delete(`/api/v1/api-keys/${created.data._id}`)
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+  })
 })
