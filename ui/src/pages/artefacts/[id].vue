@@ -144,7 +144,7 @@ fr:
   noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
   loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
   mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
-  deprecatedNotice: "Cet artefact est obsol\xE8te. Il reste disponible mais n'est plus recommand\xE9."
+  deprecatedNotice: "Cet artefact est d\xE9pr\xE9ci\xE9. Il reste disponible mais n'est plus recommand\xE9."
 en:
   artefacts: Artefacts
   tarballs: Tarballs

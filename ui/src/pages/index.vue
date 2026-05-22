@@ -307,8 +307,8 @@ fr:
   size: Taille
   visibility: "Visibilit\xE9"
   mirror: miroir
-  deprecated: "obsol\xE8te"
-  showDeprecated: "Afficher les obsol\xE8tes"
+  deprecated: "d\xE9pr\xE9ci\xE9"
+  showDeprecated: "Afficher les versions d\xE9pr\xE9ci\xE9es"
   dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
   total: artefact(s)
   createKey: "Cr\xE9er une cl\xE9 de lecture"

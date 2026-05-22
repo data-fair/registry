@@ -27,7 +27,7 @@
               density="compact"
               hide-details
               variant="outlined"
-              placeholder="https://registry.example.com/registry/api"
+              placeholder="https://registry.example.com/registry"
             />
           </v-col>
           <v-col
