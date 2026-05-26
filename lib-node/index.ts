@@ -3,6 +3,7 @@ import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, rename, stat, utimes } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
+import { spawn } from 'node:child_process'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
@@ -96,6 +97,9 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
     await extractTarball(tarballRes.data as Readable, tmpDir)
     // Write meta inside tmpDir so it survives the rename atomically.
     await writeFile(join(tmpDir, '.meta.json'), JSON.stringify({ dataUpdatedAt } satisfies CacheMeta))
+    if (opts.build && artefact.hasNativeModules) {
+      await rebuildNativeModules(tmpDir)
+    }
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true })
     throw err
@@ -168,6 +172,34 @@ export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise
 
   return { path: destPath, downloaded: true }
 }
+
+const rebuildNativeModules = (dir: string): Promise<void> => new Promise((resolve, reject) => {
+  const child = spawn('npm', ['rebuild'], {
+    cwd: dir,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      npm_config_offline: 'true',
+      npm_config_audit: 'false',
+      npm_config_fund: 'false',
+      npm_config_proxy: '',
+      npm_config_https_proxy: '',
+      NODE_AUTH_TOKEN: ''
+    }
+  })
+  const stderrChunks: Buffer[] = []
+  child.stderr?.on('data', (chunk: Buffer) => stderrChunks.push(chunk))
+  child.stdout?.on('data', () => {})
+  child.on('error', reject)
+  child.on('close', (code) => {
+    if (code === 0) {
+      resolve()
+    } else {
+      const stderr = Buffer.concat(stderrChunks).toString('utf-8').slice(0, 4000)
+      reject(new Error(`npm rebuild exited with code ${code}: ${stderr}`))
+    }
+  })
+})
 
 export async function extractTarball (stream: Readable, destDir: string): Promise<void> {
   const extract = tar.extract()
