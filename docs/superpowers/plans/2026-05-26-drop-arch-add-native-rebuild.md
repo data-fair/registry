@@ -1990,14 +1990,21 @@ modules itself. Probe checks for artefact.path."
 
 ---
 
-## Task 15 — processings: pass `build: true` + Dockerfile toolchain
+## Task 15 — processings worker: pass `build: true` + Dockerfile toolchain
 
 **Repo:** `data-fair/processings`
 
 **Files:**
 - Modify: `worker/src/task/task.ts`
-- Modify: `api/src/processings/router.ts`
+- Modify: `api/src/processings/router.ts` (keep build:false here — see below)
 - Modify: `Dockerfile`
+
+Only the worker runs plugin code, so only the worker needs to rebuild native
+modules. The API only reads plugin metadata (manifest / config schemas) and
+never loads the plugin's native addons. The API can extract the tarball
+without rebuilding — its cache slot lives under the `js` key per the lib-node
+cache-key change in Task 7, so it remains isolated from the worker's
+runtime-tuple cache slot.
 
 - [ ] **Step 1: Pass build:true in worker/src/task/task.ts**
 
@@ -2018,32 +2025,39 @@ Example (read the actual call first via `sed -n '95,115p' worker/src/task/task.t
 
 (Field names will follow whatever is already there; the additions are `build: true` and the removal of any `architecture` key.)
 
-- [ ] **Step 2: Pass build:true in api/src/processings/router.ts**
+- [ ] **Step 2: Drop any `architecture` field in api/src/processings/router.ts but DO NOT add build:true**
 
-Same change in `/home/alban/data-fair/processings/api/src/processings/router.ts` around line 53.
+Open `/home/alban/data-fair/processings/api/src/processings/router.ts` around line 53. If the existing `ensureArtefact({ ... })` call passes `architecture: hostArch` (or similar), remove that field. **Do not add `build: true`** — the API does not execute plugin code, so a rebuild would be wasted work and would also be the wrong place to bury the toolchain dependency.
 
-- [ ] **Step 3: Add the build toolchain to the runtime stage of the Dockerfile**
+If the API call has no `architecture` field at all, this step is a no-op for the API.
 
-Open `/home/alban/data-fair/processings/Dockerfile`. The base is `node:24.11.1-alpine3.22`.
+- [ ] **Step 3: Add the build toolchain to the worker runtime stage of the Dockerfile**
 
-Find the **runtime stage** (the final `FROM ... AS <stagename>` or unnamed `FROM` that produces the image). Add:
+Open `/home/alban/data-fair/processings/Dockerfile`. The base is `node:24.11.1-alpine3.22`. Verify by reading the whole file:
+
+```bash
+cat /home/alban/data-fair/processings/Dockerfile
+```
+
+The Dockerfile has at least two runtime stages — one for the API, one for the worker. Identify the **worker runtime stage only** (search for `worker` in stage names, ENTRYPOINTs, or CMDs). Add this line inside that stage, after the `FROM` and before COPY/CMD lines:
 
 ```dockerfile
 RUN apk add --no-cache python3 make g++
 ```
 
-If the worker has a separate runtime stage from the API, add to the worker stage. (Verify by reading the file end-to-end: `cat Dockerfile`.)
+Do not add this line to the API runtime stage. If you discover the API and worker share a single runtime stage (unlikely given the file's typical structure), STOP and re-read the file to confirm — the worker needs the toolchain, the API does not, and conflating them would bloat the API image unnecessarily.
 
 - [ ] **Step 4: Commit in the processings repo**
 
 ```bash
 cd /home/alban/data-fair/processings
 git add worker/src/task/task.ts api/src/processings/router.ts Dockerfile
-git commit -m "feat(consumer): build:true on ensureArtefact + Dockerfile toolchain
+git commit -m "feat(consumer): worker rebuilds native modules; api stays slim
 
-Plugins flagged hasNativeModules by the registry now get 'npm rebuild'
-on extraction. python3/make/g++ added to the worker image for the few
-plugins that need to compile from source."
+Worker passes build:true to ensureArtefact and gets python3/make/g++
+added to its runtime image. API extracts plugins without rebuilding —
+it only reads manifests / config schemas and never loads native addons,
+so the toolchain stays out of the api image."
 ```
 
 ---
