@@ -148,9 +148,9 @@ export const commitNpmUpload = async (params: {
 
 // --- file upload ----------------------------------------------------------
 
-// Finalize a staged raw file. Stores the NEW file first, then commits the DB
-// row, then deletes the OLD file — avoiding a window where the artefact row
-// points at a missing file. A failed DB write removes the new file.
+// Finalize a staged raw file: move it into its final path, commit the DB row,
+// then delete the OLD file — avoiding a window where the artefact row points
+// at a missing file. A failed DB write removes the freshly-moved file.
 export const commitFileUpload = async (params: {
   artefactId: string
   name: string
@@ -163,6 +163,8 @@ export const commitFileUpload = async (params: {
 }): Promise<Artefact> => {
   const { artefactId, name, fileName, stagingPath, category, title, description, uploadedBy } = params
   const existing = await mongo.artefacts.findOne({ _id: artefactId })
+  // Namespace new writes with a random suffix so a failed delete of the
+  // old file doesn't clobber the fresh one.
   const path = `files/${name}/${randomUUID()}-${fileName}`
   await filesStorage.move(stagingPath, path)
   try {
