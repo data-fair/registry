@@ -70,14 +70,7 @@ export const deleteArtefact = async (artefact: Artefact) => {
   // Delete DB state first so concurrent GETs fail cleanly with 404,
   // then best-effort remove files.
   await mongo.artefacts.deleteOne({ _id: artefact._id })
-  if (artefact.format === 'file') {
-    if (artefact.filePath) await filesStorage.delete(artefact.filePath)
-  } else {
-    // npm artefacts store tarballs inline in the `tarballs` map
-    for (const slot of Object.values(artefact.tarballs ?? {})) {
-      await filesStorage.delete(slot.path).catch(() => {})
-    }
-  }
+  if (artefact.path) await filesStorage.delete(artefact.path).catch(() => {})
   await mongo.thumbnails.deleteMany({ artefactId: artefact._id })
 }
 
@@ -94,26 +87,27 @@ export const extractStagedManifest = async (
   })
 }
 
-// Finalize a staged npm tarball into its per-arch slot: move the file into
-// place, upsert the artefact doc, then prune the previous occupant of the
-// slot. On a DB failure the freshly-moved tarball is removed before
-// rethrowing, so the artefact row never points at a missing file.
+// Finalize a staged npm tarball: move the file into place, upsert the artefact
+// doc, then prune the previous tarball. On a DB failure the freshly-moved
+// tarball is removed before rethrowing, so the artefact row never points at a
+// missing file.
 export const commitNpmUpload = async (params: {
   id: string
-  arch: string
   stagingPath: string
   manifest: Manifest
+  hasNativeModules: boolean
   category: Artefact['category']
   uploadedBy: UploadedBy
   existing: Artefact | null
 }): Promise<Artefact> => {
-  const { id, arch, stagingPath, manifest, category, uploadedBy, existing } = params
-  const tarballPath = `npm/${id}/${arch}-${randomUUID()}.tgz`
-  await filesStorage.move(stagingPath, tarballPath)
+  const { id, stagingPath, manifest, hasNativeModules, category, uploadedBy, existing } = params
+  // Namespace new writes with a random suffix so a failed delete of the
+  // old tarball doesn't clobber the fresh one.
+  const path = `npm/${id}/${randomUUID()}.tgz`
+  await filesStorage.move(stagingPath, path)
   try {
-    const { size } = await filesStorage.stats(tarballPath)
+    const { size } = await filesStorage.stats(path)
     const now = new Date().toISOString()
-    const tarballEntry = { path: tarballPath, size, uploadedAt: now, uploadedBy }
     await mongo.artefacts.updateOne(
       { _id: id },
       {
@@ -122,8 +116,10 @@ export const commitNpmUpload = async (params: {
           version: manifest.version,
           ...(manifest.licence ? { licence: manifest.licence } : {}),
           category,
-          [`tarballs.${arch}`]: tarballEntry,
+          path,
           size,
+          hasNativeModules,
+          uploadedBy,
           updatedAt: now,
           dataUpdatedAt: now
         },
@@ -139,14 +135,12 @@ export const commitNpmUpload = async (params: {
       { upsert: true }
     )
   } catch (err) {
-    await filesStorage.delete(tarballPath).catch(() => {})
+    await filesStorage.delete(path).catch(() => {})
     throw err
   }
 
-  // Best-effort delete of the previous occupant of this arch slot.
-  const previousPath = existing?.tarballs?.[arch]?.path
-  if (previousPath && previousPath !== tarballPath) {
-    await filesStorage.delete(previousPath).catch(() => {})
+  if (existing?.path && existing.path !== path) {
+    await filesStorage.delete(existing.path).catch(() => {})
   }
 
   return (await mongo.artefacts.findOne({ _id: id }))!
@@ -169,18 +163,16 @@ export const commitFileUpload = async (params: {
 }): Promise<Artefact> => {
   const { artefactId, name, fileName, stagingPath, category, title, description, uploadedBy } = params
   const existing = await mongo.artefacts.findOne({ _id: artefactId })
-  // Namespace new writes with a random suffix so a failed delete of the
-  // old file doesn't clobber the fresh one.
-  const filePath = `files/${name}/${randomUUID()}-${fileName}`
-  await filesStorage.move(stagingPath, filePath)
+  const path = `files/${name}/${randomUUID()}-${fileName}`
+  await filesStorage.move(stagingPath, path)
   try {
-    const { size } = await filesStorage.stats(filePath)
+    const { size } = await filesStorage.stats(path)
     const now = new Date().toISOString()
     await mongo.artefacts.updateOne(
       { _id: artefactId },
       {
         $set: {
-          filePath,
+          path,
           fileName,
           size,
           category,
@@ -202,12 +194,12 @@ export const commitFileUpload = async (params: {
       { upsert: true }
     )
   } catch (err) {
-    await filesStorage.delete(filePath).catch(() => {})
+    await filesStorage.delete(path).catch(() => {})
     throw err
   }
 
-  if (existing?.filePath && existing.filePath !== filePath) {
-    await filesStorage.delete(existing.filePath).catch(() => {})
+  if (existing?.path && existing.path !== path) {
+    await filesStorage.delete(existing.path).catch(() => {})
   }
 
   return (await mongo.artefacts.findOne({ _id: artefactId }))!
