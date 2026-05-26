@@ -99,10 +99,10 @@ test.describe('extractManifest', () => {
     expect(MAX_DECOMPRESSED_BYTES).toBeGreaterThan(0)
   })
 
-  test('aborts pipeline early after finding manifest (does not scan the whole tarball)', async () => {
-    // Many entries after package.json — with the early-abort, extractManifest
-    // should not keep draining them. We just verify it succeeds under the
-    // entry count cap even with entries after.
+  test('manifest extraction succeeds with many trailing entries', async () => {
+    // Many entries around package.json — extractManifest walks the whole
+    // tarball to collect native-module signals. Verify the manifest is found
+    // and returned correctly regardless of surrounding entries.
     const entries: Array<{ name: string, content: string }> = [
       { name: 'package/package.json', content: manifest() }
     ]
@@ -116,7 +116,7 @@ test.describe('extractManifest', () => {
 
   test('caps entry count', async () => {
     // Use the opts override so this stays cheap regardless of the default cap.
-    // package.json is LAST so the early-abort doesn't save us.
+    // package.json is LAST — asserts the cap is enforced regardless of manifest position.
     const cap = 50
     const entries: Array<{ name: string, content: string }> = []
     for (let i = 0; i < cap + 10; i++) {

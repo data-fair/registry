@@ -71,7 +71,6 @@ export const extractManifest = async (
   const maxTarEntries = opts.maxTarEntries ?? MAX_TAR_ENTRIES
   const extract = tar.extract()
   let manifest: Manifest | null = null
-  let manifestError: Error | null = null
   let entryCount = 0
   let hasNativeModules = false
 
@@ -90,7 +89,7 @@ export const extractManifest = async (
     if (isInNodeModules(name) && name.endsWith('.node')) hasNativeModules = true
     // Signal 2: binding.gyp inside node_modules
     if (isInNodeModules(name) && name.endsWith('/binding.gyp')) hasNativeModules = true
-    // Signal 4: prebuilds dir inside node_modules
+    // Signal 3: prebuilds dir inside node_modules
     if (isInNodeModules(name) && name.includes('/prebuilds/')) hasNativeModules = true
 
     if (name === 'package/package.json') {
@@ -120,28 +119,33 @@ export const extractManifest = async (
           }
           next()
         } catch (err) {
-          manifestError = httpError(400, `invalid package.json: ${(err as Error).message}`)
-          next(manifestError)
+          next(httpError(400, `invalid package.json: ${(err as Error).message}`))
         }
       })
       entryStream.on('error', next)
       return
     }
 
-    // Signal 3: subpackage package.json with native script
+    // Signal 4: subpackage package.json with native script
     if (isInNodeModules(name) && name.endsWith('/package.json')) {
       // Bound the read at MAX_MANIFEST_BYTES — subpackage manifests are tiny.
       let size = 0
+      let tooLarge = false
       const chunks: Buffer[] = []
       entryStream.on('data', (chunk: Buffer) => {
+        if (tooLarge) return
         size += chunk.length
         if (size > MAX_MANIFEST_BYTES) {
-          entryStream.destroy()
+          tooLarge = true
           return
         }
         chunks.push(chunk)
       })
       entryStream.on('end', () => {
+        if (tooLarge) {
+          next()
+          return
+        }
         try {
           const pkg = JSON.parse(Buffer.concat(chunks).toString('utf-8'))
           if (scriptIndicatesNative(pkg)) hasNativeModules = true
@@ -166,7 +170,6 @@ export const extractManifest = async (
     extract
   )
 
-  if (manifestError) throw manifestError
   if (!manifest) throw httpError(400, 'package.json not found in tarball')
   const result = manifest as Manifest
   if (!result.name) throw httpError(400, 'missing name in package.json')
