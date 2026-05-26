@@ -4,6 +4,9 @@ import { createGzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 import * as tar from 'tar-stream'
 import { extractManifest, MAX_DECOMPRESSED_BYTES } from '../api/src/artefacts/operations.ts'
+import { createTestTarball } from './support/test-tarball.ts'
+
+const streamBuffer = (buf: Buffer): Readable => Readable.from(buf)
 
 const gzipBuffer = async (raw: Buffer): Promise<Buffer> => {
   const chunks: Buffer[] = []
@@ -40,8 +43,8 @@ test.describe('extractManifest', () => {
   test('extracts standard package/package.json entry', async () => {
     const tarball = await packTarball([{ name: 'package/package.json', content: manifest() }])
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.name).toBe('@test/pkg')
-    expect(result.version).toBe('1.0.0')
+    expect(result.manifest.name).toBe('@test/pkg')
+    expect(result.manifest.version).toBe('1.0.0')
   })
 
   test('normalizes licence/license', async () => {
@@ -49,7 +52,7 @@ test.describe('extractManifest', () => {
       { name: 'package/package.json', content: manifest({ license: 'MIT' }) }
     ])
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.licence).toBe('MIT')
+    expect(result.manifest.licence).toBe('MIT')
   })
 
   test('does not extract a category from package.json (category comes from the upload form field)', async () => {
@@ -57,7 +60,7 @@ test.describe('extractManifest', () => {
       { name: 'package/package.json', content: manifest({ registry: { category: 'processing' } }) }
     ])
     const result = await extractManifest(Readable.from(tarball))
-    expect((result as { category?: unknown }).category).toBeUndefined()
+    expect((result.manifest as { category?: unknown }).category).toBeUndefined()
   })
 
   test('rejects missing package.json', async () => {
@@ -71,7 +74,7 @@ test.describe('extractManifest', () => {
       { name: 'package/package.json', content: manifest() }
     ])
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.name).toBe('@test/pkg')
+    expect(result.manifest.name).toBe('@test/pkg')
   })
 
   test('rejects invalid JSON in package.json with 400', async () => {
@@ -108,7 +111,7 @@ test.describe('extractManifest', () => {
     }
     const tarball = await packTarball(entries)
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.name).toBe('@test/pkg')
+    expect(result.manifest.name).toBe('@test/pkg')
   })
 
   test('caps entry count', async () => {
@@ -122,5 +125,80 @@ test.describe('extractManifest', () => {
     entries.push({ name: 'package/package.json', content: manifest() })
     const tarball = await packTarball(entries)
     await expect(extractManifest(Readable.from(tarball), { maxTarEntries: cap })).rejects.toMatchObject({ status: 413 })
+  })
+})
+
+test.describe('extractManifest hasNativeModules detection', () => {
+  test('pure JS package returns hasNativeModules=false', async () => {
+    const tarball = await createTestTarball({ name: '@test/pure', version: '1.0.0' })
+    const result = await extractManifest(streamBuffer(tarball))
+    expect(result.manifest.name).toBe('@test/pure')
+    expect(result.hasNativeModules).toBe(false)
+  })
+
+  test('package with a .node binary in node_modules returns true', async () => {
+    const tarball = await createTestTarball({
+      name: '@test/native',
+      version: '1.0.0',
+      extraEntries: [{ name: 'package/node_modules/foo/build/Release/foo.node', content: 'BINARY' }]
+    })
+    const result = await extractManifest(streamBuffer(tarball))
+    expect(result.hasNativeModules).toBe(true)
+  })
+
+  test('package with binding.gyp in node_modules returns true', async () => {
+    const tarball = await createTestTarball({
+      name: '@test/gyp',
+      version: '1.0.0',
+      extraEntries: [{ name: 'package/node_modules/foo/binding.gyp', content: '{}' }]
+    })
+    const result = await extractManifest(streamBuffer(tarball))
+    expect(result.hasNativeModules).toBe(true)
+  })
+
+  test('subpackage with node-gyp postinstall returns true', async () => {
+    const subPkg = JSON.stringify({ name: 'foo', version: '1.0.0', scripts: { postinstall: 'node-gyp rebuild' } })
+    const tarball = await createTestTarball({
+      name: '@test/postinstall',
+      version: '1.0.0',
+      extraEntries: [{ name: 'package/node_modules/foo/package.json', content: subPkg }]
+    })
+    const result = await extractManifest(streamBuffer(tarball))
+    expect(result.hasNativeModules).toBe(true)
+  })
+
+  test('subpackage with prebuild-install install script returns true', async () => {
+    const subPkg = JSON.stringify({ name: 'foo', version: '1.0.0', scripts: { install: 'prebuild-install || node-gyp rebuild' } })
+    const tarball = await createTestTarball({
+      name: '@test/prebuild',
+      version: '1.0.0',
+      extraEntries: [{ name: 'package/node_modules/foo/package.json', content: subPkg }]
+    })
+    const result = await extractManifest(streamBuffer(tarball))
+    expect(result.hasNativeModules).toBe(true)
+  })
+
+  test('prebuilds directory anywhere in node_modules returns true', async () => {
+    const tarball = await createTestTarball({
+      name: '@test/prebuilds',
+      version: '1.0.0',
+      extraEntries: [{ name: 'package/node_modules/foo/prebuilds/linux-x64/foo.node', content: 'BINARY' }]
+    })
+    const result = await extractManifest(streamBuffer(tarball))
+    expect(result.hasNativeModules).toBe(true)
+  })
+
+  test('top-level binding.gyp NOT in node_modules does not trigger', async () => {
+    // The plugin package itself rarely ships a binding.gyp at top level;
+    // when it does, it's metadata about the plugin's own build (not a dep
+    // to rebuild). Detection scopes to node_modules/** to avoid false
+    // positives on plugins that bundle native helpers as source.
+    const tarball = await createTestTarball({
+      name: '@test/topgyp',
+      version: '1.0.0',
+      extraEntries: [{ name: 'package/binding.gyp', content: '{}' }]
+    })
+    const result = await extractManifest(streamBuffer(tarball))
+    expect(result.hasNativeModules).toBe(false)
   })
 })

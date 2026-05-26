@@ -11,7 +11,7 @@ import config from '#config'
 import { filesStorage } from '../files-storage/index.ts'
 import { extractManifest, type Manifest } from './operations.ts'
 
-export type { Manifest } from './operations.ts'
+export type { Manifest, ExtractManifestResult } from './operations.ts'
 
 type UploadedBy = NonNullable<Artefact['uploadedBy']>
 
@@ -84,7 +84,9 @@ export const deleteArtefact = async (artefact: Artefact) => {
 // --- npm upload -----------------------------------------------------------
 
 // Reads a staged tarball and extracts its npm manifest. Caps come from config.
-export const extractStagedManifest = async (stagingPath: string): Promise<Manifest> => {
+export const extractStagedManifest = async (
+  stagingPath: string
+): Promise<{ manifest: Manifest, hasNativeModules: boolean }> => {
   const { body } = await filesStorage.readStream(stagingPath)
   return extractManifest(body, {
     maxDecompressedBytes: config.maxDecompressedBytes,

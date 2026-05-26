@@ -3,10 +3,18 @@ import { pipeline } from 'node:stream/promises'
 import { Writable } from 'node:stream'
 import * as tar from 'tar-stream'
 
+export interface TarballEntry {
+  /** Full tar path including the `package/` prefix, e.g. `package/node_modules/foo/binding.gyp` */
+  name: string
+  content: string | Buffer
+}
+
 export interface TarballOptions {
   name: string
   version: string
   licence?: string
+  /** Additional entries appended after package/package.json. Useful for native-module signal tests. */
+  extraEntries?: TarballEntry[]
 }
 
 export const createTestTarball = async (options: TarballOptions): Promise<Buffer> => {
@@ -16,14 +24,14 @@ export const createTestTarball = async (options: TarballOptions): Promise<Buffer
     version: options.version,
     ...(options.licence ? { licence: options.licence } : {})
   }
-
-  const content = JSON.stringify(pkg, null, 2)
-  pack.entry({ name: 'package/package.json' }, content)
+  pack.entry({ name: 'package/package.json' }, JSON.stringify(pkg, null, 2))
+  for (const entry of options.extraEntries ?? []) {
+    pack.entry({ name: entry.name }, entry.content)
+  }
   pack.finalize()
 
   const chunks: Buffer[] = []
   const gzip = createGzip()
-
   await pipeline(
     pack,
     gzip,
@@ -34,6 +42,5 @@ export const createTestTarball = async (options: TarballOptions): Promise<Buffer
       }
     })
   )
-
   return Buffer.concat(chunks)
 }

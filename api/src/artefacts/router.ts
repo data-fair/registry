@@ -279,7 +279,7 @@ router.post('/npm/:id', async (req, res, next) => {
     const { architecture, category: uploadCategory } = await streamTarballUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
     stagingStored = true
 
-    const manifest = await extractStagedManifest(stagingPath)
+    const { manifest } = await extractStagedManifest(stagingPath)
 
     if (existing?.packageName && existing.packageName !== manifest.name) {
       throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
