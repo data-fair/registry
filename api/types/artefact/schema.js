@@ -20,32 +20,6 @@ export default {
       type: 'string',
       enum: ['processing', 'catalog', 'application', 'tileset', 'maplibre-style', 'other']
     },
-    // Per-architecture tarball slots for npm artefacts. `noarch` is the valid
-    // key for portable builds; arch keys mirror `process.arch` values.
-    tarballs: {
-      type: 'object',
-      readOnly: true,
-      additionalProperties: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['path', 'size', 'uploadedAt'],
-        properties: {
-          path: { type: 'string' },
-          size: { type: 'integer' },
-          uploadedAt: { type: 'string', format: 'date-time' },
-          uploadedBy: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              apiKeyId: { type: 'string' },
-              apiKeyName: { type: 'string' },
-              shortId: { type: 'string' },
-              internal: { type: 'boolean' }
-            }
-          }
-        }
-      }
-    },
     title: {
       type: 'object',
       additionalProperties: false,
@@ -154,13 +128,21 @@ export default {
       'x-i18n-title': { fr: 'URL de documentation' }
     },
     origin: { type: 'string', readOnly: true },
-    // `filePath`, `fileName` are only used by format=file.
-    filePath: { type: 'string', readOnly: true },
+    // `fileName` is only used by format=file.
     fileName: { type: 'string', readOnly: true },
     size: { type: 'integer', readOnly: true },
-    // Top-level `uploadedBy` is only meaningful for file format (single
-    // upload per artefact). npm format carries per-arch `uploadedBy` inside
-    // `tarballs[arch]`.
+    // Path to the artefact's primary blob in files-storage. For npm, the
+    // tarball; for file, the uploaded file; for spa, currently still
+    // tarballPath (spa is unchanged in this revision). Renamed from
+    // filePath for npm/file symmetry.
+    path: { type: 'string', readOnly: true },
+    // True iff the npm tarball contains compiled .node binaries, a
+    // binding.gyp, a prebuilds/ directory, or an install/preinstall/
+    // postinstall script that references node-gyp / prebuild-install /
+    // node-gyp-build / node-pre-gyp. Set at upload time; consumers
+    // (lib-node) use it to decide whether to run `npm rebuild` after
+    // extraction.
+    hasNativeModules: { type: 'boolean', readOnly: true },
     uploadedBy: {
       type: 'object',
       readOnly: true,
