@@ -110,6 +110,7 @@ test.describe('lib-node-registry', () => {
       name: '@test/with-postinstall',
       version: '1.0.0',
       extraEntries: [
+        { name: 'package/node_modules/sentinel/binding.gyp', content: '{}' },
         { name: 'package/node_modules/sentinel/package.json', content: subPkg }
       ]
     })
@@ -143,7 +144,10 @@ test.describe('lib-node-registry', () => {
     const tarball = await createTestTarball({
       name: '@test/no-build',
       version: '1.0.0',
-      extraEntries: [{ name: 'package/node_modules/sentinel/package.json', content: subPkg }]
+      extraEntries: [
+        { name: 'package/node_modules/sentinel/binding.gyp', content: '{}' },
+        { name: 'package/node_modules/sentinel/package.json', content: subPkg }
+      ]
     })
     const ax = axiosWithApiKey(uploadApiKey)
     const form = new FormData()
