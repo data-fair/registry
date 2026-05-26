@@ -25,7 +25,7 @@
 
     <!-- Download file artefact -->
     <v-card
-      v-if="hasGrant && artefact.format === 'file' && artefact.filePath"
+      v-if="hasGrant && artefact.format === 'file' && artefact.path"
       class="mb-4"
     >
       <v-card-title>{{ t('download') }}</v-card-title>
@@ -69,20 +69,26 @@
     <!-- Metadata -->
     <artefact-metadata :artefact="artefact" />
 
-    <!-- Tarballs (npm only) -->
+    <!-- Tarball (npm only) -->
     <v-card
-      v-if="artefact.format === 'npm'"
+      v-if="artefact.format === 'npm' && artefact.path"
       class="mb-4"
     >
       <v-card-title>
-        {{ t('tarballs') }}
-        <span class="text-medium-emphasis text-body-2 ml-2">({{ Object.keys(artefact.tarballs ?? {}).length }})</span>
+        {{ t('tarball') }}
+        <v-chip
+          v-if="artefact.hasNativeModules"
+          color="warning"
+          size="small"
+          class="ml-2"
+        >
+          {{ t('hasNativeModules') }}
+        </v-chip>
       </v-card-title>
       <v-card-text>
         <v-table density="compact">
           <thead>
             <tr>
-              <th>{{ t('architecture') }}</th>
               <th>{{ t('size') }}</th>
               <th>{{ t('uploadedAt') }}</th>
               <th v-if="adminMode">
@@ -92,15 +98,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="(entry, arch) in artefact.tarballs ?? {}"
-              :key="arch"
-            >
-              <td><code>{{ arch }}</code></td>
-              <td>{{ typeof entry.size === 'number' ? formatBytes(entry.size, locale) : '-' }}</td>
-              <td>{{ dayjs(entry.uploadedAt).format('L LT') }}</td>
+            <tr>
+              <td>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</td>
+              <td>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</td>
               <td v-if="adminMode">
-                {{ entry.uploadedBy?.apiKeyName ?? (entry.uploadedBy?.internal ? 'internal' : '') }}
+                {{ artefact.uploadedBy?.apiKeyName ?? (artefact.uploadedBy?.internal ? 'internal' : '') }}
               </td>
               <td
                 v-if="hasGrant"
@@ -110,7 +112,7 @@
                   :icon="mdiDownload"
                   size="small"
                   variant="text"
-                  :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/tarball?architecture=${arch}`"
+                  :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/tarball`"
                 />
               </td>
             </tr>
@@ -135,8 +137,8 @@
 <i18n lang="yaml">
 fr:
   artefacts: Artefacts
-  tarballs: Tarballs
-  architecture: Architecture
+  tarball: Tarball
+  hasNativeModules: "Modules natifs"
   size: Taille
   uploadedAt: "T\xE9l\xE9vers\xE9 le"
   uploadedBy: "T\xE9l\xE9vers\xE9 par"
@@ -147,8 +149,8 @@ fr:
   deprecatedNotice: "Cet artefact est d\xE9pr\xE9ci\xE9. Il reste disponible mais n'est plus recommand\xE9."
 en:
   artefacts: Artefacts
-  tarballs: Tarballs
-  architecture: Architecture
+  tarball: Tarball
+  hasNativeModules: "Has native modules"
   size: Size
   uploadedAt: Uploaded
   uploadedBy: Uploaded by
