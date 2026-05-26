@@ -3,11 +3,24 @@ import { pipeline } from 'node:stream/promises'
 import { createWriteStream } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, rename, stat, utimes } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
-import { arch as defaultArch } from 'node:process'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import type { Readable } from 'node:stream'
+
+const nodeMajor = (): string => process.versions.node.split('.')[0]
+
+const detectLibc = (): 'glibc' | 'musl' => {
+  // process.report.getReport().header.glibcVersionRuntime is a non-empty
+  // string on glibc, undefined or '' on musl (and on non-Linux). For our
+  // purposes, "no glibc" means musl; the consumer is presumed Linux.
+  try {
+    const header = (process.report?.getReport() as { header?: { glibcVersionRuntime?: string } } | undefined)?.header
+    return header?.glibcVersionRuntime ? 'glibc' : 'musl'
+  } catch {
+    return 'musl'
+  }
+}
 
 export interface Account {
   type: 'user' | 'organization'
@@ -20,13 +33,14 @@ export interface EnsureArtefactOpts {
   secretKey: string
   artefactId: string
   cacheDir: string
-  /**
-   * Architecture to request. Defaults to the running Node process arch.
-   * Pass an empty string to skip the arch query (registry returns the
-   * `noarch` slot if present).
-   */
-  architecture?: string
   account?: Account
+  /**
+   * When true and the artefact's `hasNativeModules` is true, run `npm rebuild`
+   * against the extracted node_modules. No-op when the artefact has no
+   * native modules. The cache key incorporates Node major + libc, so a
+   * runtime upgrade naturally invalidates the cache and forces a rebuild.
+   */
+  build?: boolean
 }
 
 export interface EnsureArtefactResult {
@@ -43,7 +57,6 @@ interface CacheMeta {
 }
 
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
-  const architecture = opts.architecture === undefined ? defaultArch : (opts.architecture || undefined)
   const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
   if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
   const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
@@ -58,8 +71,8 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   const version: string = artefact.version
 
   const artefactDir = join(opts.cacheDir, opts.artefactId)
-  const cacheKey = architecture ? `${architecture}` : 'noarch'
-  const extractDir = join(artefactDir, cacheKey)
+  const buildTuple = opts.build ? `${nodeMajor()}-${detectLibc()}` : 'js'
+  const extractDir = join(artefactDir, buildTuple)
   const metaPath = join(extractDir, '.meta.json')
 
   try {
@@ -72,10 +85,8 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
     // cold cache or invalid metadata
   }
 
-  const params = architecture ? { architecture } : undefined
   const tarballRes = await ax.get(`/api/v1/artefacts/${encodedId}/tarball`, {
-    responseType: 'stream',
-    params
+    responseType: 'stream'
   })
 
   const tmpDir = `${extractDir}.tmp.${process.pid}`
