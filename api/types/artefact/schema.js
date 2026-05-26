@@ -131,10 +131,9 @@ export default {
     // `fileName` is only used by format=file.
     fileName: { type: 'string', readOnly: true },
     size: { type: 'integer', readOnly: true },
-    // Path to the artefact's primary blob in files-storage. For npm, the
-    // tarball; for file, the uploaded file; for spa, currently still
-    // tarballPath (spa is unchanged in this revision). Renamed from
-    // filePath for npm/file symmetry.
+    // Path to the artefact's primary blob in files-storage. For npm,
+    // the tarball; for file, the uploaded file. Renamed from filePath
+    // for npm/file symmetry.
     path: { type: 'string', readOnly: true },
     // True iff the npm tarball contains compiled .node binaries, a
     // binding.gyp, a prebuilds/ directory, or an install/preinstall/
