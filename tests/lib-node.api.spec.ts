@@ -65,19 +65,8 @@ test.describe('lib-node-registry', () => {
   })
 
   test('cache slot lives under nodeMajor-libc when build:true', async () => {
-    const subPkg = JSON.stringify({ name: 'sentinel', version: '1.0.0', scripts: {} })
-    const tarball = await createTestTarball({
-      name: '@test/cache-key',
-      version: '1.0.0',
-      extraEntries: [
-        { name: 'package/node_modules/sentinel/binding.gyp', content: '{}' },
-        { name: 'package/node_modules/sentinel/package.json', content: subPkg }
-      ]
-    })
-    const ax = axiosWithApiKey(uploadApiKey)
-    const form = new FormData()
-    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/cache-key@1'), form, { headers: form.getHeaders() })
+    // Slot naming depends solely on opts.build; no native-module signal needed.
+    await uploadNpm('@test/cache-key@1', { name: '@test/cache-key', version: '1.0.0' })
     const admin = await superAdmin
     await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/cache-key@1'), { public: true })
 
@@ -125,7 +114,10 @@ test.describe('lib-node-registry', () => {
       name: '@test/with-postinstall',
       version: '1.0.0',
       extraEntries: [
-        { name: 'package/node_modules/sentinel/binding.gyp', content: '{}' },
+        // A .node binary trips the native-module detector without making npm
+        // rebuild invoke node-gyp (which would happen if we used binding.gyp
+        // and would fail for our fake fixture).
+        { name: 'package/node_modules/sentinel/index.node', content: 'fake' },
         { name: 'package/node_modules/sentinel/package.json', content: subPkg }
       ]
     })
@@ -160,7 +152,7 @@ test.describe('lib-node-registry', () => {
       name: '@test/no-build',
       version: '1.0.0',
       extraEntries: [
-        { name: 'package/node_modules/sentinel/binding.gyp', content: '{}' },
+        { name: 'package/node_modules/sentinel/index.node', content: 'fake' },
         { name: 'package/node_modules/sentinel/package.json', content: subPkg }
       ]
     })
