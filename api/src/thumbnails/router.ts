@@ -10,6 +10,14 @@ import { tryInternalSecretWithAccount } from '../auth.ts'
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
+type StoredThumbnail = {
+  data: Buffer
+  width: number
+  height: number
+  mimeType: 'image/webp' | 'image/svg+xml'
+  byteSize: number
+}
+
 // Buffers the single uploaded file in memory (capped at MAX_UPLOAD_BYTES).
 // Thumbnails are small and need to be handed to Sharp as a buffer anyway,
 // so we skip any filesystem tmp step even for the fs backend.
@@ -77,7 +85,7 @@ artefactThumbnailRouter.post('/', async (req, res, next) => {
     // SVG passes through unchanged — vector should not be rasterized. We trust
     // the multipart Content-Type (uploads are admin / internal-service only).
     // Mirrors the same branch in data-fair/portals (api/src/images/resize-image.ts).
-    let resized: { data: Buffer, width: number, height: number, mimeType: 'image/webp' | 'image/svg+xml', byteSize: number }
+    let resized: StoredThumbnail
     if (mimetype === 'image/svg+xml') {
       resized = { data, width: 0, height: 0, mimeType: 'image/svg+xml', byteSize: data.byteLength }
     } else {
