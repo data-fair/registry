@@ -130,4 +130,35 @@ test.describe('Thumbnails', () => {
       expect(err.status).toBe(404)
     }
   })
+
+  test('SVG upload is preserved byte-for-byte and served as image/svg+xml', async () => {
+    const artefactId = await createArtefact('@test/svg-pkg')
+    const admin = await superAdmin
+
+    const svgSource = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>'
+    )
+    const form = new FormData()
+    form.append('file', svgSource, { filename: 'icon.svg', contentType: 'image/svg+xml' })
+    const res = await admin.post(
+      `/api/v1/artefacts/${encodeURIComponent(artefactId)}/thumbnail`,
+      form,
+      { headers: form.getHeaders() }
+    )
+
+    expect(res.status).toBe(201)
+    expect(res.data.thumbnail).toBeTruthy()
+    expect(res.data.thumbnail.width).toBe(0)
+    expect(res.data.thumbnail.height).toBe(0)
+
+    const thumbId = res.data.thumbnail.id
+    const get = await anonymousAx.get(
+      `/api/v1/thumbnails/${thumbId}/data`,
+      { responseType: 'arraybuffer' }
+    )
+    expect(get.status).toBe(200)
+    expect(get.headers['content-type']).toBe('image/svg+xml')
+    expect(get.headers['cache-control']).toContain('immutable')
+    expect(Buffer.from(get.data).equals(svgSource)).toBe(true)
+  })
 })

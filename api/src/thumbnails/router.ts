@@ -74,13 +74,20 @@ artefactThumbnailRouter.post('/', async (req, res, next) => {
 
     const { data, mimetype } = await bufferSingleFileUpload(req)
 
-    let resized
-    try {
-      resized = await resizeThumbnail({ data, mimetype })
-    } catch (err: any) {
-      if (err?.message === 'IMAGE_EXCEEDS_PIXEL_LIMIT') throw httpError(400, 'image exceeds maximum pixel limit')
-      if (err?.message === 'INVALID_IMAGE_DIMENSIONS') throw httpError(400, 'invalid image')
-      throw httpError(400, `image processing failed: ${err?.message ?? err}`)
+    // SVG passes through unchanged — vector should not be rasterized. We trust
+    // the multipart Content-Type (uploads are admin / internal-service only).
+    // Mirrors the same branch in data-fair/portals (api/src/images/resize-image.ts).
+    let resized: { data: Buffer, width: number, height: number, mimeType: 'image/webp' | 'image/svg+xml', byteSize: number }
+    if (mimetype === 'image/svg+xml') {
+      resized = { data, width: 0, height: 0, mimeType: 'image/svg+xml', byteSize: data.byteLength }
+    } else {
+      try {
+        resized = await resizeThumbnail({ data, mimetype })
+      } catch (err: any) {
+        if (err?.message === 'IMAGE_EXCEEDS_PIXEL_LIMIT') throw httpError(400, 'image exceeds maximum pixel limit')
+        if (err?.message === 'INVALID_IMAGE_DIMENSIONS') throw httpError(400, 'invalid image')
+        throw httpError(400, `image processing failed: ${err?.message ?? err}`)
+      }
     }
 
     const id = randomUUID()
@@ -92,7 +99,7 @@ artefactThumbnailRouter.post('/', async (req, res, next) => {
       _id: id,
       artefactId,
       data: new Binary(resized.data),
-      mimeType: 'image/webp',
+      mimeType: resized.mimeType,
       width: resized.width,
       height: resized.height,
       byteSize: resized.byteSize,
