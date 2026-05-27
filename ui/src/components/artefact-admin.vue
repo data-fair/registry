@@ -13,8 +13,8 @@
         >
           <img
             :src="thumbnailUrl!"
-            :width="artefact.thumbnail.width"
-            :height="artefact.thumbnail.height"
+            :width="artefact.thumbnail.width || undefined"
+            :height="artefact.thumbnail.height || undefined"
             :style="{ maxWidth: '100%', height: 'auto', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '4px' }"
             alt=""
           >
