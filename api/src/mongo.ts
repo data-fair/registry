@@ -10,7 +10,7 @@ export type Thumbnail = {
   _id: string
   artefactId: string
   data: Binary
-  mimeType: 'image/webp'
+  mimeType: 'image/webp' | 'image/svg+xml'
   width: number
   height: number
   byteSize: number
