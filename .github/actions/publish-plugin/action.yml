@@ -14,7 +14,7 @@ inputs:
     description: 'Override the suffix appended to the artefact id. Default: major version on tag pushes; branch name on branch pushes.'
     required: false
   api-key:
-    description: 'Registry upload API key (pass via ${{ secrets.REGISTRY_API_KEY }})'
+    description: 'Registry upload API key (pass via secrets.REGISTRY_API_KEY from the calling workflow)'
     required: true
 runs:
   using: 'composite'
