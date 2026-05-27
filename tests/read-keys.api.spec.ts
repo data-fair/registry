@@ -79,7 +79,7 @@ test.describe('Read API key access', () => {
       const ax = axiosWithApiKey(readApiKey)
       const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1'))
       expect(res.data.packageName).toBe('@test/public-pkg')
-      expect(res.data.tarballs).toBeTruthy()
+      expect(typeof res.data.path).toBe('string')
     })
 
     test('read key cannot get artefact outside scope', async () => {

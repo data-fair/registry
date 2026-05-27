@@ -9,6 +9,7 @@ import { app } from './app.ts'
 import config from '#config'
 import mongo from '#mongo'
 import { syncAllRemoteRegistries } from './remote-registries/sync.ts'
+import { renameFilePathToPath } from './boot-rename-file-path.ts'
 
 const server = createServer(app)
 const httpTerminator = createHttpTerminator({ server })
@@ -26,6 +27,7 @@ export const start = async () => {
   if (config.observer?.active) await startObserver(config.observer.port)
   session.init(config.privateDirectoryUrl)
   await mongo.init()
+  await renameFilePathToPath(mongo.db)
   await locks.start(mongo.db)
 
   if (config.privateEventsUrl) {

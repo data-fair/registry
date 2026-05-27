@@ -1,0 +1,86 @@
+name: 'Publish plugin to data-fair registry'
+description: 'Package the current Node project with its production node_modules and upload it to a data-fair registry as an npm-format artefact.'
+inputs:
+  registry-url:
+    description: 'Base URL of the registry, e.g. https://koumoul.com/registry'
+    required: true
+  category:
+    description: 'Artefact category (processing, catalog, application, ...)'
+    required: true
+  artefact-id:
+    description: 'Override the computed artefact id. Default: <name-with-slashes-as-dashes>-<ref-suffix>'
+    required: false
+  ref-suffix:
+    description: 'Override the suffix appended to the artefact id. Default: major version on tag pushes; branch name on branch pushes.'
+    required: false
+  api-key:
+    description: 'Registry upload API key (pass via ${{ secrets.REGISTRY_API_KEY }})'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+
+    - name: Build artefact with bundled node_modules
+      shell: bash
+      run: |
+        set -euo pipefail
+        # 1. Source layer via `npm pack` — respects package.json#files.
+        npm pack
+        TARBALL=$(ls ./*.tgz)
+        # 2. Extract to ./build/package/ (npm tarball's top-level prefix).
+        mkdir build
+        tar xzf "$TARBALL" -C build
+        # 3. `npm pack` excludes package-lock.json; copy it in for a
+        # reproducible `npm ci`.
+        cp package-lock.json build/package/
+        # 4. Install prod deps on the runner. No alpine docker run —
+        # the consumer will `npm rebuild` against its own runtime if
+        # the registry's detection flags hasNativeModules.
+        ( cd build/package && npm ci --omit=dev --omit=optional --no-audit --no-fund )
+        # 5. Repack, preserving the `package/` prefix the registry expects.
+        tar czf with-deps.tgz -C build package
+
+    - name: Compute artefact id and upload
+      shell: bash
+      env:
+        REGISTRY_URL: ${{ inputs.registry-url }}
+        REGISTRY_API_KEY: ${{ inputs.api-key }}
+        CATEGORY: ${{ inputs.category }}
+        ARTEFACT_ID_OVERRIDE: ${{ inputs.artefact-id }}
+        REF_SUFFIX_OVERRIDE: ${{ inputs.ref-suffix }}
+      run: |
+        set -euo pipefail
+        PACKAGE_NAME=$(node -p "require('./package.json').name")
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+        if [ -n "$ARTEFACT_ID_OVERRIDE" ]; then
+          ARTEFACT_ID="$ARTEFACT_ID_OVERRIDE"
+        else
+          if [ -n "$REF_SUFFIX_OVERRIDE" ]; then
+            SUFFIX="$REF_SUFFIX_OVERRIDE"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            # Tag must match package.json version.
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match package.json version $PACKAGE_VERSION"
+              exit 1
+            fi
+            SUFFIX=$(echo "$PACKAGE_VERSION" | cut -d. -f1)
+          else
+            SUFFIX="$GITHUB_REF_NAME"
+          fi
+          BASE_ID="${PACKAGE_NAME//\//-}"
+          ARTEFACT_ID="${BASE_ID}-${SUFFIX}"
+        fi
+
+        export ARTEFACT_ID
+        ENCODED_ID=$(node -p "encodeURIComponent(process.env.ARTEFACT_ID)")
+        echo "Uploading $ARTEFACT_ID to $REGISTRY_URL"
+        curl -sS --fail-with-body -X POST \
+          "${REGISTRY_URL}/api/v1/artefacts/npm/${ENCODED_ID}" \
+          -H "x-api-key: ${REGISTRY_API_KEY}" \
+          -F "category=${CATEGORY}" \
+          -F "file=@with-deps.tgz"

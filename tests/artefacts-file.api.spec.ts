@@ -26,7 +26,7 @@ test.describe('File artefacts', () => {
       expect(res.data.artefact.name).toBe('terrain')
       expect(res.data.artefact._id).toBe('terrain')
       expect(res.data.artefact.category).toBe('tileset')
-      expect(res.data.artefact.filePath).toBeTruthy()
+      expect(res.data.artefact.path).toBeTruthy()
       expect(res.data.artefact.fileName).toBe('terrain.mbtiles')
       expect(res.data.artefact.size).toBe(Buffer.byteLength('test-content'))
       expect(res.data.artefact.uploadedBy).toBeTruthy()
@@ -123,9 +123,9 @@ test.describe('File artefacts', () => {
       expect(res.data.versions).toBeUndefined()
     })
 
-    test('detail returns npm artefact with tarballs map', async () => {
+    test('detail returns npm artefact with path', async () => {
       const res = await anonymousAx.get('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'))
-      expect(res.data.tarballs).toBeTruthy()
+      expect(typeof res.data.path).toBe('string')
     })
   })
 

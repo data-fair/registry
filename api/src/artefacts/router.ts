@@ -249,9 +249,6 @@ router.post('/file/:name', async (req, res, next) => {
 })
 
 // Upload npm artefact (API key or internal secret auth, multipart).
-// Each artefact id holds a `tarballs: { [arch]: ... }` map; per-arch upload
-// updates one slot, leaves the others alone. `noarch` is the default arch
-// for portable builds.
 router.post('/npm/:id', async (req, res, next) => {
   const stagingPath = `_staging/${randomUUID()}.tgz`
   let stagingStored = false
@@ -276,10 +273,10 @@ router.post('/npm/:id', async (req, res, next) => {
       throw httpError(409, `this artefact already exists as a "${existing.format}" artefact`)
     }
 
-    const { architecture, category: uploadCategory } = await streamTarballUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
+    const { category: uploadCategory } = await streamTarballUpload(req, (stream) => filesStorage.writeStream(stream, stagingPath))
     stagingStored = true
 
-    const manifest = await extractStagedManifest(stagingPath)
+    const { manifest, hasNativeModules } = await extractStagedManifest(stagingPath)
 
     if (existing?.packageName && existing.packageName !== manifest.name) {
       throw httpError(409, `package name mismatch: existing artefact tracks "${existing.packageName}", upload manifest says "${manifest.name}"`)
@@ -292,9 +289,9 @@ router.post('/npm/:id', async (req, res, next) => {
 
     const artefact = await commitNpmUpload({
       id,
-      arch: architecture || 'noarch',
       stagingPath,
       manifest,
+      hasNativeModules,
       category,
       uploadedBy: apiKey
         ? { apiKeyId: apiKey._id, apiKeyName: apiKey.name, shortId: apiKey.shortId }
@@ -318,10 +315,10 @@ router.get('/:id/download', async (req, res, next) => {
     if (!artefact) throw httpError(404, 'artefact not found')
     await assertDownloadAccess(caller, artefact)
     if (artefact.format !== 'file') throw httpError(400, 'this artefact is not a file-format artefact')
-    if (!artefact.filePath) throw httpError(404, 'no file uploaded for this artefact')
+    if (!artefact.path) throw httpError(404, 'no file uploaded for this artefact')
 
     const filename = artefact.fileName || artefact.name
-    const download = await resolveDownload(artefact.filePath, filename, req.get('If-Modified-Since'))
+    const download = await resolveDownload(artefact.path, filename, req.get('If-Modified-Since'))
     if ('redirectUrl' in download) {
       res.redirect(302, download.redirectUrl)
       return
@@ -337,9 +334,7 @@ router.get('/:id/download', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// Download npm artefact tarball. Optional ?architecture=<x64|arm64|...>
-// resolves a specific slot; falls back to `noarch` if the requested arch is
-// absent.
+// Download npm artefact tarball. A ?architecture= query param is silently ignored.
 router.get('/:id/tarball', async (req, res, next) => {
   try {
     const caller = await resolveCaller(req)
@@ -348,14 +343,10 @@ router.get('/:id/tarball', async (req, res, next) => {
     if (!artefact) throw httpError(404, 'artefact not found')
     if (artefact.format !== 'npm') throw httpError(400, 'this artefact is not an npm-format artefact')
     await assertDownloadAccess(caller, artefact)
-
-    const requestedArch = typeof req.query.architecture === 'string' ? req.query.architecture : undefined
-    const tarballs = artefact.tarballs || {}
-    const slot = (requestedArch && tarballs[requestedArch]) || tarballs.noarch
-    if (!slot) throw httpError(404, 'no tarball for this architecture')
+    if (!artefact.path) throw httpError(404, 'no tarball uploaded for this artefact')
 
     const filename = `${artefact.name}-${artefact.version || 'tarball'}.tgz`
-    const download = await resolveDownload(slot.path, filename, req.get('If-Modified-Since'))
+    const download = await resolveDownload(artefact.path, filename, req.get('If-Modified-Since'))
     if ('redirectUrl' in download) {
       res.redirect(302, download.redirectUrl)
       return
@@ -373,20 +364,19 @@ router.get('/:id/tarball', async (req, res, next) => {
 
 // Helper: stream a multipart upload containing a tarball to a caller-provided
 // sink (typically the configured files-storage backend), collecting the
-// `architecture` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.
+// `category` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.
 type StreamWriter = (stream: Readable) => Promise<void>
 
-function streamTarballUpload (req: import('express').Request, writer: StreamWriter): Promise<{ architecture?: string, category?: string }> {
+function streamTarballUpload (req: import('express').Request, writer: StreamWriter): Promise<{ category?: string }> {
   return new Promise((resolve, reject) => {
     let settled = false
-    const settle = (err: Error | null, result?: { architecture?: string, category?: string }) => {
+    const settle = (err: Error | null, result?: { category?: string }) => {
       if (settled) return
       settled = true
       if (err) reject(err)
       else resolve(result!)
     }
 
-    let architecture: string | undefined
     let category: string | undefined
     let fileSeen = false
     let pendingWrite: Promise<void> | null = null
@@ -403,7 +393,6 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
     })
 
     busboy.on('field', (name, val) => {
-      if (name === 'architecture') architecture = val
       // The artefact category comes solely from this multipart field; the
       // package.json manifest is never inspected for one. Absent here, the
       // category defaults to "other".
@@ -437,7 +426,7 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
         return settle(err as Error)
       }
       if (settled) return
-      settle(null, { architecture, category })
+      settle(null, { category })
     })
 
     req.on('aborted', () => settle(httpError(400, 'upload aborted')))

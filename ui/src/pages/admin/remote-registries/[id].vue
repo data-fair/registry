@@ -8,6 +8,16 @@
       <v-card-title>{{ t('config') }}</v-card-title>
       <v-card-text>
         <v-row>
+          <v-col cols="12">
+            <v-text-field
+              :model-value="registry._id"
+              :label="t('url')"
+              density="compact"
+              variant="outlined"
+              hide-details
+              readonly
+            />
+          </v-col>
           <v-col
             cols="12"
             sm="6"
@@ -235,8 +245,10 @@
 <i18n lang="yaml">
 fr:
   admin: Administration
+  remoteRegistries: Registres distants
   config: Configuration
   name: Nom
+  url: URL
   apiKey: Clé API
   changeApiKey: Nouvelle clé API
   save: Enregistrer
@@ -261,8 +273,10 @@ fr:
   delete: Supprimer
 en:
   admin: Administration
+  remoteRegistries: Remote registries
   config: Configuration
   name: Name
+  url: URL
   apiKey: API Key
   changeApiKey: New API Key
   save: Save
@@ -317,6 +331,7 @@ const unselectingId = ref<string | null>(null)
 
 useBreadcrumbs().setForPage(() => [
   { title: t('admin'), to: '/admin' },
+  { title: t('remoteRegistries'), to: '/admin#remote-registries' },
   { title: registry.value?.name || registryId.value, disabled: true }
 ])
 
