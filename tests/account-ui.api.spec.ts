@@ -47,7 +47,7 @@ test.describe('Account-facing access patterns', () => {
   test('authenticated user without grant cannot download', async () => {
     const ax = await axiosAuth('dev-standalone1')
     try {
-      await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/tarball')
+      await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/download')
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(403)
@@ -56,7 +56,7 @@ test.describe('Account-facing access patterns', () => {
 
   test('user with grant can download public artefact', async () => {
     const ax = await axiosAuth('test1-admin1', { org: 'test1' })
-    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/tarball', {
+    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/download', {
       responseType: 'arraybuffer'
     })
     expect(res.status).toBe(200)
@@ -64,7 +64,7 @@ test.describe('Account-facing access patterns', () => {
 
   test('user with grant can download private artefact in privateAccess', async () => {
     const ax = await axiosAuth('test1-admin1', { org: 'test1' })
-    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/private-pkg@2') + '/tarball', {
+    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/private-pkg@2') + '/download', {
       responseType: 'arraybuffer'
     })
     expect(res.status).toBe(200)

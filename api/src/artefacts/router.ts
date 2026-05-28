@@ -306,7 +306,15 @@ router.post('/npm/:id', async (req, res, next) => {
   }
 })
 
-// Download raw file
+// Download an artefact's bytes (raw file OR npm tarball — same endpoint).
+//
+// Last-Modified is derived from the doc's dataUpdatedAt (not the storage file
+// mtime). The If-Modified-Since check runs in the route handler so 304 works
+// for both fs streaming AND the S3 signed-URL redirect path.
+//
+// For npm artefacts the response also carries X-Artefact-Version and
+// X-Artefact-Has-Native-Modules so the lib-node client can avoid a separate
+// GET /:id metadata roundtrip.
 router.get('/:id/download', async (req, res, next) => {
   try {
     const caller = await resolveCaller(req)
@@ -314,47 +322,41 @@ router.get('/:id/download', async (req, res, next) => {
     const artefact = await getArtefact(req.params.id, filter)
     if (!artefact) throw httpError(404, 'artefact not found')
     await assertDownloadAccess(caller, artefact)
-    if (artefact.format !== 'file') throw httpError(400, 'this artefact is not a file-format artefact')
-    if (!artefact.path) throw httpError(404, 'no file uploaded for this artefact')
+    if (!artefact.path) throw httpError(404, 'no content uploaded for this artefact')
 
-    const filename = artefact.fileName || artefact.name
-    const download = await resolveDownload(artefact.path, filename, req.get('If-Modified-Since'))
+    // dataUpdatedAt is the canonical "content changed" timestamp on the doc
+    // (PATCH only touches updatedAt). Per-second resolution (HTTP-date) is
+    // accepted: sub-second republishes alias together but in practice an
+    // upload is far slower than that.
+    const lastModified = new Date(artefact.dataUpdatedAt ?? artefact.updatedAt ?? Date.now())
+    res.set('Last-Modified', lastModified.toUTCString())
+    res.set('Cache-Control', 'no-cache')
+    if (artefact.format === 'npm') {
+      res.set('X-Artefact-Version', artefact.version ?? '')
+      res.set('X-Artefact-Has-Native-Modules', artefact.hasNativeModules ? 'true' : 'false')
+    }
+
+    const ifModifiedSince = req.get('If-Modified-Since')
+    if (ifModifiedSince) {
+      const since = Math.floor(new Date(ifModifiedSince).getTime() / 1000)
+      const mod = Math.floor(lastModified.getTime() / 1000)
+      if (!isNaN(since) && since >= mod) {
+        res.status(304).end()
+        return
+      }
+    }
+
+    const filename = artefact.format === 'npm'
+      ? `${artefact.name}-${artefact.version || 'tarball'}.tgz`
+      : (artefact.fileName || artefact.name)
+    const download = await resolveDownload(artefact.path, filename)
     if ('redirectUrl' in download) {
       res.redirect(302, download.redirectUrl)
       return
     }
 
-    res.set('Content-Type', 'application/octet-stream')
+    res.set('Content-Type', artefact.format === 'npm' ? 'application/gzip' : 'application/octet-stream')
     res.set('Content-Disposition', `attachment; filename="${filename}"`)
-    res.set('Last-Modified', download.lastModified.toUTCString())
-    res.set('Content-Length', String(download.size))
-    await pipeline(download.body, res).catch((err) => {
-      if (!res.headersSent) next(err)
-    })
-  } catch (err) { next(err) }
-})
-
-// Download npm artefact tarball. A ?architecture= query param is silently ignored.
-router.get('/:id/tarball', async (req, res, next) => {
-  try {
-    const caller = await resolveCaller(req)
-    const filter = artefactAccessFilter(caller)
-    const artefact = await getArtefact(req.params.id, filter)
-    if (!artefact) throw httpError(404, 'artefact not found')
-    if (artefact.format !== 'npm') throw httpError(400, 'this artefact is not an npm-format artefact')
-    await assertDownloadAccess(caller, artefact)
-    if (!artefact.path) throw httpError(404, 'no tarball uploaded for this artefact')
-
-    const filename = `${artefact.name}-${artefact.version || 'tarball'}.tgz`
-    const download = await resolveDownload(artefact.path, filename, req.get('If-Modified-Since'))
-    if ('redirectUrl' in download) {
-      res.redirect(302, download.redirectUrl)
-      return
-    }
-
-    res.set('Content-Type', 'application/gzip')
-    res.set('Content-Disposition', `attachment; filename="${filename}"`)
-    res.set('Last-Modified', download.lastModified.toUTCString())
     res.set('Content-Length', String(download.size))
     await pipeline(download.body, res).catch((err) => {
       if (!res.headersSent) next(err)

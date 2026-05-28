@@ -16,7 +16,6 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { NodeHttpHandler } from '@smithy/node-http-handler'
 import { HttpAgent, HttpsAgent } from 'agentkeepalive'
 import type { Readable } from 'node:stream'
-import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import config from '#config'
 import type { FileBackend } from './types.ts'
 
@@ -67,30 +66,16 @@ export class S3Backend implements FileBackend {
     await upload.done()
   }
 
-  async readStream (path: string, ifModifiedSince?: string) {
-    const ifModifiedSinceDate = ifModifiedSince ? new Date(ifModifiedSince) : undefined
+  async readStream (path: string) {
     const bucketParams = {
       Bucket: config.s3!.bucket,
-      Key: this.key(path),
-      IfModifiedSince: ifModifiedSinceDate
+      Key: this.key(path)
     }
-    try {
-      const head = await this.metadataClient.send(new HeadObjectCommand(bucketParams))
-      if (ifModifiedSinceDate && head.LastModified &&
-          Math.floor(head.LastModified.getTime() / 1000) <= Math.floor(ifModifiedSinceDate.getTime() / 1000)) {
-        throw httpError(304)
-      }
-      const response = await this.dataClient.send(new GetObjectCommand(bucketParams))
-      return {
-        body: response.Body as Readable,
-        size: response.ContentLength!,
-        lastModified: response.LastModified!
-      }
-    } catch (err: any) {
-      if (err?.$metadata?.httpStatusCode === 304 || err?.name === 'NotModified') {
-        throw httpError(304)
-      }
-      throw err
+    const response = await this.dataClient.send(new GetObjectCommand(bucketParams))
+    return {
+      body: response.Body as Readable,
+      size: response.ContentLength!,
+      lastModified: response.LastModified!
     }
   }
 

@@ -112,7 +112,7 @@
                   :icon="mdiDownload"
                   size="small"
                   variant="text"
-                  :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/tarball`"
+                  :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/download`"
                 />
               </td>
             </tr>

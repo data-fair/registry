@@ -96,7 +96,7 @@ test.describe('Read API key access', () => {
   test.describe('Tarball download', () => {
     test('read key can download tarball', async () => {
       const ax = axiosWithApiKey(readApiKey)
-      const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/tarball', {
+      const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/download', {
         responseType: 'arraybuffer'
       })
       expect(res.status).toBe(200)
@@ -105,7 +105,7 @@ test.describe('Read API key access', () => {
 
     test('read key can download private artefact tarball', async () => {
       const ax = axiosWithApiKey(readApiKey)
-      const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/private-pkg@2') + '/tarball', {
+      const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/private-pkg@2') + '/download', {
         responseType: 'arraybuffer'
       })
       expect(res.status).toBe(200)
@@ -114,7 +114,7 @@ test.describe('Read API key access', () => {
     test('read key cannot download artefact outside scope', async () => {
       const ax = axiosWithApiKey(readApiKey)
       try {
-        await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/other-pkg@3') + '/tarball')
+        await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/other-pkg@3') + '/download')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(404)
@@ -174,7 +174,7 @@ test.describe('Read API key access', () => {
 
       const ax = axiosWithApiKey(keyRes.data.key)
       try {
-        await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/tarball')
+        await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/download')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(403)
