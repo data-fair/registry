@@ -318,8 +318,11 @@ router.post('/npm/:id', async (req, res, next) => {
 router.get('/:id/download', async (req, res, next) => {
   try {
     const caller = await resolveCaller(req)
-    const filter = artefactAccessFilter(caller)
-    const artefact = await getArtefact(req.params.id, filter)
+    // Download is "I already know the id" — unlike listing, hiding the
+    // artefact behind 404 is unhelpful: callers can't distinguish "doesn't
+    // exist" from "you can't have it". Look up unfiltered and let
+    // assertDownloadAccess decide between 200 and 403.
+    const artefact = await getArtefactById(req.params.id)
     if (!artefact) throw httpError(404, 'artefact not found')
     await assertDownloadAccess(caller, artefact)
     if (!artefact.path) throw httpError(404, 'no content uploaded for this artefact')

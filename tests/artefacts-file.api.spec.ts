@@ -170,6 +170,34 @@ test.describe('File artefacts', () => {
         expect(err.status).toBe(403)
       }
     })
+
+    // The download endpoint reports a permission error (403) rather than 404
+    // for callers who have a grant but are not in the artefact's
+    // privateAccess. Listing still hides such artefacts (404 on GET /:id),
+    // but download is "I already know the id" — see router note.
+    test('download of private artefact when caller is not in privateAccess returns 403', async () => {
+      const admin = await superAdmin
+      await admin.patch('/api/v1/artefacts/terrain', { public: false, privateAccess: [] })
+      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+
+      const ax = await axiosAuth('test1-admin1', { org: 'test1' })
+      try {
+        await ax.get('/api/v1/artefacts/terrain/download')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(403)
+      }
+    })
+
+    test('download of a non-existent artefact returns 404', async () => {
+      const ax = await superAdmin
+      try {
+        await ax.get('/api/v1/artefacts/does-not-exist/download')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
   })
 
   test.describe('PATCH & DELETE', () => {
