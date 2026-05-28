@@ -215,13 +215,14 @@ export type DownloadSource =
 
 // Resolve a stored file into something the router can hand to the client:
 // a signed redirect URL when the backend offers one, otherwise a stream.
+// Conditional-GET (If-Modified-Since/304) is handled by the route handler
+// against the artefact doc, not by the storage backend.
 export const resolveDownload = async (
   path: string,
-  filename: string,
-  ifModifiedSince?: string
+  filename: string
 ): Promise<DownloadSource> => {
   const signedUrl = await filesStorage.getDownloadUrl(path, { filename })
   if (signedUrl) return { redirectUrl: signedUrl }
-  const { body, size, lastModified } = await filesStorage.readStream(path, ifModifiedSince)
+  const { body, size, lastModified } = await filesStorage.readStream(path)
   return { body, size, lastModified }
 }

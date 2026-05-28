@@ -22,7 +22,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
   // Download fresh tarball into local files-storage.
   const localPath = `npm/${artefactId}/${randomUUID()}.tgz`
   const dlRes = await ax.get(
-    `/api/v1/artefacts/${encodedId}/tarball`,
+    `/api/v1/artefacts/${encodedId}/download`,
     { responseType: 'stream' }
   )
   await filesStorage.writeStream(dlRes.data, localPath)

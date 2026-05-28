@@ -1,6 +1,6 @@
 {
   "name": "@data-fair/lib-node-registry",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Node.js client library for the data-fair registry service.",
   "type": "module",
   "license": "MIT",

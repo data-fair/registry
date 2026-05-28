@@ -13,7 +13,7 @@ export interface FileStats {
 
 export interface FileBackend {
   writeStream (stream: Readable, path: string): Promise<void>
-  readStream (path: string, ifModifiedSince?: string): Promise<ReadStreamResult>
+  readStream (path: string): Promise<ReadStreamResult>
   getDownloadUrl (path: string, opts: { filename: string }): Promise<string | null>
   delete (path: string): Promise<void>
   exists (path: string): Promise<boolean>

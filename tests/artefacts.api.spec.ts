@@ -140,22 +140,106 @@ test.describe('Artefacts', () => {
       await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
     })
 
-    test('GET /tarball returns the artefact tarball', async () => {
+    test('GET /download returns the artefact tarball', async () => {
       const admin = await superAdmin
       const res = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/tarball',
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       expect([200, 302]).toContain(res.status)
     })
 
-    test('GET /tarball ignores legacy ?architecture= query', async () => {
+    test('GET /download ignores legacy ?architecture= query', async () => {
       const admin = await superAdmin
       const res = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/tarball?architecture=x64',
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download?architecture=x64',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       expect([200, 302]).toContain(res.status)
+    })
+
+    test('GET /download exposes Last-Modified and X-Artefact-* headers for npm', async () => {
+      const admin = await superAdmin
+      const res = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
+      )
+      expect(res.headers['last-modified']).toBeTruthy()
+      expect(res.headers['x-artefact-version']).toBe('1.0.0')
+      expect(res.headers['x-artefact-has-native-modules']).toBe('false')
+      expect(res.headers['cache-control']).toBe('no-cache')
+    })
+
+    test('GET /download with matching If-Modified-Since returns 304 with metadata headers', async () => {
+      const admin = await superAdmin
+      const first = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
+      )
+      const lastModified = first.headers['last-modified']
+      expect(lastModified).toBeTruthy()
+
+      const second = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        {
+          headers: { 'if-modified-since': lastModified },
+          responseType: 'arraybuffer',
+          maxRedirects: 0,
+          validateStatus: s => s === 304
+        }
+      )
+      expect(second.status).toBe(304)
+      expect(second.headers['last-modified']).toBe(lastModified)
+      expect(second.headers['x-artefact-version']).toBe('1.0.0')
+      expect(second.headers['x-artefact-has-native-modules']).toBe('false')
+    })
+
+    test('GET /download with stale If-Modified-Since returns 200 with new metadata after re-upload', async () => {
+      const admin = await superAdmin
+      const first = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
+      )
+      const staleLastModified = first.headers['last-modified']
+
+      // Wait >1s so the HTTP date moves forward (HTTP date is second-precision).
+      await new Promise(resolve => setTimeout(resolve, 1100))
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form = new FormData()
+      form.append('file', await createTestTarball({ name: '@test/pkg', version: '2.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+
+      const res = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        {
+          headers: { 'if-modified-since': staleLastModified },
+          responseType: 'arraybuffer',
+          maxRedirects: 0,
+          validateStatus: s => s === 200 || s === 302
+        }
+      )
+      expect(res.headers['x-artefact-version']).toBe('2.0.0')
+      expect(new Date(res.headers['last-modified']).getTime())
+        .toBeGreaterThan(new Date(staleLastModified).getTime())
+    })
+
+    test('GET /download flags hasNativeModules in response header', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form = new FormData()
+      form.append('file', await createTestTarball({
+        name: '@test/native-pkg',
+        version: '1.0.0',
+        extraEntries: [{ name: 'package/node_modules/foo/build/Release/foo.node', content: 'X' }]
+      }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/native-pkg@1'), form, { headers: form.getHeaders() })
+
+      const admin = await superAdmin
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/native-pkg@1'), { public: true })
+      const res = await admin.get(
+        '/api/v1/artefacts/' + encodeURIComponent('@test/native-pkg@1') + '/download',
+        { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
+      )
+      expect(res.headers['x-artefact-has-native-modules']).toBe('true')
     })
   })
 

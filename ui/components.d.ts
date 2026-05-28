@@ -8,7 +8,6 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AccessGrantsSection: typeof import('./src/components/admin/access-grants-section.vue')['default']
-    AdminNav: typeof import('./src/components/admin-nav.vue')['default']
     ApiKeysSection: typeof import('./src/components/admin/api-keys-section.vue')['default']
     ArtefactAdmin: typeof import('./src/components/artefact-admin.vue')['default']
     ArtefactMetadata: typeof import('./src/components/artefact-metadata.vue')['default']

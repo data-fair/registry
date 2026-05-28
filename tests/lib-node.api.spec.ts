@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test'
 import { join } from 'node:path'
 import { readFile, rm, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import http from 'node:http'
+import { AddressInfo } from 'node:net'
 import FormData from 'form-data'
 import { superAdmin, axiosWithApiKey, clean } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
@@ -64,6 +66,49 @@ test.describe('lib-node-registry', () => {
     expect(r2.path).toBe(r1.path)
   })
 
+  test('cache-hit call makes a single conditional request to the registry', async () => {
+    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
+    const admin = await superAdmin
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
+
+    // Counting proxy in front of the real registry. We measure only the SDK's
+    // calls — the test's own admin requests go directly to the dev API.
+    const apiHost = '127.0.0.1'
+    const apiPort = Number(process.env.DEV_API_PORT)
+    const requestPaths: string[] = []
+    const proxy = http.createServer((req, res) => {
+      requestPaths.push(`${req.method} ${req.url}`)
+      const proxyReq = http.request({
+        host: apiHost, port: apiPort, path: req.url, method: req.method, headers: req.headers
+      }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode!, proxyRes.headers)
+        proxyRes.pipe(res)
+      })
+      proxyReq.on('error', err => { res.statusCode = 502; res.end(String(err)) })
+      req.pipe(proxyReq)
+    })
+    await new Promise<void>(resolve => proxy.listen(0, '127.0.0.1', resolve))
+    const proxyPort = (proxy.address() as AddressInfo).port
+
+    try {
+      const opts = {
+        registryUrl: `http://127.0.0.1:${proxyPort}`,
+        secretKey,
+        artefactId: '@test/pkg@1',
+        cacheDir
+      }
+      await ensureArtefact(opts) // warm cache
+      requestPaths.length = 0
+      const r = await ensureArtefact(opts)
+      expect(r.downloaded).toBe(false)
+      expect(requestPaths).toEqual([
+        `GET /api/v1/artefacts/${encodeURIComponent('@test/pkg@1')}/download`
+      ])
+    } finally {
+      await new Promise<void>(resolve => proxy.close(() => resolve()))
+    }
+  })
+
   test('cache slot lives under nodeMajor-libc when build:true', async () => {
     // Slot naming depends solely on opts.build; no native-module signal needed.
     await uploadNpm('@test/cache-key@1', { name: '@test/cache-key', version: '1.0.0' })
@@ -92,7 +137,9 @@ test.describe('lib-node-registry', () => {
     const r1 = await ensureArtefact(opts)
     expect(r1.version).toBe('1.0.0')
 
-    await new Promise(resolve => setTimeout(resolve, 10))
+    // Wait >1s — Last-Modified is HTTP-date (second precision), so a same-second
+    // republish would alias to the cached entry.
+    await new Promise(resolve => setTimeout(resolve, 1100))
     await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.1' })
 
     const r2 = await ensureArtefact(opts)

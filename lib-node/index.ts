@@ -55,6 +55,8 @@ export interface EnsureArtefactResult {
 
 interface CacheMeta {
   dataUpdatedAt: string
+  version: string
+  hasNativeModules: boolean
 }
 
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
@@ -63,41 +65,63 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
 
   const encodedId = encodeURIComponent(opts.artefactId)
-  const detailRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
-  const artefact = detailRes.data
-  if (artefact.format !== 'npm') {
-    throw new Error(`artefact ${opts.artefactId} is not an npm artefact (format=${artefact.format})`)
-  }
-  const dataUpdatedAt: string = artefact.dataUpdatedAt || artefact.updatedAt
-  const version: string = artefact.version
-
   const artefactDir = join(opts.cacheDir, opts.artefactId)
   const buildTuple = opts.build ? `${nodeMajor()}-${detectLibc()}` : 'js'
   const extractDir = join(artefactDir, buildTuple)
   const metaPath = join(extractDir, '.meta.json')
 
+  // Read existing cache meta (if any) to drive the conditional GET. An older
+  // cache missing the new fields is treated as a cold cache — the server
+  // returns 200, we re-extract once, and the new meta supersedes it.
+  let cachedMeta: CacheMeta | null = null
   try {
     const raw = await readFile(metaPath, 'utf-8')
-    const meta: CacheMeta = JSON.parse(raw)
-    if (meta.dataUpdatedAt === dataUpdatedAt) {
-      return { path: extractDir, version, dataUpdatedAt, downloaded: false }
+    const parsed = JSON.parse(raw) as Partial<CacheMeta>
+    if (parsed.dataUpdatedAt && parsed.version && typeof parsed.hasNativeModules === 'boolean') {
+      cachedMeta = parsed as CacheMeta
     }
   } catch {
     // cold cache or invalid metadata
   }
 
-  const tarballRes = await ax.get(`/api/v1/artefacts/${encodedId}/tarball`, {
-    responseType: 'stream'
+  const reqHeaders: Record<string, string> = {}
+  if (cachedMeta) {
+    reqHeaders['if-modified-since'] = new Date(cachedMeta.dataUpdatedAt).toUTCString()
+  }
+
+  const res = await ax.get(`/api/v1/artefacts/${encodedId}/download`, {
+    responseType: 'stream',
+    headers: reqHeaders,
+    validateStatus: s => s === 200 || s === 304
   })
+
+  if (res.status === 304) {
+    ;(res.data as Readable).destroy()
+    return {
+      path: extractDir,
+      version: cachedMeta!.version,
+      dataUpdatedAt: cachedMeta!.dataUpdatedAt,
+      downloaded: false
+    }
+  }
+
+  // 200 — read fresh metadata from response headers.
+  const version = String(res.headers['x-artefact-version'] ?? '')
+  const hasNativeModules = res.headers['x-artefact-has-native-modules'] === 'true'
+  const lastModified = res.headers['last-modified']
+  const dataUpdatedAt = lastModified
+    ? new Date(lastModified).toISOString()
+    : new Date().toISOString()
 
   const tmpDir = `${extractDir}.tmp.${process.pid}`
   await rm(tmpDir, { recursive: true, force: true })
   await mkdir(tmpDir, { recursive: true })
   try {
-    await extractTarball(tarballRes.data as Readable, tmpDir)
+    await extractTarball(res.data as Readable, tmpDir)
     // Write meta inside tmpDir so it survives the rename atomically.
-    await writeFile(join(tmpDir, '.meta.json'), JSON.stringify({ dataUpdatedAt } satisfies CacheMeta))
-    if (opts.build && artefact.hasNativeModules) {
+    const meta: CacheMeta = { dataUpdatedAt, version, hasNativeModules }
+    await writeFile(join(tmpDir, '.meta.json'), JSON.stringify(meta))
+    if (opts.build && hasNativeModules) {
       await rebuildNativeModules(tmpDir)
     }
   } catch (err) {
