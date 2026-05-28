@@ -117,7 +117,9 @@ test.describe('Read API key access', () => {
         await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/other-pkg@3') + '/download')
         expect(true).toBe(false)
       } catch (err: any) {
-        expect(err.status).toBe(404)
+        // Download endpoint surfaces 403 for permission errors so callers
+        // can distinguish "missing" from "not allowed" — see router note.
+        expect(err.status).toBe(403)
       }
     })
   })
