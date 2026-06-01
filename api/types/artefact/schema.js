@@ -20,9 +20,18 @@ export default {
       type: 'string',
       enum: ['processing', 'catalog', 'application', 'tileset', 'maplibre-style', 'other']
     },
+    // Mirror-aware visibility (driven by the admin form's VJSF context):
+    //   context.mirrored   -> artefact is mirrored from a remote registry
+    //   context.accessOnly -> this form instance edits only local access
+    //                         (public / privateAccess)
+    // Remote-owned fields are shown read-only in the metadata section and
+    // hidden from the access-only section; public/privateAccess are the
+    // inverse. Both context flags are absent (falsy) for a normal,
+    // non-mirrored artefact, so the single form shows everything.
     title: {
       type: 'object',
       additionalProperties: false,
+      layout: { if: '!context.accessOnly' },
       properties: {
         en: { type: 'string', title: 'Title - English', 'x-i18n-title': { fr: 'Titre - Anglais' }, layout: { cols: { md: 6 } } },
         fr: { type: 'string', title: 'Title - French', 'x-i18n-title': { fr: 'Titre - Français' }, layout: { cols: { md: 6 } } }
@@ -31,6 +40,7 @@ export default {
     description: {
       type: 'object',
       additionalProperties: false,
+      layout: { if: '!context.accessOnly' },
       properties: {
         en: { type: 'string', title: 'Description - English', 'x-i18n-title': { fr: 'Description - Anglais' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { md: 6 } } },
         fr: { type: 'string', title: 'Description - French', 'x-i18n-title': { fr: 'Description - Français' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { md: 6 } } }
@@ -39,6 +49,7 @@ export default {
     group: {
       type: 'object',
       additionalProperties: false,
+      layout: { if: '!context.accessOnly' },
       properties: {
         en: {
           type: 'string',
@@ -83,21 +94,21 @@ export default {
       type: 'boolean',
       title: 'Deprecated',
       'x-i18n-title': { fr: 'Déprécié' },
-      layout: 'switch',
+      layout: { comp: 'switch', if: '!context.accessOnly' },
       default: false
     },
     public: {
       type: 'boolean',
       title: 'Public',
       'x-i18n-title': { fr: 'Public' },
-      layout: 'switch',
+      layout: { comp: 'switch', if: 'context.accessOnly || !context.mirrored' },
       default: false
     },
     privateAccess: {
       type: 'array',
       title: 'Private access',
       'x-i18n-title': { fr: 'Accès privés' },
-      layout: { if: '!parent.data?.public' },
+      layout: { if: '(context.accessOnly || !context.mirrored) && !parent.data?.public' },
       items: {
         type: 'object',
         title: 'Account',
@@ -125,7 +136,8 @@ export default {
       type: 'string',
       format: 'uri',
       title: 'Documentation URL',
-      'x-i18n-title': { fr: 'URL de documentation' }
+      'x-i18n-title': { fr: 'URL de documentation' },
+      layout: { if: '!context.accessOnly' }
     },
     origin: { type: 'string', readOnly: true },
     // `fileName` is only used by format=file.

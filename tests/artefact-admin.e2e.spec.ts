@@ -1,9 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosWithApiKey, clean } from './support/axios.ts'
+import { superAdmin, axiosWithApiKey, clean, setArtefactOrigin } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 const pkgId = '@test/grouped-pkg@1'
+const mirrorId = '@test/mirror-demo@3'
 
 test.beforeAll(async () => {
   await clean()
@@ -22,6 +23,17 @@ test.beforeAll(async () => {
     group: { en: 'Geo tools', fr: 'Outils géo' },
     documentation: 'https://example.com/docs'
   })
+
+  // A mirrored artefact: metadata is owned by the (simulated) remote registry,
+  // only local access (public/privateAccess) may be edited here.
+  const mirrorForm = new FormData()
+  mirrorForm.append('file', await createTestTarball({ name: '@test/mirror-demo', version: '3.4.5' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+  await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent(mirrorId), mirrorForm, { headers: mirrorForm.getHeaders() })
+  await ax.patch('/api/v1/artefacts/' + encodeURIComponent(mirrorId), {
+    title: { en: 'Mirror Demo', fr: 'Démo Miroir' },
+    group: { en: 'Statistics', fr: 'Statistiques' }
+  })
+  await setArtefactOrigin(mirrorId, 'https://upstream.example.com')
 })
 
 test.describe('Artefact admin metadata editing', () => {
@@ -50,6 +62,59 @@ test.describe('Artefact admin metadata editing', () => {
 
     await page.reload()
     await expect(page.getByLabel('Groupe - Anglais')).toHaveValue('Mapping tools')
+  })
+
+  test('warns before navigating away with unsaved changes', async ({ page }) => {
+    await page.goto('/registry/artefacts/' + encodeURIComponent(pkgId))
+    await expect(page.locator('#artefact-admin')).toBeVisible()
+
+    const groupEn = page.getByLabel('Groupe - Anglais')
+    await groupEn.fill('Unsaved change')
+    await groupEn.blur()
+
+    // Dismissing the confirmation keeps us on the page.
+    page.once('dialog', dialog => dialog.dismiss())
+    await page.getByRole('link', { name: 'Administration' }).click()
+    await expect(page.locator('#artefact-admin')).toBeVisible()
+
+    // Accepting it lets the navigation through.
+    page.once('dialog', dialog => dialog.accept())
+    await page.getByRole('link', { name: 'Administration' }).click()
+    await expect(page).toHaveURL(/\/admin/)
+  })
+})
+
+test.describe('Artefact admin metadata editing for a mirrored artefact', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAdmin(page)
+  })
+
+  test('remote-owned metadata is read-only while local access stays editable', async ({ page }) => {
+    await page.goto('/registry/artefacts/' + encodeURIComponent(mirrorId))
+    await expect(page.locator('#artefact-admin')).toBeVisible()
+
+    // Mirror notice is shown and the remote-owned metadata appears read-only.
+    await expect(page.getByText('mirroré depuis un registre distant')).toBeVisible()
+    const groupEn = page.getByLabel('Groupe - Anglais')
+    await expect(groupEn).toHaveValue('Statistics')
+    await expect(groupEn).toBeDisabled()
+
+    // The local access switch (Public) is editable.
+    await expect(page.getByLabel('Public')).toBeEnabled()
+  })
+
+  test('toggling local access and saving succeeds (only public/privateAccess are sent)', async ({ page }) => {
+    await page.goto('/registry/artefacts/' + encodeURIComponent(mirrorId))
+    await expect(page.locator('#artefact-admin')).toBeVisible()
+
+    // Before the fix the form sent the remote-owned fields too and the API
+    // answered 403; toggling Public and saving must now succeed.
+    await page.getByLabel('Public').click()
+    await page.locator('#artefact-admin').getByRole('button', { name: 'Enregistrer' }).click()
+    await expect(page.getByText('Modifications enregistrées')).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByLabel('Public')).toBeChecked()
   })
 })
 

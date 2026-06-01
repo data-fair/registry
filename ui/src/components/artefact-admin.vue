@@ -56,6 +56,23 @@
     <v-card class="mb-4">
       <v-card-title>{{ t('editableMetadata') }}</v-card-title>
       <v-card-text>
+        <!-- Mirrored artefacts: the remote registry owns the metadata, so show
+             it read-only. Only local access (public / privateAccess) below is
+             editable here. -->
+        <template v-if="artefact.origin">
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+            :text="t('mirroredNotice')"
+          />
+          <vjsf-patch-req
+            :model-value="readonlyData"
+            :locale="locale"
+            :options="readonlyVjsfOptions"
+          />
+        </template>
         <v-form v-model="valid">
           <vjsf-patch-req
             v-model="editData"
@@ -132,6 +149,7 @@ fr:
   replace: Remplacer
   remove: Retirer
   editableMetadata: Métadonnées éditables
+  mirroredNotice: Cet artefact est mirroré depuis un registre distant. Ses métadonnées sont en lecture seule ; seul l'accès local (public / accès privés) est modifiable ici.
   save: Enregistrer
   saved: Modifications enregistrées
   dangerZone: Zone de danger
@@ -149,6 +167,7 @@ en:
   replace: Replace
   remove: Remove
   editableMetadata: Editable Metadata
+  mirroredNotice: This artefact is mirrored from a remote registry. Its metadata is read-only; only local access (public / private access) can be edited here.
   save: Save
   saved: Changes saved
   dangerZone: Danger Zone
@@ -165,6 +184,9 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { mdiImage } from '@mdi/js'
+import equal from 'fast-deep-equal'
+import { computedDeepDiff } from '@data-fair/lib-vue/deep-diff.js'
+import { useLeaveGuard } from '@data-fair/lib-vue/leave-guard.js'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
 import type { Artefact } from '#api/types'
 
@@ -174,12 +196,44 @@ const emit = defineEmits<{ changed: [] }>()
 const { t, locale } = useI18n()
 const router = useRouter()
 
+// Mirrored artefacts: the remote registry owns the metadata. Only `public`
+// and `privateAccess` can be patched locally (the API rejects anything else
+// with 403), so the editable form is restricted to those fields.
+const isMirror = computed(() => !!artefact.origin)
+
 const editData = ref<Record<string, any>>({})
-const originalEditData = ref('')
+const readonlyData = ref<Record<string, any>>({})
 const valid = ref(true)
 const confirmDelete = ref(false)
 
-const hasDiff = computed(() => JSON.stringify(editData.value) !== originalEditData.value)
+// Build the normalized patch payload from a source (the live form, or the
+// saved artefact). The same shape is used both to compute the diff and as the
+// PATCH body, so they can never drift. On a mirror only the access fields are
+// included — the remote registry owns the rest.
+const buildPayload = (src: Record<string, any>) => {
+  const payload: Record<string, any> = {
+    public: src.public ?? false,
+    privateAccess: src.privateAccess?.length ? src.privateAccess : null
+  }
+  if (isMirror.value) return payload
+  payload.title = (src.title?.fr || src.title?.en) ? src.title : null
+  payload.description = (src.description?.fr || src.description?.en) ? src.description : null
+  payload.group = (src.group?.fr || src.group?.en) ? src.group : null
+  payload.documentation = src.documentation || null
+  payload.deprecated = src.deprecated ?? false
+  return payload
+}
+
+// computedDeepDiff keeps the reference stable across VJSF's frequent re-emits
+// (it returns the previous value when the new one is deeply equal), so the
+// payload only changes identity on a real edit.
+const editablePayload = computedDeepDiff(() => buildPayload(editData.value))
+const savedPayload = computed(() => buildPayload(artefact))
+
+const hasDiff = computed(() => !equal(editablePayload.value, savedPayload.value))
+
+// Warn before navigating away (route change or tab close) with unsaved edits.
+useLeaveGuard(hasDiff, { locale })
 
 const vjsfOptions = computed<Partial<VjsfOptions>>(() => ({
   validateOn: 'input',
@@ -189,7 +243,16 @@ const vjsfOptions = computed<Partial<VjsfOptions>>(() => ({
   initialValidation: 'always',
   locale: locale.value,
   xI18n: true,
-  context: { category: artefact.category, apiPath: $apiPath }
+  // accessOnly mirrors mirrored: on a mirror the editable form shows only the
+  // local access fields; on a normal artefact it shows everything.
+  context: { category: artefact.category, apiPath: $apiPath, mirrored: isMirror.value, accessOnly: isMirror.value }
+}))
+
+// Read-only display of the remote-owned metadata, shown for mirrors only.
+const readonlyVjsfOptions = computed<Partial<VjsfOptions>>(() => ({
+  ...vjsfOptions.value,
+  readOnly: true,
+  context: { category: artefact.category, apiPath: $apiPath, mirrored: true, accessOnly: false }
 }))
 
 // Re-seed the edit form whenever the artefact is (re)loaded by the parent.
@@ -203,18 +266,16 @@ watch(() => artefact, () => {
     public: artefact.public ?? false,
     privateAccess: artefact.privateAccess ? [...artefact.privateAccess] : []
   }
-  originalEditData.value = JSON.stringify(editData.value)
+  // Frozen snapshot for the read-only metadata form (mirrors only); kept
+  // separate from editData so the editable access form can never mutate it.
+  readonlyData.value = { ...editData.value }
 }, { immediate: true })
 
 const patchAction = useAsyncAction(
   async () => {
-    const body = { ...editData.value }
-    if (body.title && !body.title.fr && !body.title.en) body.title = null
-    if (body.description && !body.description.fr && !body.description.en) body.description = null
-    if (body.group && !body.group.fr && !body.group.en) body.group = null
-    if (body.privateAccess && body.privateAccess.length === 0) body.privateAccess = null
-
-    await $fetch(`/v1/artefacts/${encodeURIComponent(artefact._id)}`, { method: 'PATCH', body })
+    // The payload already excludes the remote-owned fields on a mirror, so the
+    // API never sees a forbidden key (which it would answer with 403).
+    await $fetch(`/v1/artefacts/${encodeURIComponent(artefact._id)}`, { method: 'PATCH', body: editablePayload.value })
     emit('changed')
   },
   { success: t('saved') }
