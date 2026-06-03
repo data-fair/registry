@@ -59,7 +59,7 @@ export interface EnsureArtefactResult {
 interface CachePointer {
   dataUpdatedAt: string
   version: string
-  /** `<version>+<hash>/<buildTuple>`, relative to the artefact dir. */
+  /** `<version>+<epochSeconds>/<buildTuple>`, relative to the artefact dir. */
   dir: string
 }
 
