@@ -17,6 +17,32 @@ export type Thumbnail = {
   createdAt: string
 }
 
+export type ScanSeverity = 'critical' | 'high' | 'medium' | 'low' | 'unknown'
+
+export type ScanFinding = {
+  id: string
+  pkgName: string
+  installedVersion: string
+  fixedVersion?: string
+  severity: ScanSeverity
+  title?: string
+  primaryUrl?: string
+}
+
+export type ScanLicense = {
+  pkgName: string
+  license: string
+}
+
+export type ArtefactScan = {
+  _id: string // artefact id
+  scannedAt: string
+  scannerVersion: string
+  vulnDbUpdatedAt?: string
+  vulnerabilities: ScanFinding[]
+  licenses?: ScanLicense[]
+}
+
 export class RegistryMongo {
   get client () {
     return mongoLib.client
@@ -40,6 +66,10 @@ export class RegistryMongo {
 
   get thumbnails () {
     return mongoLib.db.collection<Thumbnail>('thumbnails')
+  }
+
+  get artefactScans () {
+    return mongoLib.db.collection<ArtefactScan>('artefact-scans')
   }
 
   get remoteRegistries () {
