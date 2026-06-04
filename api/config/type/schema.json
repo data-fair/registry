@@ -42,6 +42,46 @@
       "default": 100000,
       "description": "Maximum number of entries (files + directories) accepted in an uploaded npm tarball. Pre-installed node_modules can easily exceed the lower legacy default."
     },
+    "scanning": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable advisory vulnerability scanning of npm artefacts via osv-scanner. Off by default so deployments without the binary keep working."
+        },
+        "osvScannerPath": {
+          "type": "string",
+          "default": "osv-scanner",
+          "description": "Path or command name of the osv-scanner v2 binary."
+        },
+        "dbDir": {
+          "type": "string",
+          "default": "/data/osv-db",
+          "description": "Local directory holding the offline OSV vulnerability database."
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Maximum number of artefact scans running at once in this process."
+        },
+        "rescanIntervalHours": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 24,
+          "description": "Interval in hours between automatic rescans of all npm artefacts (also refreshes the OSV DB)."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 30,
+          "default": 300,
+          "description": "Per-artefact scan timeout in seconds (extraction + osv-scanner)."
+        }
+      }
+    },
     "privateDirectoryUrl": {
       "type": "string",
       "pattern": "^https?://"

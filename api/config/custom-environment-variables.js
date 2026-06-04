@@ -27,6 +27,26 @@ export default {
     __name: 'MAX_TAR_ENTRIES',
     __format: 'number'
   },
+  scanning: {
+    enabled: {
+      __name: 'SCANNING_ENABLED',
+      __format: 'boolean'
+    },
+    osvScannerPath: 'OSV_SCANNER_PATH',
+    dbDir: 'OSV_DB_DIR',
+    concurrency: {
+      __name: 'SCANNING_CONCURRENCY',
+      __format: 'number'
+    },
+    rescanIntervalHours: {
+      __name: 'SCANNING_RESCAN_INTERVAL_HOURS',
+      __format: 'number'
+    },
+    timeoutSeconds: {
+      __name: 'SCANNING_TIMEOUT_SECONDS',
+      __format: 'number'
+    }
+  },
   filesStorage: 'FILES_STORAGE',
   s3: {
     region: 'S3_REGION',

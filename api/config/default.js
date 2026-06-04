@@ -7,6 +7,14 @@ export default {
   maxUploadBytes: 200 * 1024 * 1024 * 1024,
   maxDecompressedBytes: 1024 * 1024 * 1024,
   maxTarEntries: 100_000,
+  scanning: {
+    enabled: false,
+    osvScannerPath: 'osv-scanner',
+    dbDir: '/data/osv-db',
+    concurrency: 1,
+    rescanIntervalHours: 24,
+    timeoutSeconds: 300
+  },
   filesStorage: 'fs',
   s3: {
     region: '',
