@@ -44,6 +44,7 @@ if (process.env.NODE_ENV === 'development') {
   app.delete('/api/test-env', async (req, res) => {
     assertReqInternal(req)
     await mongo.artefacts.deleteMany({})
+    await mongo.artefactScans.deleteMany({})
     await mongo.apiKeys.deleteMany({})
     // Scoped delete: only grants for test accounts (test users/orgs are
     // `test*`-prefixed) are wiped, so manually-created dev grants survive.
@@ -62,6 +63,22 @@ if (process.env.NODE_ENV === 'development') {
     } else {
       await mongo.artefacts.updateOne({ _id: req.params.id }, { $unset: { origin: '' } })
     }
+    res.send()
+  })
+
+  app.put('/api/test-env/artefacts/:id/scan', async (req, res) => {
+    assertReqInternal(req)
+    const id = decodeURIComponent(req.params.id)
+    const { summary, findings } = req.body
+    await mongo.artefacts.updateOne(
+      { _id: id },
+      { $set: { scan: { status: 'success', finishedAt: new Date().toISOString(), summary } } }
+    )
+    await mongo.artefactScans.replaceOne(
+      { _id: id },
+      { scannedAt: new Date().toISOString(), scannerVersion: 'test', vulnerabilities: findings ?? [] },
+      { upsert: true }
+    )
     res.send()
   })
 }

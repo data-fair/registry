@@ -18,11 +18,23 @@ import {
 } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
+import scanRouter from '../scanning/router.ts'
+import type { Caller } from '../access.ts'
 
 const router = Router()
 export default router
 
 router.use('/:id/thumbnail', artefactThumbnailRouter)
+router.use('/:id/scan', scanRouter)
+
+// Scan results are advisory and admin-only; strip them for non-admin callers.
+const stripScan = <T extends { scan?: unknown }>(artefact: T, caller: Caller): T => {
+  if (!caller.admin && artefact.scan !== undefined) {
+    const { scan, ...rest } = artefact
+    return rest as T
+  }
+  return artefact
+}
 
 const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
@@ -85,7 +97,8 @@ const tryInternalSecret = (req: import('express').Request): boolean => {
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
-    const filter = artefactAccessFilter(await resolveCaller(req))
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
     const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { dataUpdatedAt: -1 }
@@ -116,7 +129,7 @@ router.get('/', async (req, res, next) => {
     }
 
     const { results, count } = await listArtefacts(filter, { sort, skip, size })
-    res.json({ results, count })
+    res.json({ results: results.map(r => stripScan(r, caller)), count })
   } catch (err) { next(err) }
 })
 
@@ -140,10 +153,10 @@ router.get('/groups', async (req, res, next) => {
 // All formats carry their tarball references directly on the doc.
 router.get('/:id', async (req, res, next) => {
   try {
-    const filter = artefactAccessFilter(await resolveCaller(req))
-    const artefact = await getArtefact(req.params.id, filter)
+    const caller = await resolveCaller(req)
+    const artefact = await getArtefact(req.params.id, artefactAccessFilter(caller))
     if (!artefact) throw httpError(404, 'artefact not found')
-    res.json(artefact)
+    res.json(stripScan(artefact, caller))
   } catch (err) { next(err) }
 })
 
