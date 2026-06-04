@@ -37,6 +37,17 @@ Run a specific test file:
 
 Test users are defined in @dev/resources/users.json and organizations in @dev/resources/organizations.json.
 
+## Vulnerability scanning
+
+Advisory, admin-only vulnerability scanning of `npm` artefacts (bundled `node_modules` tarballs) via the bundled **osv-scanner v2** binary. It never blocks uploads or downloads, and scan data is stripped from responses for non-admin callers.
+
+- Controlled by the `scanning.*` config block (`api/config/type/schema.json`); **off by default** (`scanning.enabled`).
+- osv-scanner runs in **offline local-DB mode** (`scanning.dbDir`), refreshed on the rescan interval. Bundled, lockfile-less `node_modules` are detected via the `--experimental-plugins javascript/packagejson` extractor on `osv-scanner scan source`.
+- Scans run on three triggers: after an npm upload (async, non-blocking), on a periodic interval (`scanning.rescanIntervalHours`, also refreshes the DB), and on-demand via `POST /api/v1/artefacts/:id/scan` (admin).
+- A summary lives on the artefact `scan` field (admin-only); full findings are stored in the `artefact-scans` Mongo collection and served by `GET /api/v1/artefacts/:id/scan` (admin).
+- Module: `api/src/scanning/` (`operations.ts` pure mapping, `extract.ts` tarball extraction, `runner.ts` osv-scanner subprocess, `service.ts` orchestration, `router.ts` endpoints).
+- The osv-scanner binary is bundled in the Docker image (see `Dockerfile`). The mapper's test fixture is `tests/resources/osv-sample-output.json`.
+
 ## Code patterns
 
   - API route: @api/src/artefacts/router.ts
