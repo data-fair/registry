@@ -10,6 +10,7 @@ import mongo from '#mongo'
 import config from '#config'
 import { filesStorage } from '../files-storage/index.ts'
 import { extractManifest, type Manifest } from './operations.ts'
+import { enqueueScan } from '../scanning/service.ts'
 
 export type { Manifest, ExtractManifestResult } from './operations.ts'
 
@@ -142,6 +143,9 @@ export const commitNpmUpload = async (params: {
   if (existing?.path && existing.path !== path) {
     await filesStorage.delete(existing.path).catch(() => {})
   }
+
+  // Advisory scan runs in the background; never blocks the upload response.
+  await enqueueScan(id)
 
   return (await mongo.artefacts.findOne({ _id: id }))!
 }
