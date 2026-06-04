@@ -53,6 +53,9 @@ type OsvOutput = { results?: { packages?: OsvPackage[] }[] }
 
 const firstFixedVersion = (vuln: OsvVuln): string | undefined => {
   for (const aff of vuln.affected ?? []) {
+    // Guard against cross-ecosystem ranges leaking a misleading "fixed" version.
+    const ecosystem = aff.package?.ecosystem
+    if (ecosystem && ecosystem !== 'npm') continue
     for (const range of aff.ranges ?? []) {
       for (const ev of range.events ?? []) {
         if (ev.fixed) return ev.fixed

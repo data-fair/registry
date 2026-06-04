@@ -35,7 +35,12 @@ const setStatus = (id: string, scan: Record<string, unknown>) =>
 // caller; failures are recorded on the doc.
 export const enqueueScan = async (id: string): Promise<void> => {
   if (!config.scanning?.enabled) return
-  await setStatus(id, { status: 'pending', queuedAt: new Date().toISOString() })
+  // Dotted paths so a re-queue keeps the previously-known summary visible until
+  // the new scan finishes, rather than blanking it while pending.
+  await mongo.artefacts.updateOne(
+    { _id: id },
+    { $set: { 'scan.status': 'pending', 'scan.queuedAt': new Date().toISOString() } }
+  )
   // Fire-and-forget; do not block the upload response.
   runScanNow(id).catch(err => internalError('scan', err))
 }
@@ -66,6 +71,7 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
       {
         scannedAt: now,
         scannerVersion: result.scannerVersion,
+        ...(result.vulnDbUpdatedAt ? { vulnDbUpdatedAt: result.vulnDbUpdatedAt } : {}),
         vulnerabilities: result.vulnerabilities,
         ...(result.licenses.length ? { licenses: result.licenses } : {})
       },
@@ -75,6 +81,7 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
       status: 'success',
       finishedAt: now,
       scannerVersion: result.scannerVersion,
+      ...(result.vulnDbUpdatedAt ? { vulnDbUpdatedAt: result.vulnDbUpdatedAt } : {}),
       hasInstallScripts: result.hasInstallScripts,
       summary: result.summary
     })

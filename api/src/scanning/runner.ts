@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { readFile, writeFile, mkdtemp, rm, mkdir } from 'node:fs/promises'
+import { readFile, writeFile, mkdtemp, rm, mkdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ChildProcess } from 'node:child_process'
@@ -13,6 +13,9 @@ export type ScanResult = {
   summary: Summary
   hasInstallScripts: boolean
   scannerVersion: string
+  // mtime of the local OSV DB the scan ran against, so admins can gauge
+  // result freshness. Undefined if the DB file can't be stat'd.
+  vulnDbUpdatedAt?: string
 }
 
 export interface Scanner {
@@ -50,10 +53,24 @@ const EXIT_VULNS_FOUND = 1
 const PLUGIN_ARGS = ['--experimental-plugins', 'javascript/packagejson']
 
 class OsvScanner implements Scanner {
+  // The binary doesn't change at runtime, so resolve the version once.
+  private versionCache?: string
+
   async version (): Promise<string> {
+    if (this.versionCache) return this.versionCache
     const { stdout } = await run(['--version'], 30_000)
     // First line: "osv-scanner version: X.Y.Z"
-    return stdout.trim().split('\n')[0] || 'unknown'
+    this.versionCache = stdout.trim().split('\n')[0] || 'unknown'
+    return this.versionCache
+  }
+
+  // Best-effort freshness timestamp of the local OSV DB (npm/all.zip mtime).
+  private async dbUpdatedAt (): Promise<string | undefined> {
+    const dbDir = config.scanning?.dbDir ?? 'osv-db'
+    try {
+      const { mtime } = await stat(join(dbDir, 'osv-scanner', 'npm', 'all.zip'))
+      return mtime.toISOString()
+    } catch { return undefined }
   }
 
   async refreshDb (): Promise<void> {
@@ -108,7 +125,14 @@ class OsvScanner implements Scanner {
       hasInstallScripts = detectInstallScripts(topPkg)
     } catch { /* top-level package.json missing/unreadable — leave false */ }
 
-    return { vulnerabilities, licenses, summary, hasInstallScripts, scannerVersion: await this.version() }
+    return {
+      vulnerabilities,
+      licenses,
+      summary,
+      hasInstallScripts,
+      scannerVersion: await this.version(),
+      vulnDbUpdatedAt: await this.dbUpdatedAt()
+    }
   }
 }
 
