@@ -40,4 +40,15 @@ test.describe('scanning operations', () => {
     expect(mapOsvOutput({ results: [] }).vulnerabilities).toEqual([])
     expect(mapOsvOutput({}).vulnerabilities).toEqual([])
   })
+
+  test('detectInstallScripts flags lifecycle install hooks', async () => {
+    const { detectInstallScripts } = await import('../api/src/scanning/operations.ts')
+    expect(detectInstallScripts({ scripts: { postinstall: 'node x.js' } })).toBe(true)
+    expect(detectInstallScripts({ scripts: { preinstall: 'sh y.sh' } })).toBe(true)
+    expect(detectInstallScripts({ scripts: { install: 'make' } })).toBe(true)
+    expect(detectInstallScripts({ scripts: { build: 'tsc', test: 'x' } })).toBe(false)
+    expect(detectInstallScripts({})).toBe(false)
+    expect(detectInstallScripts(null)).toBe(false)
+    expect(detectInstallScripts('not an object')).toBe(false)
+  })
 })

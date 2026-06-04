@@ -67,6 +67,19 @@ const primaryUrl = (vuln: OsvVuln): string | undefined => {
   return ref?.url
 }
 
+// Whether a (top-level) package.json declares an install lifecycle script.
+// Install/preinstall/postinstall run automatically on `npm install` and are a
+// primary supply-chain execution vector — surfaced as an advisory flag.
+export const detectInstallScripts = (pkgJson: unknown): boolean => {
+  if (!pkgJson || typeof pkgJson !== 'object') return false
+  const scripts = (pkgJson as { scripts?: unknown }).scripts
+  if (!scripts || typeof scripts !== 'object') return false
+  for (const hook of ['install', 'preinstall', 'postinstall'] as const) {
+    if (typeof (scripts as Record<string, unknown>)[hook] === 'string') return true
+  }
+  return false
+}
+
 export const mapOsvOutput = (raw: unknown): { vulnerabilities: ScanFinding[], licenses: ScanLicense[], summary: Summary } => {
   const out = (raw ?? {}) as OsvOutput
   const findings: ScanFinding[] = []
