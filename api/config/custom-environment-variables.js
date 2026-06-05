@@ -15,6 +15,7 @@ export default {
   },
   upgradeRoot: 'UPGRADE_ROOT',
   dataDir: 'DATA_DIR',
+  tmpDir: 'TMP_DIR',
   maxUploadBytes: {
     __name: 'MAX_UPLOAD_BYTES',
     __format: 'number'

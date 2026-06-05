@@ -4,6 +4,7 @@ export default {
   mongoUrl: 'mongodb://localhost:27017/data-fair-registry',
   port: 8080,
   dataDir: '/data',
+  tmpDir: undefined,
   maxUploadBytes: 200 * 1024 * 1024 * 1024,
   maxDecompressedBytes: 1024 * 1024 * 1024,
   maxTarEntries: 100_000,
