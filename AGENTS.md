@@ -47,6 +47,7 @@ Advisory, admin-only vulnerability scanning of `npm` artefacts (bundled `node_mo
 - A summary lives on the artefact `scan` field (admin-only); full findings are stored in the `artefact-scans` Mongo collection and served by `GET /api/v1/artefacts/:id/scan` (admin).
 - Module: `api/src/scanning/` (`operations.ts` pure mapping, `extract.ts` tarball extraction, `runner.ts` osv-scanner subprocess, `service.ts` orchestration, `router.ts` endpoints).
 - The osv-scanner binary is bundled in the Docker image (see `Dockerfile`). The mapper's test fixture is `tests/resources/osv-sample-output.json`.
+- Extracted artefacts are cached as a mirror under `<tmpDir>/scan-cache/` (config `tmpDir`, env `TMP_DIR`; mount as a k8s `emptyDir`). A scan reuses the cached extraction when the artefact's bytes are unchanged (keyed on `artefact.path`); `rescanAll` prunes slots for deleted artefacts.
 
 ## Code patterns
 

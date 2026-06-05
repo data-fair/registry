@@ -1,17 +1,19 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import locks from '@data-fair/lib-node/locks.js'
 import { internalError } from '@data-fair/lib-node/observer.js'
 import mongo from '#mongo'
-import config from '#config'
+import config, { tmpDir } from '#config'
 import { filesStorage } from '../files-storage/index.ts'
-import { extractTarballToDir } from './extract.ts'
+import { ensureExtracted, pruneExtracted } from './cache.ts'
 import { osvScanner, type Scanner } from './runner.ts'
 
 let scanner: Scanner = osvScanner
 // Test seam: swap the scanner implementation (no production caller).
 export const __setScanner = (s: Scanner) => { scanner = s }
+
+// The extracted-mirror cache lives under the configured temp dir.
+const scanCacheDir = join(tmpDir, 'scan-cache')
+const openTarball = (path: string) => filesStorage.readStream(path).then(r => r.body)
 
 // In-process concurrency gate.
 let active = 0
@@ -51,7 +53,6 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
   const lockId = `scan-${id}`
   if (!await locks.acquire(lockId)) return // another instance/worker has it
   await acquireSlot()
-  let dir: string | undefined
   try {
     const artefact = await mongo.artefacts.findOne({ _id: id })
     if (!artefact || artefact.format !== 'npm' || !artefact.path) return
@@ -59,9 +60,13 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
     await setStatus(id, { ...artefact.scan, status: 'running', startedAt: new Date().toISOString() })
     if (opts.refreshDb) await scanner.refreshDb()
 
-    const { body } = await filesStorage.readStream(artefact.path)
-    dir = await mkdtemp(join(tmpdir(), 'osv-scan-'))
-    await extractTarballToDir(body, dir, { maxEntries: config.maxTarEntries ?? 100000 })
+    // Reuse the cached extraction when the stored bytes are unchanged.
+    const dir = await ensureExtracted(
+      { artefactId: id, path: artefact.path, dataUpdatedAt: artefact.dataUpdatedAt },
+      scanCacheDir,
+      openTarball,
+      config.maxTarEntries ?? 100000
+    )
 
     const result = await scanner.scanDir(dir)
     const now = new Date().toISOString()
@@ -89,7 +94,6 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
     await setStatus(id, { status: 'error', finishedAt: new Date().toISOString(), error: (err as Error).message?.slice(0, 500) })
       .catch(e => internalError('scan', e))
   } finally {
-    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {})
     releaseSlot()
     await locks.release(lockId)
   }
@@ -104,6 +108,9 @@ export const rescanAll = async (): Promise<void> => {
     internalError('scan-db-refresh', err)
   }
   const ids = await mongo.artefacts.find({ format: 'npm' }, { projection: { _id: 1 } }).toArray()
+  // Drop cached extractions for artefacts that no longer exist (runs on every
+  // pod, so each self-prunes its own emptyDir).
+  await pruneExtracted(scanCacheDir, new Set(ids.map(a => a._id))).catch(err => internalError('scan-prune', err))
   for (const { _id } of ids) {
     await runScanNow(_id).catch(err => internalError('scan', err))
   }
