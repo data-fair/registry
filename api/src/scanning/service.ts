@@ -109,7 +109,9 @@ export const rescanAll = async (): Promise<void> => {
   }
   const ids = await mongo.artefacts.find({ format: 'npm' }, { projection: { _id: 1 } }).toArray()
   // Drop cached extractions for artefacts that no longer exist (runs on every
-  // pod, so each self-prunes its own emptyDir).
+  // pod, so each self-prunes its own emptyDir). The id snapshot is taken just
+  // above: an artefact uploaded mid-rescan may have its fresh slot pruned once
+  // and simply re-extract on its next scan — harmless and self-healing.
   await pruneExtracted(scanCacheDir, new Set(ids.map(a => a._id))).catch(err => internalError('scan-prune', err))
   for (const { _id } of ids) {
     await runScanNow(_id).catch(err => internalError('scan', err))

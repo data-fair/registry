@@ -46,8 +46,13 @@ export const ensureExtracted = async (
   return extractDir
 }
 
+// Matches the `.tmp.<pid>` suffix that ensureExtracted appends to a slot name.
+// Anchored to a trailing numeric pid so it can't be confused with a slot whose
+// (encoded) id merely contains ".tmp." somewhere in the middle.
+const TMP_DIR_SUFFIX = /\.tmp\.\d+$/
+
 // Remove cache slots whose artefact id is no longer present. Skips in-flight
-// `*.tmp.*` extraction dirs (deleting one could break a concurrent
+// `.tmp.<pid>` extraction dirs (deleting one could break a concurrent
 // ensureExtracted; orphans are reclaimed when the emptyDir resets on restart).
 export const pruneExtracted = async (cacheDir: string, validIds: Set<string>): Promise<void> => {
   let entries: string[]
@@ -57,7 +62,7 @@ export const pruneExtracted = async (cacheDir: string, validIds: Set<string>): P
     return // cache dir doesn't exist yet → nothing to prune
   }
   for (const entry of entries) {
-    if (entry.includes('.tmp.')) continue
+    if (TMP_DIR_SUFFIX.test(entry)) continue
     let id: string
     try { id = decodeURIComponent(entry) } catch { continue }
     if (!validIds.has(id)) {
