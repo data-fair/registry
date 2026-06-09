@@ -172,7 +172,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="f in findings"
+                v-for="f in sortedFindings"
                 :key="f.id + f.pkgName"
               >
                 <td>{{ f.pkgName }}</td>
@@ -332,7 +332,7 @@ import equal from 'fast-deep-equal'
 import { computedDeepDiff } from '@data-fair/lib-vue/deep-diff.js'
 import { useLeaveGuard } from '@data-fair/lib-vue/leave-guard.js'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
-import { severityColor } from '~/utils/severity'
+import { severityColor, SEVERITY_ORDER } from '~/utils/severity'
 import type { Artefact } from '#api/types'
 
 const { artefact } = defineProps<{ artefact: Artefact }>()
@@ -469,11 +469,22 @@ type ScanFinding = {
   primaryUrl?: string
 }
 
-const severities = ['critical', 'high', 'medium', 'low', 'unknown'] as const
+const severities = SEVERITY_ORDER
 // Shared with the list column and dashboard section (single source of truth).
 const sevColor = severityColor
 
 const findings = ref<ScanFinding[]>([])
+
+// The API returns findings grouped by package in scanner order, which buries
+// criticals among lower-severity rows. Surface the most severe first; tie-break
+// by package then advisory id for a stable, scannable order.
+const sortedFindings = computed(() =>
+  [...findings.value].sort((a, b) =>
+    SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity) ||
+    a.pkgName.localeCompare(b.pkgName) ||
+    a.id.localeCompare(b.id)
+  )
+)
 const loadFindings = async () => {
   if (artefact.format !== 'npm' || !artefact.scan) { findings.value = []; return }
   try {
