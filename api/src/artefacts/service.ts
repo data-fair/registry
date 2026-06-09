@@ -130,6 +130,9 @@ export const deleteArtefact = async (artefact: Artefact) => {
   await mongo.artefacts.deleteOne({ _id: artefact._id })
   if (artefact.path) await filesStorage.delete(artefact.path).catch(() => {})
   await mongo.thumbnails.deleteMany({ artefactId: artefact._id })
+  // Drop the full-findings doc so a later artefact reusing this id can't surface
+  // stale scan results before its own scan runs.
+  await mongo.artefactScans.deleteOne({ _id: artefact._id })
 }
 
 // --- npm upload -----------------------------------------------------------

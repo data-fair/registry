@@ -103,4 +103,37 @@ test.describe('Scanning', () => {
       expect([401, 403]).toContain(err.status)
     }
   })
+
+  test('npm re-upload response never leaks scan data to the (non-admin) uploader', async () => {
+    // Give the existing artefact a scan summary, then re-upload via the upload
+    // API key. enqueueScan preserves scan.summary via dotted paths, so the
+    // committed doc still carries it — the 201 response must omit it anyway.
+    await injectScan(id, { critical: 1, high: 0, medium: 0, low: 0, unknown: 0, total: 1 },
+      [{ id: 'GHSA-x', pkgName: 'minimist', installedVersion: '0.0.8', severity: 'critical' }])
+
+    const form = new FormData()
+    form.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.1' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+    const res = await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + enc, form, { headers: form.getHeaders() })
+    expect(res.status).toBe(201)
+    expect(res.data.artefact.scan).toBeUndefined()
+  })
+
+  test('deleting an artefact removes its full-findings scan doc', async () => {
+    await injectScan(id, { critical: 0, high: 1, medium: 0, low: 0, unknown: 0, total: 1 },
+      [{ id: 'GHSA-x', pkgName: 'minimist', installedVersion: '0.0.8', severity: 'high' }])
+
+    const admin = await superAdmin
+    // Findings doc exists before deletion.
+    const before = await admin.get('/api/v1/artefacts/' + enc + '/scan')
+    expect(before.data.vulnerabilities[0].pkgName).toBe('minimist')
+
+    await admin.delete('/api/v1/artefacts/' + enc)
+
+    try {
+      await admin.get('/api/v1/artefacts/' + enc + '/scan')
+      expect(true).toBe(false)
+    } catch (err: any) {
+      expect(err.status).toBe(404)
+    }
+  })
 })

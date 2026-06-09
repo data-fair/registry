@@ -27,14 +27,16 @@ export default router
 router.use('/:id/thumbnail', artefactThumbnailRouter)
 router.use('/:id/scan', scanRouter)
 
-// Scan results are advisory and admin-only; strip them for non-admin callers.
-const stripScan = <T extends { scan?: unknown }>(artefact: T, caller: Caller): T => {
-  if (!caller.admin && artefact.scan !== undefined) {
-    const { scan, ...rest } = artefact
-    return rest as T
-  }
-  return artefact
+// Drop the advisory, admin-only scan field unconditionally.
+const omitScan = <T extends { scan?: unknown }>(artefact: T): T => {
+  if (artefact.scan === undefined) return artefact
+  const { scan, ...rest } = artefact
+  return rest as T
 }
+
+// Scan results are advisory and admin-only; strip them for non-admin callers.
+const stripScan = <T extends { scan?: unknown }>(artefact: T, caller: Caller): T =>
+  caller.admin ? artefact : omitScan(artefact)
 
 const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
@@ -270,7 +272,8 @@ router.post('/file/:name', async (req, res, next) => {
         : { internal: true }
     })
     stagingStored = false
-    res.status(201).json({ artefact })
+    // Uploaders are never admin session callers; never leak scan data.
+    res.status(201).json({ artefact: omitScan(artefact) })
   } catch (err) {
     if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
     next(err)
@@ -328,7 +331,8 @@ router.post('/npm/:id', async (req, res, next) => {
       existing
     })
     stagingStored = false
-    res.status(201).json({ artefact })
+    // Uploaders are never admin session callers; never leak scan data.
+    res.status(201).json({ artefact: omitScan(artefact) })
   } catch (err) {
     if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
     next(err)
