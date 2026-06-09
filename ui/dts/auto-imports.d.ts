@@ -12,6 +12,7 @@ declare global {
   const $sitePath: typeof import('~/context')['$sitePath']
   const $uiConfig: typeof import('~/context')['$uiConfig']
   const EffectScope: typeof import('vue')['EffectScope']
+  const SEVERITY_ORDER: typeof import('../src/utils/severity')['SEVERITY_ORDER']
   const categoryColor: typeof import('../src/utils/categories')['categoryColor']
   const categoryColors: typeof import('../src/utils/categories')['categoryColors']
   const categoryItems: typeof import('../src/utils/categories')['categoryItems']
@@ -60,6 +61,7 @@ declare global {
   const resolveComponent: typeof import('vue')['resolveComponent']
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
+  const severityColor: typeof import('../src/utils/severity')['severityColor']
   const shallowRef: typeof import('vue')['shallowRef']
   const toRaw: typeof import('vue')['toRaw']
   const toRef: typeof import('vue')['toRef']
@@ -106,6 +108,7 @@ declare global {
   const watchPostEffect: typeof import('vue')['watchPostEffect']
   const watchSyncEffect: typeof import('vue')['watchSyncEffect']
   const withUiNotif: typeof import('@data-fair/lib-vue/ui-notif.js')['withUiNotif']
+  const worstSeverity: typeof import('../src/utils/severity')['worstSeverity']
 }
 // for type re-export
 declare global {
@@ -125,6 +128,7 @@ declare module 'vue' {
     readonly $sitePath: UnwrapRef<typeof import('~/context')['$sitePath']>
     readonly $uiConfig: UnwrapRef<typeof import('~/context')['$uiConfig']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly SEVERITY_ORDER: UnwrapRef<typeof import('../src/utils/severity')['SEVERITY_ORDER']>
     readonly categoryColor: UnwrapRef<typeof import('../src/utils/categories')['categoryColor']>
     readonly categoryColors: UnwrapRef<typeof import('../src/utils/categories')['categoryColors']>
     readonly categoryItems: UnwrapRef<typeof import('../src/utils/categories')['categoryItems']>
@@ -173,6 +177,7 @@ declare module 'vue' {
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
+    readonly severityColor: UnwrapRef<typeof import('../src/utils/severity')['severityColor']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
@@ -219,5 +224,6 @@ declare module 'vue' {
     readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>
     readonly watchSyncEffect: UnwrapRef<typeof import('vue')['watchSyncEffect']>
     readonly withUiNotif: UnwrapRef<typeof import('@data-fair/lib-vue/ui-notif.js')['withUiNotif']>
+    readonly worstSeverity: UnwrapRef<typeof import('../src/utils/severity')['worstSeverity']>
   }
 }
