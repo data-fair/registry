@@ -18,6 +18,17 @@ RUN jq '.version="build"' package.json | sponge package.json
 RUN jq '.version="build"' package-lock.json | sponge package-lock.json
 
 ##########################
+FROM base AS osv-scanner
+# Advisory npm vulnerability scanner (statically-linked Go binary; runs on musl).
+ARG OSV_SCANNER_VERSION=v2.2.3
+ARG TARGETARCH=amd64
+RUN apk add --no-cache curl && \
+    curl -sSfL -o /usr/local/bin/osv-scanner \
+      "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_${TARGETARCH}" && \
+    chmod +x /usr/local/bin/osv-scanner && \
+    /usr/local/bin/osv-scanner --version
+
+##########################
 FROM base AS installer
 
 RUN apk add --no-cache python3 make g++ git jq moreutils
@@ -77,6 +88,7 @@ RUN mkdir -p /app/api/node_modules
 FROM native-deps AS main
 
 COPY --from=api-installer /app/node_modules node_modules
+COPY --from=osv-scanner /usr/local/bin/osv-scanner /usr/local/bin/osv-scanner
 ADD /api api
 ADD /shared shared
 COPY --from=types /app/api/types api/types

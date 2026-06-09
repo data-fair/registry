@@ -18,5 +18,6 @@ declare module 'vue' {
     VjsfPatchReq: typeof import('./src/components/vjsf/vjsf-patch-req.vue')['default']
     VjsfPatchReqEn: typeof import('./src/components/vjsf/vjsf-patch-req-en.vue')['default']
     VjsfPatchReqFr: typeof import('./src/components/vjsf/vjsf-patch-req-fr.vue')['default']
+    VulnerabilitySection: typeof import('./src/components/admin/vulnerability-section.vue')['default']
   }
 }

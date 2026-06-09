@@ -60,6 +60,12 @@
             <v-btn value="name">
               {{ t('name') }}
             </v-btn>
+            <v-btn
+              v-if="showVulns"
+              value="vulnerabilities"
+            >
+              {{ t('vulns') }}
+            </v-btn>
           </v-btn-toggle>
         </v-col>
         <v-col cols="auto">
@@ -91,6 +97,9 @@
               <th>{{ t('group') }}</th>
               <th>{{ t('version') }}</th>
               <th>{{ t('size') }}</th>
+              <th v-if="showVulns">
+                {{ t('vulns') }}
+              </th>
               <th v-if="adminMode">
                 {{ t('visibility') }}
               </th>
@@ -150,6 +159,33 @@
               <td>{{ (artefact.group as any)?.[locale] || '-' }}</td>
               <td>{{ artefact.version || '-' }}</td>
               <td>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</td>
+              <td v-if="showVulns">
+                <v-chip
+                  v-if="vulnChip(artefact)"
+                  :color="severityColor(vulnChip(artefact)!.severity)"
+                  size="x-small"
+                  label
+                >
+                  {{ vulnChip(artefact)!.count }} {{ t(vulnChip(artefact)!.severity) }}
+                </v-chip>
+                <v-icon
+                  v-else-if="artefact.scan?.status === 'error'"
+                  :icon="mdiAlertCircle"
+                  color="error"
+                  size="small"
+                  :title="t('scanError')"
+                />
+                <v-progress-circular
+                  v-else-if="artefact.scan?.status === 'pending' || artefact.scan?.status === 'running'"
+                  indeterminate
+                  size="16"
+                  width="2"
+                />
+                <span
+                  v-else
+                  class="text-medium-emphasis"
+                >—</span>
+              </td>
               <td v-if="adminMode">
                 <v-icon
                   :icon="artefact.public ? mdiEye : mdiEyeOff"
@@ -305,6 +341,13 @@ fr:
   name: Nom
   version: Version
   size: Taille
+  vulns: "Vuln\xE9rabilit\xE9s"
+  scanError: "\xC9chec de l'analyse"
+  critical: critique
+  high: "\xE9lev\xE9e"
+  medium: moyenne
+  low: faible
+  unknown: inconnue
   visibility: "Visibilit\xE9"
   mirror: miroir
   deprecated: "d\xE9pr\xE9ci\xE9"
@@ -329,6 +372,13 @@ en:
   name: Name
   version: Version
   size: Size
+  vulns: Vulnerabilities
+  scanError: Scan failed
+  critical: critical
+  high: high
+  medium: medium
+  low: low
+  unknown: unknown
   visibility: Visibility
   mirror: mirror
   deprecated: deprecated
@@ -348,8 +398,11 @@ en:
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { mdiMagnify, mdiDelete, mdiEye, mdiEyeOff } from '@mdi/js'
+import { mdiMagnify, mdiDelete, mdiEye, mdiEyeOff, mdiAlertCircle } from '@mdi/js'
 import { VDateInput } from 'vuetify/labs/VDateInput'
+// Explicit import (rather than the src/utils auto-import) so the helpers resolve
+// reliably even before the dev server's auto-import scan picks up severity.ts.
+import { severityColor, worstSeverity } from '~/utils/severity'
 import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
@@ -357,6 +410,12 @@ const session = useSession()
 const { dayjs } = useLocaleDayjs()
 
 const adminMode = computed(() => !!session.state.user?.adminMode)
+
+// The Vulns column + sort are admin-only and only meaningful when scanning is
+// enabled on this deployment. Scan data is already stripped server-side for
+// non-admins, and the list endpoint only honors sort=vulnerabilities for admins.
+const showVulns = computed(() => adminMode.value && !!$uiConfig.scanning?.enabled)
+const vulnChip = (artefact: Artefact) => worstSeverity(artefact.scan?.summary)
 
 // Read keys can only be managed by an admin of the owner account: a user for
 // their own account, or an organization admin at the organization root (a

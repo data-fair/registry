@@ -9,6 +9,15 @@ export default {
   privateEventsUrl: `http://localhost:${process.env.EVENTS_PORT}`,
   mongoUrl: `mongodb://localhost:${process.env.MONGO_PORT}/data-fair-registry-development`,
   dataDir: './data',
+  // Vulnerability scanning is enabled in dev. Requires the osv-scanner binary
+  // on PATH (see "Vulnerability scanner" in AGENTS.md for install). The offline
+  // OSV DB is downloaded under dataDir on first scan. If osv-scanner is missing,
+  // scans just record scan.status="error" and the rest of the app is unaffected.
+  scanning: {
+    enabled: true,
+    osvScannerPath: 'osv-scanner',
+    dbDir: './data/osv-db'
+  },
   observer: {
     active: false
   },

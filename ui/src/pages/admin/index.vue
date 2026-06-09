@@ -1,6 +1,17 @@
 <template>
   <v-container data-iframe-height>
     <section-tabs
+      v-if="$uiConfig.scanning?.enabled"
+      id="vulnerabilities"
+      :title="t('vulnerabilities')"
+      :subtitle="t('vulnerabilitiesSubtitle')"
+    >
+      <template #content>
+        <vulnerability-section />
+      </template>
+    </section-tabs>
+
+    <section-tabs
       id="api-keys"
       :title="t('apiKeys')"
       :subtitle="t('apiKeysSubtitle')"
@@ -35,6 +46,8 @@
 <i18n lang="yaml">
 fr:
   admin: Administration
+  vulnerabilities: "Vuln\xE9rabilit\xE9s"
+  vulnerabilitiesSubtitle: "Synth\xE8se des analyses de vuln\xE9rabilit\xE9s des artefacts npm du parc."
   apiKeys: Clés API
   apiKeysSubtitle: Les clés d'upload permettent aux services externes de téléverser des artefacts dans le registre.
   accessGrants: Accès accordés
@@ -43,6 +56,8 @@ fr:
   remoteRegistriesSubtitle: Synchronisez des artefacts depuis d'autres registres pour les mettre en miroir localement.
 en:
   admin: Administration
+  vulnerabilities: Vulnerabilities
+  vulnerabilitiesSubtitle: Fleet-wide overview of npm artefact vulnerability scans.
   apiKeys: API Keys
   apiKeysSubtitle: Upload keys let external services push artefacts to the registry.
   accessGrants: Access Grants
@@ -58,6 +73,7 @@ import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import ApiKeysSection from '~/components/admin/api-keys-section.vue'
 import AccessGrantsSection from '~/components/admin/access-grants-section.vue'
 import RemoteRegistriesSection from '~/components/admin/remote-registries-section.vue'
+import VulnerabilitySection from '~/components/admin/vulnerability-section.vue'
 
 const { t } = useI18n()
 const session = useSession()
