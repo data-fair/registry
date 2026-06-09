@@ -65,7 +65,7 @@ test.describe('Scanning', () => {
     }
   })
 
-  test('POST /:id/scan returns 503 when scanning is disabled (dev default)', async () => {
+  test('POST /:id/scan returns 202 when scanning is enabled, else 503', async () => {
     const admin = await superAdmin
     try {
       const res = await admin.post('/api/v1/artefacts/' + enc + '/scan')

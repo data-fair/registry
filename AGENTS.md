@@ -23,6 +23,18 @@ Check if services are running: `bash dev/status.sh`
 
 Log files are in `dev/logs/` (dev-api.log, dev-ui.log, docker-compose.log).
 
+### Vulnerability scanner (osv-scanner)
+
+Dev config enables npm vulnerability scanning (`api/config/development.js`), which shells out to the **osv-scanner v2** binary. Install it once so it's on your PATH (Linux x86_64):
+
+    OSV_VERSION=v2.2.3
+    sudo curl -sSfL -o /usr/local/bin/osv-scanner \
+      "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
+    sudo chmod +x /usr/local/bin/osv-scanner
+    osv-scanner --version
+
+(Any directory on PATH works; drop `sudo` if you install into a user-writable dir.) The offline OSV database (~200 MB) downloads on first scan into `./data/osv-db` and is refreshed by the periodic rescan; extracted artefacts are cached under `./data/tmp/scan-cache`. If osv-scanner is not installed, scans fail gracefully (`scan.status: "error"`) and the rest of the app keeps working.
+
 ## Testing
 
 Tests use Playwright as a test runner with 3 project types: unit (*.unit.spec.ts), api (*.api.spec.ts), and e2e (*.e2e.spec.ts). State setup/teardown fixtures run before api and e2e tests.
