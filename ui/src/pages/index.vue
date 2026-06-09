@@ -311,6 +311,7 @@ fr:
   showDeprecated: "Afficher les versions d\xE9pr\xE9ci\xE9es"
   dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
   total: artefact(s)
+  artefactsCount: "{count} artefact(s)"
   createKey: "Cr\xE9er une cl\xE9 de lecture"
   keyName: "Nom de la cl\xE9"
   create: "Cr\xE9er"
@@ -335,6 +336,7 @@ en:
   showDeprecated: Show deprecated
   dataUpdatedAt: Data updated
   total: artefact(s)
+  artefactsCount: "{count} artefact(s)"
   createKey: Create read key
   keyName: Key name
   create: Create
@@ -351,6 +353,7 @@ import { useI18n } from 'vue-i18n'
 import { mdiMagnify, mdiDelete, mdiEye, mdiEyeOff } from '@mdi/js'
 import { VDateInput } from 'vuetify/labs/VDateInput'
 import type { Artefact } from '#api/types'
+import { useBreadcrumbs } from '~/composables/breadcrumbs'
 
 const { t, locale } = useI18n()
 const session = useSession()
@@ -405,6 +408,13 @@ const nbPages = computed(() => {
   if (!artefactsFetch.data.value) return 0
   return Math.ceil(artefactsFetch.data.value.count / pageSize)
 })
+
+// Forward a breadcrumb to the integrating shell (data-fair) so the Registry tab
+// is never left with an empty trail — mirrors the count breadcrumb that the
+// processings/catalogs list pages emit.
+useBreadcrumbs().setForPage(() => [
+  { title: t('artefactsCount', { count: artefactsFetch.data.value?.count ?? 0 }) }
+])
 
 // --- API Keys tab state ---
 const newKeyName = ref('')
