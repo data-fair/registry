@@ -109,6 +109,10 @@ class OsvScanner implements Scanner {
     const timeoutMs = (config.scanning?.timeoutSeconds ?? 300) * 1000
     const args = [
       'scan', 'source', '--recursive',
+      // Scan extracted artefacts regardless of any .gitignore: the cache dir
+      // lives under a git-ignored path (dev's ./data) and a tarball could even
+      // bundle its own .gitignore — both would otherwise hide all files.
+      '--no-ignore',
       ...PLUGIN_ARGS,
       '--offline-vulnerabilities',
       '--local-db-path', dbDir,
