@@ -101,7 +101,14 @@ router.get('/', async (req, res, next) => {
     const filter = artefactAccessFilter(caller)
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
-    const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { dataUpdatedAt: -1 }
+    // `vulnerabilities` is admin-only: scan data is stripped for non-admins, so
+    // ordering by it would leak. Non-admins silently get the default sort.
+    let sort: Record<string, 1 | -1> = { dataUpdatedAt: -1 }
+    if (req.query.sort === 'name') {
+      sort = { name: 1 }
+    } else if (req.query.sort === 'vulnerabilities' && caller.admin) {
+      sort = { 'scan.summary.critical': -1, 'scan.summary.high': -1, 'scan.summary.medium': -1, dataUpdatedAt: -1 }
+    }
 
     // Text search on name
     if (req.query.q) {
