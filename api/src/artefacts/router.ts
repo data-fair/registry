@@ -14,7 +14,7 @@ import { filesStorage } from '../files-storage/index.ts'
 import {
   listArtefacts, getArtefact, getArtefactById, patchArtefact, deleteArtefact,
   commitFileUpload, commitNpmUpload, extractStagedManifest, resolveDownload,
-  listGroupValues
+  listGroupValues, getScanSummary
 } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
@@ -153,6 +153,15 @@ router.get('/groups', async (req, res, next) => {
     if (!locale) throw httpError(400, 'locale query param must be "en" or "fr"')
     const results = await listGroupValues(category as Category, locale)
     res.json({ results })
+  } catch (err) { next(err) }
+})
+
+// Fleet-wide vulnerability roll-up for the admin dashboard. Registered before
+// GET /:id so the literal path isn't swallowed as an id. Admin-only.
+router.get('/scan-summary', async (req, res, next) => {
+  try {
+    await session.reqAdminMode(req)
+    res.json(await getScanSummary())
   } catch (err) { next(err) }
 })
 
