@@ -81,6 +81,31 @@ if (process.env.NODE_ENV === 'development') {
     )
     res.send()
   })
+
+  // Upsert an artefact doc directly with arbitrary fields — lets tests build a
+  // deterministic fleet (with controlled scan state) without the upload
+  // pipeline, whose auto-scan would otherwise race injected state.
+  app.put('/api/test-env/artefacts/:id/doc', async (req, res) => {
+    assertReqInternal(req)
+    const id = decodeURIComponent(req.params.id)
+    const now = new Date().toISOString()
+    await mongo.artefacts.replaceOne(
+      { _id: id },
+      {
+        _id: id,
+        name: id,
+        format: 'npm',
+        public: false,
+        privateAccess: [],
+        createdAt: now,
+        updatedAt: now,
+        dataUpdatedAt: now,
+        ...req.body
+      } as any,
+      { upsert: true }
+    )
+    res.send()
+  })
 }
 
 app.use('/api', (req, res) => res.status(404).send('unknown api endpoint'))
