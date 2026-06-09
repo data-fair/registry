@@ -85,6 +85,10 @@ class OsvScanner implements Scanner {
       await writeFile(join(dummy, 'node_modules', 'left-pad', 'package.json'), '{"name":"left-pad","version":"1.0.0"}')
       const args = [
         'scan', 'source', '--recursive',
+        // Scan extracted artefacts regardless of any .gitignore: the cache dir
+        // may live under a git-ignored path (e.g. dev's ./data), and a tarball
+        // could even bundle its own .gitignore. Both would otherwise hide files.
+        '--no-ignore',
         ...PLUGIN_ARGS,
         '--offline-vulnerabilities',
         '--download-offline-databases',
