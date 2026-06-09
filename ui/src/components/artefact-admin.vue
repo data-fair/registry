@@ -332,6 +332,7 @@ import equal from 'fast-deep-equal'
 import { computedDeepDiff } from '@data-fair/lib-vue/deep-diff.js'
 import { useLeaveGuard } from '@data-fair/lib-vue/leave-guard.js'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
+import { severityColor } from '~/utils/severity'
 import type { Artefact } from '#api/types'
 
 const { artefact } = defineProps<{ artefact: Artefact }>()
@@ -469,7 +470,8 @@ type ScanFinding = {
 }
 
 const severities = ['critical', 'high', 'medium', 'low', 'unknown'] as const
-const sevColor = (s: string) => ({ critical: 'red-darken-2', high: 'red', medium: 'orange', low: 'grey', unknown: 'grey-lighten-1' }[s] ?? 'grey')
+// Shared with the list column and dashboard section (single source of truth).
+const sevColor = severityColor
 
 const findings = ref<ScanFinding[]>([])
 const loadFindings = async () => {

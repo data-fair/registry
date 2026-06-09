@@ -1,6 +1,7 @@
 <template>
   <v-container data-iframe-height>
     <section-tabs
+      v-if="$uiConfig.scanning?.enabled"
       id="vulnerabilities"
       :title="t('vulnerabilities')"
       :subtitle="t('vulnerabilitiesSubtitle')"
