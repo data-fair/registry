@@ -6,10 +6,32 @@ import config, { tmpDir } from '#config'
 import { filesStorage } from '../files-storage/index.ts'
 import { ensureExtracted, pruneExtracted } from './cache.ts'
 import { osvScanner, type Scanner } from './runner.ts'
+import type { Summary } from './operations.ts'
 
 let scanner: Scanner = osvScanner
 // Test seam: swap the scanner implementation (no production caller).
 export const __setScanner = (s: Scanner) => { scanner = s }
+
+// Scanning is a security control, so its activity is logged to stdout (visible
+// in container logs) at every step — queue, start, per-artefact result, db
+// refresh, and the periodic rescan bounds — not just on failure. Errors also go
+// through internalError() so they increment the Prometheus counter.
+const log = (msg: string) => console.log(`[scan] ${msg}`)
+const durationSec = (since: number) => ((Date.now() - since) / 1000).toFixed(1)
+
+// One-line, grep-able summary of a scan result for the logs.
+const formatSummary = (s: Summary, hasInstallScripts: boolean): string => {
+  const parts: string[] = []
+  if (s.total === 0) {
+    parts.push('no vulnerabilities')
+  } else {
+    const sev = (['critical', 'high', 'medium', 'low', 'unknown'] as const)
+      .filter(k => s[k] > 0).map(k => `${k}=${s[k]}`).join(' ')
+    parts.push(`${s.total} vulnerabilit${s.total === 1 ? 'y' : 'ies'} (${sev})`)
+  }
+  if (hasInstallScripts) parts.push('install-scripts=yes')
+  return parts.join(', ')
+}
 
 // The extracted-mirror cache lives under the configured temp dir.
 const scanCacheDir = join(tmpDir, 'scan-cache')
@@ -43,6 +65,7 @@ export const enqueueScan = async (id: string): Promise<void> => {
     { _id: id },
     { $set: { 'scan.status': 'pending', 'scan.queuedAt': new Date().toISOString() } }
   )
+  log(`${id}: scan queued`)
   // Fire-and-forget; do not block the upload response.
   runScanNow(id).catch(err => internalError('scan', err))
 }
@@ -53,10 +76,12 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
   const lockId = `scan-${id}`
   if (!await locks.acquire(lockId)) return // another instance/worker has it
   await acquireSlot()
+  const startedAt = Date.now()
   try {
     const artefact = await mongo.artefacts.findOne({ _id: id })
     if (!artefact || artefact.format !== 'npm' || !artefact.path) return
 
+    log(`${id}: scan started${opts.refreshDb ? ' (with db refresh)' : ''}`)
     await setStatus(id, { ...artefact.scan, status: 'running', startedAt: new Date().toISOString() })
     if (opts.refreshDb) await scanner.refreshDb()
 
@@ -90,7 +115,11 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
       hasInstallScripts: result.hasInstallScripts,
       summary: result.summary
     })
+    log(`${id}: ${formatSummary(result.summary, result.hasInstallScripts)} in ${durationSec(startedAt)}s`)
   } catch (err) {
+    // A scan failure is itself security-relevant (the artefact's safety is now
+    // unknown): log it with the artefact id AND bump the error counter.
+    internalError('scan', err, `(artefact ${id})`)
     await setStatus(id, { status: 'error', finishedAt: new Date().toISOString(), error: (err as Error).message?.slice(0, 500) })
       .catch(e => internalError('scan', e))
   } finally {
@@ -102,12 +131,17 @@ export const runScanNow = async (id: string, opts: { refreshDb?: boolean } = {})
 // Periodic job: refresh the DB once, then rescan every npm artefact.
 export const rescanAll = async (): Promise<void> => {
   if (!config.scanning?.enabled) return
+  const startedAt = Date.now()
+  log('rescan started: refreshing OSV database')
   try {
+    const dbStart = Date.now()
     await scanner.refreshDb()
+    log(`OSV database refreshed in ${durationSec(dbStart)}s`)
   } catch (err) {
     internalError('scan-db-refresh', err)
   }
   const ids = await mongo.artefacts.find({ format: 'npm' }, { projection: { _id: 1 } }).toArray()
+  log(`rescan: scanning ${ids.length} npm artefact(s)`)
   // Drop cached extractions for artefacts that no longer exist (runs on every
   // pod, so each self-prunes its own emptyDir). The id snapshot is taken just
   // above: an artefact uploaded mid-rescan may have its fresh slot pruned once
@@ -116,4 +150,5 @@ export const rescanAll = async (): Promise<void> => {
   for (const { _id } of ids) {
     await runScanNow(_id).catch(err => internalError('scan', err))
   }
+  log(`rescan finished: ${ids.length} artefact(s) in ${durationSec(startedAt)}s`)
 }
