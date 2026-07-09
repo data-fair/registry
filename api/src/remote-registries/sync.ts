@@ -211,7 +211,6 @@ const runSync = async (remoteRegistryId: string) => {
       $set: {
         lastSyncAt,
         lastSyncStatus,
-        'syncProgress.done': done,
         ...(hasErrors ? { lastSyncError: lastError } : {})
       },
       $unset: {

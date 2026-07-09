@@ -463,5 +463,37 @@ test.describe('Remote registries', () => {
       expect(doc.syncProgress.startedAt <= doc.lastSyncAt).toBe(true)
       expect(doc.syncState).toBe('idle')
     })
+
+    test('a sync over one selected artefact records per-artefact progress and surfaces the fetch error', async () => {
+      const ax = await superAdmin
+      const artefactId = '@test/pkg@1'
+
+      // Selecting doesn't contact the remote — only checks for a conflicting
+      // local artefact — so this is safe against a non-resolving remote URL.
+      await ax.post(`/api/v1/remote-registries/${encodeURIComponent(url)}/selected-artefacts`, {
+        artefactId
+      })
+
+      await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+
+      // the sync runs in the background; poll the doc until it settles (test-only wait)
+      let doc: any
+      for (let i = 0; i < 50; i++) {
+        const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+        doc = res.data
+        if (doc.lastSyncStatus) break
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      // The remote host doesn't resolve, so the single artefact fails to
+      // fetch -- the loop's catch records the error and keeps going.
+      expect(doc.lastSyncStatus).toBe('error')
+      expect(doc.lastSyncError).toContain(artefactId)
+      expect(doc.syncProgress.total).toBe(1)
+      expect(doc.syncProgress.done).toBe(1)
+      expect(doc.syncProgress.currentArtefact).toBeUndefined()
+      expect(doc.syncProgress.startedAt <= doc.lastSyncAt).toBe(true)
+      expect(doc.syncState).toBe('idle')
+    })
   })
 })
