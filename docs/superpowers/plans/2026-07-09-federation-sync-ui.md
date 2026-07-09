@@ -842,10 +842,12 @@ const runSync = async (remoteRegistryId: string) => {
   await mongo.remoteRegistries.updateOne(
     { _id: remoteRegistryId },
     {
+      // NB: `syncProgress.done` is deliberately NOT re-written here. The loop's
+      // per-artefact write is its only writer when total > 0 — a redundant write
+      // here would mask a regression in the loop, making any test of `done` vacuous.
       $set: {
         lastSyncAt,
         lastSyncStatus,
-        'syncProgress.done': done,
         ...(hasErrors ? { lastSyncError: lastError } : {})
       },
       $unset: {
