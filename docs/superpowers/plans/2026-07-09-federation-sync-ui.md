@@ -21,6 +21,7 @@
 - `syncState` is **never persisted**. It is computed on read from the lock plus `syncProgress`/`lastSyncAt`.
 - The registry `_id` **is a URL**. Every channel name, lock id, and route param built from it must be `encodeURIComponent`-ed at the boundary that needs it.
 - No upgrade script. `syncProgress` is absent on existing docs and every derivation treats absent as "no attempt recorded".
+- **Dependencies (landed before Task 3, commit `878eb8f`).** `ws@8` is a peerDependency of `@data-fair/lib-express` (needed by `ws-server.js`) and `reconnecting-websocket@4` is a peerDependency of `@data-fair/lib-vue` (needed by `ws.js`). Both were unmet. They are now in `api/package.json` and `ui/package.json` respectively. Neither is imported directly by our code, so no `@types/*` package is needed.
 
 ## Deviation from the spec
 
