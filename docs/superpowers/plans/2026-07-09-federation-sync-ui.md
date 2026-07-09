@@ -16,8 +16,11 @@
 - After `build-types`, the running dev API may still execute stale generated code. Touch `api/index.ts` to force a nodemon reload.
 - Never start, stop, or restart dev processes. Check them with `bash dev/status.sh`. Logs are in `dev/logs/`.
 - Quality gates: `npm run lint-fix`, `npm run check-types`, `npm run test`. All three via `npm run quality`.
-- Run a single test file with `npm run test tests/<file>.spec.ts`.
 - Test projects are matched by filename: `*.unit.spec.ts`, `*.api.spec.ts`, `*.e2e.spec.ts`.
+- **Running one file or one test.** `npm run test` is a compound `a && b && c` script, so `npm run test <file>` appends the file to the *last* command only (the e2e project) and runs unit and api in full. `AGENTS.md` documents this broken form. Use the per-project scripts instead:
+  - `npm run test-api -- tests/remote-registries.api.spec.ts`
+  - `npm run test-api -- tests/remote-registries.api.spec.ts -g "held lock rejects"`
+  - `npm run test-unit -- tests/remote-registries-operations.unit.spec.ts`
 - `syncState` is **never persisted**. It is computed on read from the lock plus `syncProgress`/`lastSyncAt`.
 - The registry `_id` **is a URL**. Every channel name, lock id, and route param built from it must be `encodeURIComponent`-ed at the boundary that needs it.
 - No upgrade script. `syncProgress` is absent on existing docs and every derivation treats absent as "no attempt recorded".
@@ -121,7 +124,7 @@ Note the import line **replaces** the existing `import { filterSuggestedArtefact
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `npm run test tests/remote-registries-operations.unit.spec.ts`
+Run: `npm run test-unit -- tests/remote-registries-operations.unit.spec.ts`
 Expected: FAIL — `syncLockId is not a function` (or a TypeScript "has no exported member" error).
 
 - [ ] **Step 3: Write the implementation**
@@ -155,7 +158,7 @@ export const syncState = (
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `npm run test tests/remote-registries-operations.unit.spec.ts`
+Run: `npm run test-unit -- tests/remote-registries-operations.unit.spec.ts`
 Expected: PASS — 11 tests (3 pre-existing + 8 new).
 
 - [ ] **Step 5: Commit**
@@ -275,7 +278,7 @@ In `stop()`, between `httpTerminator.terminate()` and `locks.stop()`:
 
 - [ ] **Step 4: Verify no regression and that the socket is up**
 
-Run: `npm run check-types && npm run test tests/ping.api.spec.ts`
+Run: `npm run check-types && npm run test-api -- tests/ping.api.spec.ts`
 Expected: both exit 0.
 
 Then confirm the server upgraded a websocket rather than 404ing it:
@@ -431,7 +434,7 @@ Append a new describe block to `tests/remote-registries.api.spec.ts`, and add `h
 
 - [ ] **Step 4: Run the tests to verify they fail**
 
-Run: `npm run test tests/remote-registries.api.spec.ts`
+Run: `npm run test-api -- tests/remote-registries.api.spec.ts`
 Expected: FAIL — `expected 'idle', received undefined` (the field does not exist yet).
 
 - [ ] **Step 5: Enrich the read endpoints**
@@ -487,7 +490,7 @@ router.get('/:id', async (req, res, next) => {
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
-Run: `npm run test tests/remote-registries.api.spec.ts`
+Run: `npm run test-api -- tests/remote-registries.api.spec.ts`
 Expected: PASS — all pre-existing tests plus the 4 new ones.
 
 - [ ] **Step 7: Commit**
@@ -559,7 +562,7 @@ Append to the `Sync state on reads` describe block's parent (a new describe bloc
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `npm run test tests/remote-registries.api.spec.ts -g "held lock rejects"`
+Run: `npm run test-api -- tests/remote-registries.api.spec.ts -g "held lock rejects"`
 Expected: FAIL — the request returns `202`, so `expect(true).toBe(false)` trips.
 
 - [ ] **Step 3: Split the sync entry points**
@@ -677,7 +680,7 @@ The 404 lookup stays **before** the lock attempt, so an unknown registry never a
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `npm run test tests/remote-registries.api.spec.ts`
+Run: `npm run test-api -- tests/remote-registries.api.spec.ts`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -730,7 +733,7 @@ The poll loop here is a *test* waiting on a background job, not the production p
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `npm run test tests/remote-registries.api.spec.ts -g "zero selected artefacts"`
+Run: `npm run test-api -- tests/remote-registries.api.spec.ts -g "zero selected artefacts"`
 Expected: FAIL — `Cannot read properties of undefined (reading 'total')`; `syncProgress` is never written.
 
 - [ ] **Step 3: Add the emitter and progress writes**
@@ -856,14 +859,14 @@ const runSync = async (remoteRegistryId: string) => {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `npm run test tests/remote-registries.api.spec.ts`
+Run: `npm run test-api -- tests/remote-registries.api.spec.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Verify a crashed run renders as interrupted**
 
 There is no automated test for this (it requires killing the API mid-sync). Assert the derivation by hand against the shipped helper:
 
-Run: `npm run test tests/remote-registries-operations.unit.spec.ts -g "stranded ahead"`
+Run: `npm run test-unit -- tests/remote-registries-operations.unit.spec.ts -g "stranded ahead"`
 Expected: PASS. This is the same function the router calls.
 
 - [ ] **Step 6: Commit**
