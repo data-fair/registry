@@ -155,7 +155,7 @@ export const syncState = (
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npm run test tests/remote-registries-operations.unit.spec.ts`
-Expected: PASS — 9 tests (3 pre-existing + 6 new).
+Expected: PASS — 11 tests (3 pre-existing + 8 new).
 
 - [ ] **Step 5: Commit**
 
