@@ -177,7 +177,7 @@ export const startSync = async (remoteRegistryId: string): Promise<boolean> => {
   if (!await locks.acquire(lockId)) return false
   runSync(remoteRegistryId)
     .catch(err => internalError('sync-remote-registry', err))
-    .finally(() => locks.release(lockId))
+    .finally(() => locks.release(lockId).catch(err => internalError('sync-remote-registry-release', err)))
   return true
 }
 

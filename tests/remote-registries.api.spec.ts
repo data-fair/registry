@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin, holdSyncLock, releaseSyncLock } from './support/axios.ts'
+import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin, holdSyncLock, releaseSyncLock, syncLockExists } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -410,12 +410,37 @@ test.describe('Remote registries', () => {
 
     test('an unknown registry is still 404, not 409', async () => {
       const ax = await superAdmin
+      const unknownUrl = 'https://nope.example.com'
+
+      // Deterministic ordering guard: pre-occupy the lock so a wrong-order
+      // implementation (lock-acquire before the 404 check) fails to acquire
+      // it and throws 409 instead of 404. This is the real enforcement.
+      // Merely asserting the lock's absence right after the response
+      // returns (see below) is NOT reliable on its own: runSync's early
+      // return (remote not found) plus the background lock release both
+      // complete -- as two fast in-process Mongo round trips -- faster than
+      // this test's separate follow-up HTTP round trip, even under the
+      // wrong order. Verified by mutation testing: inverting the route's
+      // order left that assertion passing 5/5 runs.
+      await holdSyncLock(unknownUrl)
       try {
-        await ax.post('/api/v1/remote-registries/' + encodeURIComponent('https://nope.example.com') + '/sync')
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent(unknownUrl) + '/sync')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      } finally {
+        await releaseSyncLock(unknownUrl)
+      }
+
+      // Sanity check for the un-contended case: a genuine 404 never creates
+      // a lock row at all.
+      try {
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent(unknownUrl) + '/sync')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(404)
       }
+      expect(await syncLockExists(unknownUrl)).toBe(false)
     })
   })
 })

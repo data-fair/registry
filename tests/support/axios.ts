@@ -39,3 +39,8 @@ export const holdSyncLock = async (registryId: string) => {
 export const releaseSyncLock = async (registryId: string) => {
   await anonymousAx.delete(syncLockPath(registryId))
 }
+
+export const syncLockExists = async (registryId: string): Promise<boolean> => {
+  const res = await anonymousAx.get(syncLockPath(registryId))
+  return res.data.exists
+}

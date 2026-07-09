@@ -87,6 +87,12 @@ if (process.env.NODE_ENV === 'development') {
     await mongo.db.collection('locks').deleteOne({ _id: req.params.id as any })
     res.send()
   })
+
+  app.get('/api/test-env/locks/:id', async (req, res) => {
+    assertReqInternal(req)
+    const lock = await mongo.db.collection('locks').findOne({ _id: req.params.id as any })
+    res.json({ exists: !!lock })
+  })
 }
 
 app.use('/api', (req, res) => res.status(404).send('unknown api endpoint'))
