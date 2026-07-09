@@ -2,12 +2,34 @@ import { randomUUID } from 'node:crypto'
 import locks from '@data-fair/lib-node/locks.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import { internalError } from '@data-fair/lib-node/observer.js'
+import * as wsEmitter from '@data-fair/lib-node/ws-emitter.js'
 import type { AxiosInstance } from 'axios'
 import mongo from '#mongo'
 import { decipher } from '../cipher.ts'
 import { filesStorage } from '../files-storage/index.ts'
 import type { Artefact } from '#types/artefact/index.ts'
-import { syncLockId } from './operations.ts'
+import { syncLockId, syncChannel } from './operations.ts'
+
+export type SyncEvent = {
+  running: boolean
+  startedAt: string
+  done: number
+  total: number
+  currentArtefact?: string
+  lastSyncAt?: string
+  lastSyncStatus?: 'success' | 'error'
+  lastSyncError?: string
+}
+
+// A dropped progress frame is cosmetic — the next frame supersedes it — so an emit
+// failure must never abort a sync.
+const emitSync = async (remoteRegistryId: string, event: SyncEvent) => {
+  try {
+    await wsEmitter.emit(syncChannel(remoteRegistryId), event)
+  } catch (err) {
+    internalError('sync-ws-emit', err)
+  }
+}
 
 const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
   const encodedId = encodeURIComponent(artefactId)
@@ -130,6 +152,16 @@ const runSync = async (remoteRegistryId: string) => {
   const remote = await mongo.remoteRegistries.findOne({ _id: remoteRegistryId })
   if (!remote) return
 
+  const startedAt = new Date().toISOString()
+  const total = remote.selectedArtefacts.length
+  let done = 0
+
+  await mongo.remoteRegistries.updateOne(
+    { _id: remoteRegistryId },
+    { $set: { syncProgress: { startedAt, done, total } } }
+  )
+  await emitSync(remoteRegistryId, { running: true, startedAt, done, total })
+
   const apiKey = decipher(remote.apiKey)
   const ax = axiosBuilder({
     baseURL: remote._id,
@@ -140,6 +172,12 @@ const runSync = async (remoteRegistryId: string) => {
   let lastError = ''
 
   for (const artefactId of remote.selectedArtefacts) {
+    await mongo.remoteRegistries.updateOne(
+      { _id: remoteRegistryId },
+      { $set: { 'syncProgress.currentArtefact': artefactId } }
+    )
+    await emitSync(remoteRegistryId, { running: true, startedAt, done, total, currentArtefact: artefactId })
+
     try {
       const encodedId = encodeURIComponent(artefactId)
       const detailRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
@@ -155,19 +193,44 @@ const runSync = async (remoteRegistryId: string) => {
       lastError = `${artefactId}: ${err.message || err}`
       console.error(`[sync] Error syncing ${artefactId} from ${remote._id}:`, err.message || err)
     }
+
+    done++
+    await mongo.remoteRegistries.updateOne(
+      { _id: remoteRegistryId },
+      { $set: { 'syncProgress.done': done } }
+    )
+    await emitSync(remoteRegistryId, { running: true, startedAt, done, total, currentArtefact: artefactId })
   }
+
+  const lastSyncAt = new Date().toISOString()
+  const lastSyncStatus = hasErrors ? 'error' as const : 'success' as const
 
   await mongo.remoteRegistries.updateOne(
     { _id: remoteRegistryId },
     {
       $set: {
-        lastSyncAt: new Date().toISOString(),
-        lastSyncStatus: hasErrors ? 'error' : 'success',
+        lastSyncAt,
+        lastSyncStatus,
+        'syncProgress.done': done,
         ...(hasErrors ? { lastSyncError: lastError } : {})
       },
-      ...(!hasErrors ? { $unset: { lastSyncError: '' } } : {})
+      $unset: {
+        'syncProgress.currentArtefact': '',
+        ...(hasErrors ? {} : { lastSyncError: '' })
+      }
     }
   )
+
+  // The end event carries the terminal state, so the UI never refetches to learn the outcome.
+  await emitSync(remoteRegistryId, {
+    running: false,
+    startedAt,
+    done,
+    total,
+    lastSyncAt,
+    lastSyncStatus,
+    ...(hasErrors ? { lastSyncError: lastError } : {})
+  })
 }
 
 // Returns as soon as the lock is taken; the work continues in the background.

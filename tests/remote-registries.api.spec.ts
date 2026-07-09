@@ -442,5 +442,26 @@ test.describe('Remote registries', () => {
       }
       expect(await syncLockExists(unknownUrl)).toBe(false)
     })
+
+    test('a sync over zero selected artefacts records progress and succeeds', async () => {
+      const ax = await superAdmin
+      await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+
+      // the sync runs in the background; poll the doc until it settles (test-only wait)
+      let doc: any
+      for (let i = 0; i < 50; i++) {
+        const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+        doc = res.data
+        if (doc.lastSyncStatus) break
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      expect(doc.lastSyncStatus).toBe('success')
+      expect(doc.syncProgress.total).toBe(0)
+      expect(doc.syncProgress.done).toBe(0)
+      expect(doc.syncProgress.currentArtefact).toBeUndefined()
+      expect(doc.syncProgress.startedAt <= doc.lastSyncAt).toBe(true)
+      expect(doc.syncState).toBe('idle')
+    })
   })
 })
