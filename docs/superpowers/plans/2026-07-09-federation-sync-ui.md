@@ -548,13 +548,22 @@ Append to the `Sync state on reads` describe block's parent (a new describe bloc
       }
     })
 
-    test('an unknown registry is still 404, not 409', async () => {
+    // Asserting only `404` here would pass under a wrong-order (lock-then-404)
+    // implementation too. Pre-holding the lock makes the orders diverge: correct
+    // order 404s before ever touching the lock; inverted order fails to acquire
+    // and returns 409. Checking the lock row *after* a plain 404 does NOT work —
+    // the background release wins the race against the follow-up request.
+    test('an unknown registry is still 404, not 409, even while a lock is held', async () => {
       const ax = await superAdmin
+      const unknown = 'https://nope.example.com'
+      await holdSyncLock(unknown)
       try {
-        await ax.post('/api/v1/remote-registries/' + encodeURIComponent('https://nope.example.com') + '/sync')
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent(unknown) + '/sync')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(404)
+      } finally {
+        await releaseSyncLock(unknown)
       }
     })
   })
@@ -624,12 +633,16 @@ const runSync = async (remoteRegistryId: string) => {
 
 // Returns as soon as the lock is taken; the work continues in the background.
 // A held lock is a conflict the caller (a human clicking a button) should see.
+//
+// Both the work AND the release are guarded. `.finally(cb)` propagates a rejection
+// thrown by `cb` into a promise nobody consumes here — an unguarded `locks.release`
+// failure would surface as an unhandled rejection and kill the process.
 export const startSync = async (remoteRegistryId: string): Promise<boolean> => {
   const lockId = syncLockId(remoteRegistryId)
   if (!await locks.acquire(lockId)) return false
   runSync(remoteRegistryId)
     .catch(err => internalError('sync-remote-registry', err))
-    .finally(() => locks.release(lockId))
+    .finally(() => locks.release(lockId).catch(err => internalError('sync-remote-registry-release', err)))
   return true
 }
 
