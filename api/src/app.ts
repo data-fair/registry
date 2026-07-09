@@ -50,6 +50,7 @@ if (process.env.NODE_ENV === 'development') {
     await mongo.accessGrants.deleteMany({ 'account.id': { $regex: /^test/ } })
     await mongo.thumbnails.deleteMany({})
     await mongo.remoteRegistries.deleteMany({})
+    await mongo.db.collection('locks').deleteMany({})
     await filesStorage.clean()
     res.send()
   })
@@ -62,6 +63,28 @@ if (process.env.NODE_ENV === 'development') {
     } else {
       await mongo.artefacts.updateOne({ _id: req.params.id }, { $unset: { origin: '' } })
     }
+    res.send()
+  })
+
+  // Hold a lock under a FOREIGN pid so the API process can neither release nor prolong it.
+  // Lets a test observe `running` deterministically instead of racing a real sync.
+  // The row still expires on its own via the locks TTL index if a test forgets to clean up.
+  app.put('/api/test-env/locks/:id', async (req, res) => {
+    assertReqInternal(req)
+    const now = new Date()
+    await mongo.db.collection('locks').insertOne({
+      _id: req.params.id as any,
+      pid: 'test-env',
+      hostname: 'test-env',
+      createdAt: now,
+      updatedAt: now
+    })
+    res.send()
+  })
+
+  app.delete('/api/test-env/locks/:id', async (req, res) => {
+    assertReqInternal(req)
+    await mongo.db.collection('locks').deleteOne({ _id: req.params.id as any })
     res.send()
   })
 }

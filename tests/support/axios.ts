@@ -26,3 +26,16 @@ export const clean = async () => {
 export const setArtefactOrigin = async (artefactId: string, origin: string) => {
   await anonymousAx.put(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/artefacts/${encodeURIComponent(artefactId)}/origin`, { origin })
 }
+
+const testEnvUrl = `http://localhost:${process.env.DEV_API_PORT}/api/test-env`
+
+// The lock id embeds the registry url, so it must be encoded as a single path segment.
+const syncLockPath = (registryId: string) => `${testEnvUrl}/locks/${encodeURIComponent('sync-remote-' + registryId)}`
+
+export const holdSyncLock = async (registryId: string) => {
+  await anonymousAx.put(syncLockPath(registryId), {})
+}
+
+export const releaseSyncLock = async (registryId: string) => {
+  await anonymousAx.delete(syncLockPath(registryId))
+}

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin } from './support/axios.ts'
+import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin, holdSyncLock, releaseSyncLock } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -323,6 +323,60 @@ test.describe('Remote registries', () => {
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(409)
+      }
+    })
+  })
+
+  test.describe('Sync state on reads', () => {
+    const url = 'https://upstream.example.com'
+
+    test.beforeEach(async () => {
+      const ax = await superAdmin
+      await ax.post('/api/v1/remote-registries', { url, name: 'Upstream', apiKey: 'reg_abc_secretkey123' })
+    })
+
+    test('a registry with no attempt recorded is idle', async () => {
+      const ax = await superAdmin
+      const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+      expect(res.data.syncState).toBe('idle')
+    })
+
+    test('a held lock reports running on the detail endpoint', async () => {
+      const ax = await superAdmin
+      await holdSyncLock(url)
+      try {
+        const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+        expect(res.data.syncState).toBe('running')
+      } finally {
+        await releaseSyncLock(url)
+      }
+      const after = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+      expect(after.data.syncState).toBe('idle')
+    })
+
+    test('a held lock reports running on the list endpoint', async () => {
+      const ax = await superAdmin
+      await holdSyncLock(url)
+      try {
+        const res = await ax.get('/api/v1/remote-registries')
+        expect(res.data.results.find((r: any) => r._id === url).syncState).toBe('running')
+      } finally {
+        await releaseSyncLock(url)
+      }
+    })
+
+    test('one registry running does not mark its siblings as running', async () => {
+      const ax = await superAdmin
+      const other = 'https://other.example.com'
+      await ax.post('/api/v1/remote-registries', { url: other, name: 'Other', apiKey: 'reg_def_otherkey' })
+      await holdSyncLock(url)
+      try {
+        const res = await ax.get('/api/v1/remote-registries')
+        const byId = Object.fromEntries(res.data.results.map((r: any) => [r._id, r.syncState]))
+        expect(byId[url]).toBe('running')
+        expect(byId[other]).toBe('idle')
+      } finally {
+        await releaseSyncLock(url)
       }
     })
   })
