@@ -380,4 +380,42 @@ test.describe('Remote registries', () => {
       }
     })
   })
+
+  test.describe('Manual sync trigger', () => {
+    const url = 'https://upstream.example.com'
+
+    test.beforeEach(async () => {
+      const ax = await superAdmin
+      await ax.post('/api/v1/remote-registries', { url, name: 'Upstream', apiKey: 'reg_abc_secretkey123' })
+    })
+
+    test('a free lock accepts the sync with 202', async () => {
+      const ax = await superAdmin
+      const res = await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+      expect(res.status).toBe(202)
+    })
+
+    test('a held lock rejects the sync with 409', async () => {
+      const ax = await superAdmin
+      await holdSyncLock(url)
+      try {
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(409)
+      } finally {
+        await releaseSyncLock(url)
+      }
+    })
+
+    test('an unknown registry is still 404, not 409', async () => {
+      const ax = await superAdmin
+      try {
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent('https://nope.example.com') + '/sync')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+    })
+  })
 })

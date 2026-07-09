@@ -4,7 +4,7 @@ import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import mongo from '#mongo'
 import { cipher, decipher } from '../cipher.ts'
-import { syncRemoteRegistry } from './sync.ts'
+import { startSync } from './sync.ts'
 import { filterSuggestedArtefacts, syncLockId, syncState } from './operations.ts'
 import * as postReqBody from '#doc/remote-registries/post-req/index.ts'
 import * as patchReqBody from '#doc/remote-registries/patch-req/index.ts'
@@ -205,9 +205,7 @@ router.post('/:id/sync', async (req, res, next) => {
     const doc = await mongo.remoteRegistries.findOne({ _id: req.params.id })
     if (!doc) throw httpError(404, 'remote registry not found')
 
-    syncRemoteRegistry(req.params.id).catch(err => {
-      console.error(`[sync] Manual sync error for ${req.params.id}:`, err.message || err)
-    })
+    if (!await startSync(req.params.id)) throw httpError(409, 'sync already running')
     res.status(202).json({ message: 'sync started' })
   } catch (err) { next(err) }
 })
