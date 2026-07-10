@@ -101,7 +101,27 @@
             </td>
             <td>{{ reg.selectedArtefacts.length }}</td>
             <td>
-              <template v-if="reg.lastSyncAt">
+              <template v-if="reg.syncState === 'running'">
+                <v-chip
+                  size="small"
+                  color="info"
+                >
+                  {{ t('running') }}
+                </v-chip>
+                <span
+                  v-if="reg.syncProgress"
+                  class="text-medium-emphasis text-body-2 ml-1"
+                >{{ reg.syncProgress.done }}/{{ reg.syncProgress.total }}</span>
+              </template>
+              <template v-else-if="reg.syncState === 'interrupted'">
+                <v-chip
+                  size="small"
+                  color="warning"
+                >
+                  {{ t('interrupted') }}
+                </v-chip>
+              </template>
+              <template v-else-if="reg.lastSyncAt">
                 <v-chip
                   size="small"
                   :color="reg.lastSyncStatus === 'success' ? 'success' : 'error'"
@@ -142,6 +162,8 @@ fr:
   selections: Sélections
   lastSync: Dernière synchro
   neverSynced: Jamais synchronisé
+  running: en cours
+  interrupted: interrompue
   add: Ajouter
 en:
   remoteRegistries: Remote Registries
@@ -152,6 +174,8 @@ en:
   selections: Selections
   lastSync: Last Sync
   neverSynced: Never synced
+  running: running
+  interrupted: interrupted
   add: Add
 </i18n>
 
