@@ -296,10 +296,19 @@ async function main () {
     console.log('  ✓ upstream access-grant organization:test1 (skipped)')
   }
 
-  if (output.keys['dev-upstream-read']) {
+  // Consult the upstream itself, not just our output file — the api-test suite
+  // wipes the upstream between runs (cleanUpstream), so a raw key cached here can
+  // reference a key the upstream no longer has. Mirrors the upload-key logic above.
+  //
+  // The read-key LIST endpoint filters by the caller's own account, so a read key
+  // owned by org test1 is only visible through a test1-scoped session — never to a
+  // plain superadmin session. List and mint through the same org admin.
+  const orgAdmin = await upstreamAxiosAuth('test1-admin1', { org: 'test1' })
+  const upstreamReadKeys = await orgAdmin.get('/api/v1/api-keys?type=read')
+  const hasFederationKey = upstreamReadKeys.data.results.some((k: any) => k.name === 'dev-federation')
+  if (hasFederationKey && output.keys['dev-upstream-read']) {
     console.log('  ✓ upstream read-key dev-federation (skipped)')
   } else {
-    const orgAdmin = await upstreamAxiosAuth('test1-admin1', { org: 'test1' })
     const res = await orgAdmin.post('/api/v1/api-keys', {
       type: 'read',
       name: 'dev-federation',
@@ -323,6 +332,13 @@ async function main () {
     if (!isHttp409(err)) throw err
     console.log(`  ✓ remote-registry ${upstreamUrl} (skipped)`)
   }
+
+  // Always refresh the stored key: on a re-run the read key above may have been
+  // re-minted, and the existing registry doc would otherwise keep ciphering the
+  // old, now-invalid key — the cause of a 401 when browsing the mirror.
+  await admin.patch(`/api/v1/remote-registries/${encodeURIComponent(upstreamUrl)}`, {
+    apiKey: output.keys['dev-upstream-read']
+  })
 
   for (const artefactId of [UPSTREAM_NPM_ID, UPSTREAM_FILE_ID]) {
     try {
