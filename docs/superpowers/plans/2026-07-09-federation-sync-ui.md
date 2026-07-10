@@ -1017,8 +1017,13 @@ const syncAction = useAsyncAction(
       await $fetch(`/v1/remote-registries/${encodeURIComponent(registryId.value)}/sync`, {
         method: 'POST'
       })
-      // optimistic: the first ws progress event confirms it within milliseconds
-      if (registry.value) registry.value.syncState = 'running'
+      // Optimistic: the first ws progress event fills syncProgress in within milliseconds.
+      // Clearing it avoids showing the *previous* run's completed bar in the meantime —
+      // and, with the `starting` branch below, avoids an empty card body on a first sync.
+      if (registry.value) {
+        registry.value.syncState = 'running'
+        registry.value.syncProgress = undefined
+      }
       sendUiNotif({ type: 'success', msg: t('syncStarted') })
     } catch (err: any) {
       // losing the race with a peer replica or another admin is not a fault
@@ -1090,6 +1095,21 @@ Replace the whole `<!-- Sync status -->` `v-card`:
           </div>
         </template>
 
+        <!-- running before the first progress event lands: every fallback line below is
+             gated on !syncRunning, so without this branch the card body renders empty -->
+        <template v-else-if="syncRunning">
+          <v-progress-linear
+            indeterminate
+            height="6"
+            rounded
+            color="info"
+            class="mb-2"
+          />
+          <div class="text-body-2 text-medium-emphasis">
+            {{ t('syncStarting') }}
+          </div>
+        </template>
+
         <template v-else-if="syncInterrupted && registry.syncProgress">
           <div>
             {{ t('stoppedAt', { done: registry.syncProgress.done, total: registry.syncProgress.total }) }}
@@ -1138,6 +1158,7 @@ In the `<i18n>` block, add to `fr:`
   interrupted: interrompue
   startedAt: Démarrée à
   stoppedAt: Arrêtée à {done}/{total} artefacts
+  syncStarting: Démarrage…
   syncAlreadyRunning: Une synchronisation est déjà en cours
 ```
 
@@ -1148,6 +1169,7 @@ and to `en:`
   interrupted: interrupted
   startedAt: Started at
   stoppedAt: Stopped at {done}/{total} artefacts
+  syncStarting: Starting…
   syncAlreadyRunning: A sync is already running
 ```
 
