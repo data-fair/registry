@@ -115,6 +115,19 @@
           </div>
         </template>
 
+        <template v-else-if="syncRunning">
+          <v-progress-linear
+            indeterminate
+            height="6"
+            rounded
+            color="info"
+            class="mb-2"
+          />
+          <div class="text-body-2 text-medium-emphasis">
+            {{ t('syncStarting') }}
+          </div>
+        </template>
+
         <template v-else-if="syncInterrupted && registry.syncProgress">
           <div>
             {{ t('stoppedAt', { done: registry.syncProgress.done, total: registry.syncProgress.total }) }}
@@ -304,6 +317,7 @@ fr:
   neverSynced: Jamais synchronisé
   syncNow: Synchroniser maintenant
   syncStarted: Synchronisation lancée
+  syncStarting: Démarrage…
   running: en cours
   interrupted: interrompue
   startedAt: Démarrée à
@@ -337,6 +351,7 @@ en:
   neverSynced: Never synced
   syncNow: Sync Now
   syncStarted: Sync started
+  syncStarting: Starting…
   running: running
   interrupted: interrupted
   startedAt: Started at
@@ -451,8 +466,12 @@ const syncAction = useAsyncAction(
       await $fetch(`/v1/remote-registries/${encodeURIComponent(registryId.value)}/sync`, {
         method: 'POST'
       })
-      // optimistic: the first ws progress event confirms it within milliseconds
-      if (registry.value) registry.value.syncState = 'running'
+      // Optimistic: the first ws progress event fills syncProgress in within milliseconds.
+      // Clearing it avoids showing the *previous* run's completed bar in the meantime.
+      if (registry.value) {
+        registry.value.syncState = 'running'
+        registry.value.syncProgress = undefined
+      }
       sendUiNotif({ type: 'success', msg: t('syncStarted') })
     } catch (err: any) {
       // losing the race with a peer replica or another admin is not a fault
