@@ -32,7 +32,28 @@ jobs:
       run: docker compose up -d --wait
 
     - name: Start dev API
-      run: NODE_ENV=development NODE_CONFIG_DIR=$PWD/api/config/ node api/index.ts &
+      run: |
+        set -a && . ./.env && set +a
+        NODE_ENV=development NODE_CONFIG_DIR=$PWD/api/config/ node api/index.ts &
+
+    # Sync mirrors artefacts *from* an upstream registry, so exercising it needs a
+    # second one. Same code, different port / database / data dir.
+    - name: Start upstream registry API
+      run: |
+        set -a && . ./.env && set +a
+        NODE_ENV=development NODE_CONFIG_DIR=$PWD/api/config/ \
+          PORT=$DEV_UPSTREAM_API_PORT \
+          MONGO_URL=mongodb://localhost:$MONGO_PORT/data-fair-registry-upstream \
+          DATA_DIR=./data-upstream \
+          node api/index.ts &
+
+    - name: Wait for both APIs
+      run: |
+        set -a && . ./.env && set +a
+        for p in $DEV_API_PORT $DEV_UPSTREAM_API_PORT; do
+          timeout 60 bash -c "until curl -sf http://localhost:$p/api/ping >/dev/null; do sleep 1; done"
+          echo "api on :$p is up"
+        done
 
     - name: Run tests
       run: npm run test-unit && npm run test-api
