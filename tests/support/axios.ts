@@ -9,8 +9,15 @@ const axiosOpts = { baseURL }
 export const axios = (opts = {}) => axiosBuilder({ ...axiosOpts, ...opts })
 export const anonymousAx = axios()
 
-export const axiosAuth = (user: string, opts?: { adminMode?: boolean, org?: string }) => {
-  return _axiosAuth({ email: user + '@test.com', password: 'passwd', adminMode: opts?.adminMode, org: opts?.org, axiosOpts, directoryUrl })
+export const axiosAuth = (user: string, opts?: { adminMode?: boolean, org?: string, baseURL?: string }) => {
+  return _axiosAuth({
+    email: user + '@test.com',
+    password: 'passwd',
+    adminMode: opts?.adminMode,
+    org: opts?.org,
+    axiosOpts: opts?.baseURL ? { baseURL: opts.baseURL } : axiosOpts,
+    directoryUrl
+  })
 }
 
 export const superAdmin = axiosAuth('superadmin', { adminMode: true })
@@ -43,4 +50,35 @@ export const releaseSyncLock = async (registryId: string) => {
 export const syncLockExists = async (registryId: string): Promise<boolean> => {
   const res = await anonymousAx.get(syncLockPath(registryId))
   return res.data.exists
+}
+
+// --- federation upstream --------------------------------------------------
+// A second registry process, used as a mirror source. See
+// docs/superpowers/specs/2026-07-10-federation-dev-testing-design.md
+//
+// Resolved lazily: this module is imported by every spec, and most of them
+// never touch the upstream. A module-level throw would break them all.
+
+const upstreamPort = (): string => {
+  const port = process.env.DEV_UPSTREAM_API_PORT
+  if (!port) {
+    throw new Error('DEV_UPSTREAM_API_PORT is not set — append it to .env (DEV_API_PORT + 5), do not re-run dev/init-env.sh')
+  }
+  return port
+}
+
+export const upstreamBaseURL = () => `http://localhost:${upstreamPort()}`
+
+export const upstreamSuperAdmin = () => axiosAuth('superadmin', { adminMode: true, baseURL: upstreamBaseURL() })
+
+export const upstreamAxiosAuth = (user: string, opts?: { org?: string }) =>
+  axiosAuth(user, { ...opts, baseURL: upstreamBaseURL() })
+
+export const upstreamAxiosWithApiKey = (key: string) =>
+  axiosBuilder({ baseURL: upstreamBaseURL(), headers: { 'x-api-key': key } })
+
+// The upstream also runs NODE_ENV=development, so its test-env router is
+// mounted, and a request from localhost is internal.
+export const cleanUpstream = async () => {
+  await anonymousAx.delete(`${upstreamBaseURL()}/api/test-env`)
 }
