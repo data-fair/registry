@@ -11,6 +11,7 @@
     "lint": "eslint . && npm -w ui run lint",
     "lint-fix": "eslint --fix . && npm -w ui run lint-fix",
     "dev-api": "npm -w api run dev",
+    "dev-api-upstream": "dotenv -- bash -c 'PORT=$DEV_UPSTREAM_API_PORT MONGO_URL=mongodb://localhost:$MONGO_PORT/data-fair-registry-upstream DATA_DIR=./data-upstream npm -w api run dev-upstream'",
     "dev-ui": "npm -w ui run dev",
     "dev-deps": "mkdir -p dev/logs && docker compose up 2>&1 | tee dev/logs/docker-compose.log",
     "stop-dev-deps": "docker compose stop",
