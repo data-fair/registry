@@ -4,7 +4,8 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "mkdir -p ../dev/logs && NODE_ENV=development EVENTS_LOG_LEVEL=warn nodemon -e js,ts,json index.ts 2>&1 | tee ../dev/logs/dev-api.log"
+    "dev": "mkdir -p ../dev/logs && NODE_ENV=development EVENTS_LOG_LEVEL=warn nodemon -e js,ts,json index.ts 2>&1 | tee ../dev/logs/dev-api.log",
+    "dev-upstream": "mkdir -p ../dev/logs && NODE_ENV=development EVENTS_LOG_LEVEL=warn nodemon -e js,ts,json index.ts 2>&1 | tee ../dev/logs/dev-api-upstream.log"
   },
   "imports": {
     "#config": "./src/config.ts",
@@ -38,6 +39,7 @@
     "semver": "^7.6.0",
     "sharp": "^0.33.5",
     "tar": "^7.5.16",
-    "tar-stream": "^3.1.0"
+    "tar-stream": "^3.1.0",
+    "ws": "^8.21.0"
   }
 }

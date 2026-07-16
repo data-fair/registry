@@ -26,6 +26,17 @@ export default {
     lastSyncAt: { type: 'string', format: 'date-time' },
     lastSyncStatus: { type: 'string', enum: ['success', 'error'] },
     lastSyncError: { type: 'string' },
+    syncProgress: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['startedAt', 'done', 'total'],
+      properties: {
+        startedAt: { type: 'string', format: 'date-time' },
+        done: { type: 'integer' },
+        total: { type: 'integer' },
+        currentArtefact: { type: 'string' }
+      }
+    },
     createdAt: { type: 'string', format: 'date-time', readOnly: true },
     updatedAt: { type: 'string', format: 'date-time', readOnly: true }
   }

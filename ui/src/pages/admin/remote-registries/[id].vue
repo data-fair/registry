@@ -70,7 +70,23 @@
       <v-card-title>
         {{ t('syncStatus') }}
         <v-chip
-          v-if="registry.lastSyncStatus"
+          v-if="syncRunning"
+          size="small"
+          color="info"
+          class="ml-2"
+        >
+          {{ t('running') }}
+        </v-chip>
+        <v-chip
+          v-else-if="syncInterrupted"
+          size="small"
+          color="warning"
+          class="ml-2"
+        >
+          {{ t('interrupted') }}
+        </v-chip>
+        <v-chip
+          v-else-if="registry.lastSyncStatus"
           size="small"
           :color="registry.lastSyncStatus === 'success' ? 'success' : 'error'"
           class="ml-2"
@@ -79,17 +95,59 @@
         </v-chip>
       </v-card-title>
       <v-card-text>
-        <div v-if="registry.lastSyncAt">
+        <template v-if="syncRunning && registry.syncProgress">
+          <v-progress-linear
+            :model-value="syncPercent"
+            :indeterminate="!registry.syncProgress.total"
+            height="6"
+            rounded
+            color="info"
+            class="mb-2"
+          />
+          <div class="text-body-2">
+            {{ registry.syncProgress.done }} / {{ registry.syncProgress.total }}
+            <template v-if="registry.syncProgress.currentArtefact">
+              — <code>{{ registry.syncProgress.currentArtefact }}</code>
+            </template>
+          </div>
+          <div class="text-medium-emphasis text-body-2">
+            {{ t('startedAt') }}: {{ dayjs(registry.syncProgress.startedAt).format('LT') }}
+          </div>
+        </template>
+
+        <template v-else-if="syncRunning">
+          <v-progress-linear
+            indeterminate
+            height="6"
+            rounded
+            color="info"
+            class="mb-2"
+          />
+          <div class="text-body-2 text-medium-emphasis">
+            {{ t('syncStarting') }}
+          </div>
+        </template>
+
+        <template v-else-if="syncInterrupted && registry.syncProgress">
+          <div>
+            {{ t('stoppedAt', { done: registry.syncProgress.done, total: registry.syncProgress.total }) }}
+          </div>
+          <div class="text-medium-emphasis text-body-2">
+            {{ t('startedAt') }}: {{ dayjs(registry.syncProgress.startedAt).format('L LT') }}
+          </div>
+        </template>
+
+        <div v-if="!syncRunning && registry.lastSyncAt">
           {{ t('lastSyncAt') }}: {{ dayjs(registry.lastSyncAt).format('L LT') }}
         </div>
         <div
-          v-if="registry.lastSyncError"
+          v-if="!syncRunning && registry.lastSyncError"
           class="text-error mt-1"
         >
           {{ registry.lastSyncError }}
         </div>
         <div
-          v-if="!registry.lastSyncAt"
+          v-if="!syncRunning && !syncInterrupted && !registry.lastSyncAt"
           class="text-medium-emphasis"
         >
           {{ t('neverSynced') }}
@@ -99,6 +157,7 @@
         <v-btn
           color="primary"
           variant="flat"
+          :disabled="syncRunning"
           :loading="syncAction.loading.value"
           @click="syncAction.execute()"
         >
@@ -258,6 +317,12 @@ fr:
   neverSynced: Jamais synchronisé
   syncNow: Synchroniser maintenant
   syncStarted: Synchronisation lancée
+  syncStarting: Démarrage…
+  running: en cours
+  interrupted: interrompue
+  startedAt: Démarrée à
+  stoppedAt: Arrêtée à {done}/{total} artefacts
+  syncAlreadyRunning: Une synchronisation est déjà en cours
   remoteArtefacts: Artefacts distants
   search: Rechercher
   artefactName: Nom
@@ -286,6 +351,12 @@ en:
   neverSynced: Never synced
   syncNow: Sync Now
   syncStarted: Sync started
+  syncStarting: Starting…
+  running: running
+  interrupted: interrupted
+  startedAt: Started at
+  stoppedAt: Stopped at {done}/{total} artefacts
+  syncAlreadyRunning: A sync is already running
   remoteArtefacts: Remote Artefacts
   search: Search
   artefactName: Name
@@ -306,6 +377,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
+import { useRegistrySync } from '~/composables/registry-sync'
 import { categoryColor, categoryLabel } from '~/utils/categories'
 
 const { t, locale } = useI18n()
@@ -328,6 +400,18 @@ const confirmDelete = ref(false)
 const searchQuery = ref('')
 const selectingId = ref<string | null>(null)
 const unselectingId = ref<string | null>(null)
+
+const { sendUiNotif } = useUiNotif()
+
+useRegistrySync(registryId.value, registry)
+
+const syncRunning = computed(() => registry.value?.syncState === 'running')
+const syncInterrupted = computed(() => registry.value?.syncState === 'interrupted')
+const syncPercent = computed(() => {
+  const progress = registry.value?.syncProgress
+  if (!progress?.total) return 0
+  return Math.round((progress.done / progress.total) * 100)
+})
 
 useBreadcrumbs().setForPage(() => [
   { title: t('admin'), to: '/admin' },
@@ -378,12 +462,27 @@ const patchAction = useAsyncAction(
 
 const syncAction = useAsyncAction(
   async () => {
-    await $fetch(`/v1/remote-registries/${encodeURIComponent(registryId.value)}/sync`, {
-      method: 'POST'
-    })
-    setTimeout(fetchRegistry, 2000)
-  },
-  { success: t('syncStarted') }
+    try {
+      await $fetch(`/v1/remote-registries/${encodeURIComponent(registryId.value)}/sync`, {
+        method: 'POST'
+      })
+      // Optimistic: the first ws progress event fills syncProgress in within milliseconds.
+      // Clearing it avoids showing the *previous* run's completed bar in the meantime.
+      if (registry.value) {
+        registry.value.syncState = 'running'
+        registry.value.syncProgress = undefined
+      }
+      sendUiNotif({ type: 'success', msg: t('syncStarted') })
+    } catch (err: any) {
+      // losing the race with a peer replica or another admin is not a fault
+      if ((err.status ?? err.statusCode) === 409) {
+        sendUiNotif({ type: 'warning', msg: t('syncAlreadyRunning') })
+        await fetchRegistry()
+        return
+      }
+      throw err
+    }
+  }
 )
 
 async function selectArtefact (artefactId: string) {

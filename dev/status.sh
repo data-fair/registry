@@ -65,6 +65,13 @@ echo ""
 echo -e "${BOLD}Dev processes:${RESET}"
 check_http "dev-api" "$NGINX/registry/api/ping"
 check_http "dev-ui" "$NGINX/registry"
+# The upstream registry has no nginx route by design — probe it directly.
+# Guarded: this script runs under `set -u`, and older .env files lack the var.
+if [ -n "${DEV_UPSTREAM_API_PORT:-}" ]; then
+  check_http "dev-api-upstream" "http://localhost:${DEV_UPSTREAM_API_PORT}/api/ping"
+else
+  printf "%-20s MISSING  DEV_UPSTREAM_API_PORT not set in .env\n" "dev-api-upstream"
+fi
 echo ""
 
 # --- Docker compose services (probed through nginx where possible) ---

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin } from './support/axios.ts'
+import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin, holdSyncLock, releaseSyncLock, syncLockExists } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -324,6 +324,176 @@ test.describe('Remote registries', () => {
       } catch (err: any) {
         expect(err.status).toBe(409)
       }
+    })
+  })
+
+  test.describe('Sync state on reads', () => {
+    const url = 'https://upstream.example.com'
+
+    test.beforeEach(async () => {
+      const ax = await superAdmin
+      await ax.post('/api/v1/remote-registries', { url, name: 'Upstream', apiKey: 'reg_abc_secretkey123' })
+    })
+
+    test('a registry with no attempt recorded is idle', async () => {
+      const ax = await superAdmin
+      const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+      expect(res.data.syncState).toBe('idle')
+    })
+
+    test('a held lock reports running on the detail endpoint', async () => {
+      const ax = await superAdmin
+      await holdSyncLock(url)
+      try {
+        const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+        expect(res.data.syncState).toBe('running')
+      } finally {
+        await releaseSyncLock(url)
+      }
+      const after = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+      expect(after.data.syncState).toBe('idle')
+    })
+
+    test('a held lock reports running on the list endpoint', async () => {
+      const ax = await superAdmin
+      await holdSyncLock(url)
+      try {
+        const res = await ax.get('/api/v1/remote-registries')
+        expect(res.data.results.find((r: any) => r._id === url).syncState).toBe('running')
+      } finally {
+        await releaseSyncLock(url)
+      }
+    })
+
+    test('one registry running does not mark its siblings as running', async () => {
+      const ax = await superAdmin
+      const other = 'https://other.example.com'
+      await ax.post('/api/v1/remote-registries', { url: other, name: 'Other', apiKey: 'reg_def_otherkey' })
+      await holdSyncLock(url)
+      try {
+        const res = await ax.get('/api/v1/remote-registries')
+        const byId = Object.fromEntries(res.data.results.map((r: any) => [r._id, r.syncState]))
+        expect(byId[url]).toBe('running')
+        expect(byId[other]).toBe('idle')
+      } finally {
+        await releaseSyncLock(url)
+      }
+    })
+  })
+
+  test.describe('Manual sync trigger', () => {
+    const url = 'https://upstream.example.com'
+
+    test.beforeEach(async () => {
+      const ax = await superAdmin
+      await ax.post('/api/v1/remote-registries', { url, name: 'Upstream', apiKey: 'reg_abc_secretkey123' })
+    })
+
+    test('a free lock accepts the sync with 202', async () => {
+      const ax = await superAdmin
+      const res = await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+      expect(res.status).toBe(202)
+    })
+
+    test('a held lock rejects the sync with 409', async () => {
+      const ax = await superAdmin
+      await holdSyncLock(url)
+      try {
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(409)
+      } finally {
+        await releaseSyncLock(url)
+      }
+    })
+
+    test('an unknown registry is still 404, not 409', async () => {
+      const ax = await superAdmin
+      const unknownUrl = 'https://nope.example.com'
+
+      // Deterministic ordering guard: pre-occupy the lock so a wrong-order
+      // implementation (lock-acquire before the 404 check) fails to acquire
+      // it and throws 409 instead of 404. This is the real enforcement.
+      // Merely asserting the lock's absence right after the response
+      // returns (see below) is NOT reliable on its own: runSync's early
+      // return (remote not found) plus the background lock release both
+      // complete -- as two fast in-process Mongo round trips -- faster than
+      // this test's separate follow-up HTTP round trip, even under the
+      // wrong order. Verified by mutation testing: inverting the route's
+      // order left that assertion passing 5/5 runs.
+      await holdSyncLock(unknownUrl)
+      try {
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent(unknownUrl) + '/sync')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      } finally {
+        await releaseSyncLock(unknownUrl)
+      }
+
+      // Sanity check for the un-contended case: a genuine 404 never creates
+      // a lock row at all.
+      try {
+        await ax.post('/api/v1/remote-registries/' + encodeURIComponent(unknownUrl) + '/sync')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(404)
+      }
+      expect(await syncLockExists(unknownUrl)).toBe(false)
+    })
+
+    test('a sync over zero selected artefacts records progress and succeeds', async () => {
+      const ax = await superAdmin
+      await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+
+      // the sync runs in the background; poll the doc until it settles (test-only wait)
+      let doc: any
+      for (let i = 0; i < 50; i++) {
+        const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+        doc = res.data
+        if (doc.lastSyncStatus) break
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      expect(doc.lastSyncStatus).toBe('success')
+      expect(doc.syncProgress.total).toBe(0)
+      expect(doc.syncProgress.done).toBe(0)
+      expect(doc.syncProgress.currentArtefact).toBeUndefined()
+      expect(doc.syncProgress.startedAt <= doc.lastSyncAt).toBe(true)
+      expect(doc.syncState).toBe('idle')
+    })
+
+    test('a sync over one selected artefact records per-artefact progress and surfaces the fetch error', async () => {
+      const ax = await superAdmin
+      const artefactId = '@test/pkg@1'
+
+      // Selecting doesn't contact the remote — only checks for a conflicting
+      // local artefact — so this is safe against a non-resolving remote URL.
+      await ax.post(`/api/v1/remote-registries/${encodeURIComponent(url)}/selected-artefacts`, {
+        artefactId
+      })
+
+      await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
+
+      // the sync runs in the background; poll the doc until it settles (test-only wait)
+      let doc: any
+      for (let i = 0; i < 50; i++) {
+        const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
+        doc = res.data
+        if (doc.lastSyncStatus) break
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      // The remote host doesn't resolve, so the single artefact fails to
+      // fetch -- the loop's catch records the error and keeps going.
+      expect(doc.lastSyncStatus).toBe('error')
+      expect(doc.lastSyncError).toContain(artefactId)
+      expect(doc.syncProgress.total).toBe(1)
+      expect(doc.syncProgress.done).toBe(1)
+      expect(doc.syncProgress.currentArtefact).toBeUndefined()
+      expect(doc.syncProgress.startedAt <= doc.lastSyncAt).toBe(true)
+      expect(doc.syncState).toBe('idle')
     })
   })
 })

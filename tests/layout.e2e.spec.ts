@@ -19,10 +19,14 @@ test.beforeAll(async () => {
 })
 
 test.describe('App layout (anonymous)', () => {
-  test('home page shows the artefacts list without breadcrumbs', async ({ page }) => {
+  // The list page emits a single artefact-count crumb so an embedding shell
+  // (data-fair) does not open the Registry tab on an empty trail — see a61123d.
+  test('home page shows the artefacts list with a single count breadcrumb', async ({ page }) => {
     await page.goto('/registry/')
     await expect(page.locator('header').getByText('@data-fair/registry')).toBeVisible()
-    await expect(page.locator('.v-breadcrumbs')).toHaveCount(0)
+    const crumbs = page.locator('.v-breadcrumbs .v-breadcrumbs-item')
+    await expect(crumbs).toHaveCount(1)
+    await expect(crumbs.first()).toContainText('artefact')
     await expect(page.getByText(layoutPkgId).first()).toBeVisible()
   })
 

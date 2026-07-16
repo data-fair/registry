@@ -4,8 +4,8 @@ import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import mongo from '#mongo'
 import { cipher, decipher } from '../cipher.ts'
-import { syncRemoteRegistry } from './sync.ts'
-import { filterSuggestedArtefacts } from './operations.ts'
+import { startSync } from './sync.ts'
+import { filterSuggestedArtefacts, syncLockId, syncState } from './operations.ts'
 import * as postReqBody from '#doc/remote-registries/post-req/index.ts'
 import * as patchReqBody from '#doc/remote-registries/patch-req/index.ts'
 
@@ -15,6 +15,15 @@ export default router
 const extractShortId = (apiKey: string): string => {
   const match = apiKey.match(/^(reg_[^_]+)_/)
   return match ? match[1] : apiKey.slice(0, 12)
+}
+
+// One query for the whole page, not one per row.
+const lockedLockIds = async (registryIds: string[]): Promise<Set<string>> => {
+  if (registryIds.length === 0) return new Set()
+  const rows = await mongo.db.collection('locks')
+    .find({ _id: { $in: registryIds.map(syncLockId) as any } }, { projection: { _id: 1 } })
+    .toArray()
+  return new Set(rows.map(row => String(row._id)))
 }
 
 // Create remote registry
@@ -48,7 +57,11 @@ router.get('/', async (req, res, next) => {
   try {
     await session.reqAdminMode(req)
     const results = await mongo.remoteRegistries.find({}, { projection: { apiKey: 0 } }).toArray()
-    res.json({ results, count: results.length })
+    const locked = await lockedLockIds(results.map(r => r._id))
+    res.json({
+      results: results.map(r => ({ ...r, syncState: syncState(locked.has(syncLockId(r._id)), r) })),
+      count: results.length
+    })
   } catch (err) { next(err) }
 })
 
@@ -58,7 +71,8 @@ router.get('/:id', async (req, res, next) => {
     await session.reqAdminMode(req)
     const doc = await mongo.remoteRegistries.findOne({ _id: req.params.id }, { projection: { apiKey: 0 } })
     if (!doc) throw httpError(404, 'remote registry not found')
-    res.json(doc)
+    const locked = await lockedLockIds([doc._id])
+    res.json({ ...doc, syncState: syncState(locked.has(syncLockId(doc._id)), doc) })
   } catch (err) { next(err) }
 })
 
@@ -191,9 +205,7 @@ router.post('/:id/sync', async (req, res, next) => {
     const doc = await mongo.remoteRegistries.findOne({ _id: req.params.id })
     if (!doc) throw httpError(404, 'remote registry not found')
 
-    syncRemoteRegistry(req.params.id).catch(err => {
-      console.error(`[sync] Manual sync error for ${req.params.id}:`, err.message || err)
-    })
+    if (!await startSync(req.params.id)) throw httpError(409, 'sync already running')
     res.status(202).json({ message: 'sync started' })
   } catch (err) { next(err) }
 })
