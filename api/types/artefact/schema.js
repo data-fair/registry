@@ -154,6 +154,36 @@ export default {
     // (lib-node) use it to decide whether to run `npm rebuild` after
     // extraction.
     hasNativeModules: { type: 'boolean', readOnly: true },
+    // Advisory vulnerability-scan summary. Admin-only: stripped from
+    // responses for non-admin callers in the artefacts router. Full
+    // findings live in the separate `artefactScans` collection.
+    scan: {
+      type: 'object',
+      readOnly: true,
+      additionalProperties: false,
+      properties: {
+        status: { type: 'string', enum: ['pending', 'running', 'success', 'error'] },
+        queuedAt: { type: 'string', format: 'date-time' },
+        startedAt: { type: 'string', format: 'date-time' },
+        finishedAt: { type: 'string', format: 'date-time' },
+        scannerVersion: { type: 'string' },
+        vulnDbUpdatedAt: { type: 'string', format: 'date-time' },
+        hasInstallScripts: { type: 'boolean' },
+        error: { type: 'string' },
+        summary: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            critical: { type: 'integer' },
+            high: { type: 'integer' },
+            medium: { type: 'integer' },
+            low: { type: 'integer' },
+            unknown: { type: 'integer' },
+            total: { type: 'integer' }
+          }
+        }
+      }
+    },
     uploadedBy: {
       type: 'object',
       readOnly: true,

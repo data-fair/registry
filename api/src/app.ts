@@ -44,6 +44,7 @@ if (process.env.NODE_ENV === 'development') {
   app.delete('/api/test-env', async (req, res) => {
     assertReqInternal(req)
     await mongo.artefacts.deleteMany({})
+    await mongo.artefactScans.deleteMany({})
     await mongo.apiKeys.deleteMany({})
     // Scoped delete: only grants for test accounts (test users/orgs are
     // `test*`-prefixed) are wiped, so manually-created dev grants survive.
@@ -92,6 +93,47 @@ if (process.env.NODE_ENV === 'development') {
     assertReqInternal(req)
     const lock = await mongo.db.collection('locks').findOne({ _id: req.params.id as any })
     res.json({ exists: !!lock })
+  })
+
+  app.put('/api/test-env/artefacts/:id/scan', async (req, res) => {
+    assertReqInternal(req)
+    const id = decodeURIComponent(req.params.id)
+    const { summary, findings } = req.body
+    await mongo.artefacts.updateOne(
+      { _id: id },
+      { $set: { scan: { status: 'success', finishedAt: new Date().toISOString(), summary } } }
+    )
+    await mongo.artefactScans.replaceOne(
+      { _id: id },
+      { scannedAt: new Date().toISOString(), scannerVersion: 'test', vulnerabilities: findings ?? [] },
+      { upsert: true }
+    )
+    res.send()
+  })
+
+  // Upsert an artefact doc directly with arbitrary fields — lets tests build a
+  // deterministic fleet (with controlled scan state) without the upload
+  // pipeline, whose auto-scan would otherwise race injected state.
+  app.put('/api/test-env/artefacts/:id/doc', async (req, res) => {
+    assertReqInternal(req)
+    const id = decodeURIComponent(req.params.id)
+    const now = new Date().toISOString()
+    await mongo.artefacts.replaceOne(
+      { _id: id },
+      {
+        _id: id,
+        name: id,
+        format: 'npm',
+        public: false,
+        privateAccess: [],
+        createdAt: now,
+        updatedAt: now,
+        dataUpdatedAt: now,
+        ...req.body
+      } as any,
+      { upsert: true }
+    )
+    res.send()
   })
 }
 

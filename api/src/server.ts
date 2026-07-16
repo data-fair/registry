@@ -11,6 +11,7 @@ import { app } from './app.ts'
 import config from '#config'
 import mongo from '#mongo'
 import { syncAllRemoteRegistries } from './remote-registries/sync.ts'
+import { rescanAll } from './scanning/service.ts'
 import { renameFilePathToPath } from './boot-rename-file-path.ts'
 
 const server = createServer(app)
@@ -24,6 +25,7 @@ server.requestTimeout = 60 * 60 * 1000
 server.on('timeout', () => internalError('http-timeout', 'http socket timeout'))
 server.on('clientError', (err) => internalError('http-client-error', err))
 let syncTimer: ReturnType<typeof setInterval> | undefined
+let rescanTimer: ReturnType<typeof setInterval> | undefined
 
 export const start = async () => {
   if (config.observer?.active) await startObserver(config.observer.port)
@@ -55,11 +57,20 @@ export const start = async () => {
     })
   }, 24 * 60 * 60 * 1000)
 
+  if (config.scanning?.enabled) {
+    // Warm the DB + do an initial pass shortly after boot, then on the interval.
+    rescanAll().catch(err => internalError('rescan-all', err))
+    rescanTimer = setInterval(() => {
+      rescanAll().catch(err => internalError('rescan-all', err))
+    }, (config.scanning.rescanIntervalHours ?? 24) * 60 * 60 * 1000)
+  }
+
   console.log(`API server listening on port ${config.port}`)
 }
 
 export const stop = async () => {
   if (syncTimer) clearInterval(syncTimer)
+  if (rescanTimer) clearInterval(rescanTimer)
   await httpTerminator.terminate()
   await wsServer.stop()
   if (config.observer?.active) await stopObserver()

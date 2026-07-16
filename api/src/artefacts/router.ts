@@ -14,15 +14,29 @@ import { filesStorage } from '../files-storage/index.ts'
 import {
   listArtefacts, getArtefact, getArtefactById, patchArtefact, deleteArtefact,
   commitFileUpload, commitNpmUpload, extractStagedManifest, resolveDownload,
-  listGroupValues
+  listGroupValues, getScanSummary
 } from './service.ts'
 import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
+import scanRouter from '../scanning/router.ts'
+import type { Caller } from '../access.ts'
 
 const router = Router()
 export default router
 
 router.use('/:id/thumbnail', artefactThumbnailRouter)
+router.use('/:id/scan', scanRouter)
+
+// Drop the advisory, admin-only scan field unconditionally.
+const omitScan = <T extends { scan?: unknown }>(artefact: T): T => {
+  if (artefact.scan === undefined) return artefact
+  const { scan, ...rest } = artefact
+  return rest as T
+}
+
+// Scan results are advisory and admin-only; strip them for non-admin callers.
+const stripScan = <T extends { scan?: unknown }>(artefact: T, caller: Caller): T =>
+  caller.admin ? artefact : omitScan(artefact)
 
 const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
@@ -85,10 +99,18 @@ const tryInternalSecret = (req: import('express').Request): boolean => {
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
-    const filter = artefactAccessFilter(await resolveCaller(req))
+    const caller = await resolveCaller(req)
+    const filter = artefactAccessFilter(caller)
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
-    const sort: Record<string, 1 | -1> = req.query.sort === 'name' ? { name: 1 } : { dataUpdatedAt: -1 }
+    // `vulnerabilities` is admin-only: scan data is stripped for non-admins, so
+    // ordering by it would leak. Non-admins silently get the default sort.
+    let sort: Record<string, 1 | -1> = { dataUpdatedAt: -1 }
+    if (req.query.sort === 'name') {
+      sort = { name: 1 }
+    } else if (req.query.sort === 'vulnerabilities' && caller.admin) {
+      sort = { 'scan.summary.critical': -1, 'scan.summary.high': -1, 'scan.summary.medium': -1, dataUpdatedAt: -1 }
+    }
 
     // Text search on name
     if (req.query.q) {
@@ -116,7 +138,7 @@ router.get('/', async (req, res, next) => {
     }
 
     const { results, count } = await listArtefacts(filter, { sort, skip, size })
-    res.json({ results, count })
+    res.json({ results: results.map(r => stripScan(r, caller)), count })
   } catch (err) { next(err) }
 })
 
@@ -136,14 +158,23 @@ router.get('/groups', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Fleet-wide vulnerability roll-up for the admin dashboard. Registered before
+// GET /:id so the literal path isn't swallowed as an id. Admin-only.
+router.get('/scan-summary', async (req, res, next) => {
+  try {
+    await session.reqAdminMode(req)
+    res.json(await getScanSummary())
+  } catch (err) { next(err) }
+})
+
 // Get artefact detail
 // All formats carry their tarball references directly on the doc.
 router.get('/:id', async (req, res, next) => {
   try {
-    const filter = artefactAccessFilter(await resolveCaller(req))
-    const artefact = await getArtefact(req.params.id, filter)
+    const caller = await resolveCaller(req)
+    const artefact = await getArtefact(req.params.id, artefactAccessFilter(caller))
     if (!artefact) throw httpError(404, 'artefact not found')
-    res.json(artefact)
+    res.json(stripScan(artefact, caller))
   } catch (err) { next(err) }
 })
 
@@ -241,7 +272,8 @@ router.post('/file/:name', async (req, res, next) => {
         : { internal: true }
     })
     stagingStored = false
-    res.status(201).json({ artefact })
+    // Uploaders are never admin session callers; never leak scan data.
+    res.status(201).json({ artefact: omitScan(artefact) })
   } catch (err) {
     if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
     next(err)
@@ -299,7 +331,8 @@ router.post('/npm/:id', async (req, res, next) => {
       existing
     })
     stagingStored = false
-    res.status(201).json({ artefact })
+    // Uploaders are never admin session callers; never leak scan data.
+    res.status(201).json({ artefact: omitScan(artefact) })
   } catch (err) {
     if (stagingStored) await filesStorage.delete(stagingPath).catch(() => {})
     next(err)

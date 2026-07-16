@@ -10,6 +10,7 @@ import mongo from '#mongo'
 import config from '#config'
 import { filesStorage } from '../files-storage/index.ts'
 import { extractManifest, type Manifest } from './operations.ts'
+import { enqueueScan } from '../scanning/service.ts'
 
 export type { Manifest, ExtractManifestResult } from './operations.ts'
 
@@ -49,6 +50,63 @@ export const listGroupValues = async (
     .sort((a, b) => a.localeCompare(b))
 }
 
+// --- scan summary (fleet-wide, admin dashboard) ---------------------------
+
+export type ScanSummaryResult = {
+  enabled: boolean
+  totals: { critical: number, high: number, medium: number, low: number, unknown: number, artefactsWithCritical: number }
+  health: { npmTotal: number, scanned: number, error: number, pending: number, never: number, oldestScanAt: string | null }
+  worstOffenders: { _id: string, name: string, status?: string, summary?: { critical?: number, high?: number, medium?: number, low?: number, unknown?: number, total?: number } }[]
+}
+
+// Fleet-wide vulnerability roll-up over npm artefacts, in a single $facet.
+// Artefacts without a scan contribute 0 to totals and to the "never" bucket.
+export const getScanSummary = async (): Promise<ScanSummaryResult> => {
+  const enabled = config.scanning?.enabled ?? false
+  const num = (path: string) => ({ $ifNull: [path, 0] })
+  const [facet] = await mongo.artefacts.aggregate([
+    { $match: { format: 'npm' } },
+    {
+      $facet: {
+        totals: [{
+          $group: {
+            _id: null,
+            critical: { $sum: num('$scan.summary.critical') },
+            high: { $sum: num('$scan.summary.high') },
+            medium: { $sum: num('$scan.summary.medium') },
+            low: { $sum: num('$scan.summary.low') },
+            unknown: { $sum: num('$scan.summary.unknown') },
+            artefactsWithCritical: { $sum: { $cond: [{ $gt: [num('$scan.summary.critical'), 0] }, 1, 0] } }
+          }
+        }],
+        health: [{
+          $group: {
+            _id: null,
+            npmTotal: { $sum: 1 },
+            scanned: { $sum: { $cond: [{ $eq: ['$scan.status', 'success'] }, 1, 0] } },
+            error: { $sum: { $cond: [{ $eq: ['$scan.status', 'error'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $in: ['$scan.status', ['pending', 'running']] }, 1, 0] } },
+            never: { $sum: { $cond: [{ $eq: [{ $ifNull: ['$scan.status', null] }, null] }, 1, 0] } },
+            oldestScanAt: { $min: { $cond: [{ $eq: ['$scan.status', 'success'] }, '$scan.finishedAt', null] } }
+          }
+        }],
+        worstOffenders: [
+          { $match: { 'scan.summary.total': { $gt: 0 } } },
+          { $sort: { 'scan.summary.critical': -1, 'scan.summary.high': -1 } },
+          { $limit: 10 },
+          { $project: { _id: 1, name: 1, status: '$scan.status', summary: '$scan.summary' } }
+        ]
+      }
+    }
+  ]).toArray() as any[]
+
+  const totals = facet?.totals?.[0] ?? { critical: 0, high: 0, medium: 0, low: 0, unknown: 0, artefactsWithCritical: 0 }
+  delete totals._id
+  const health = facet?.health?.[0] ?? { npmTotal: 0, scanned: 0, error: 0, pending: 0, never: 0, oldestScanAt: null }
+  delete health._id
+  return { enabled, totals, health, worstOffenders: facet?.worstOffenders ?? [] }
+}
+
 // --- metadata patch -------------------------------------------------------
 
 export const patchArtefact = (id: string, body: Record<string, unknown>) => {
@@ -72,6 +130,9 @@ export const deleteArtefact = async (artefact: Artefact) => {
   await mongo.artefacts.deleteOne({ _id: artefact._id })
   if (artefact.path) await filesStorage.delete(artefact.path).catch(() => {})
   await mongo.thumbnails.deleteMany({ artefactId: artefact._id })
+  // Drop the full-findings doc so a later artefact reusing this id can't surface
+  // stale scan results before its own scan runs.
+  await mongo.artefactScans.deleteOne({ _id: artefact._id })
 }
 
 // --- npm upload -----------------------------------------------------------
@@ -142,6 +203,9 @@ export const commitNpmUpload = async (params: {
   if (existing?.path && existing.path !== path) {
     await filesStorage.delete(existing.path).catch(() => {})
   }
+
+  // Advisory scan runs in the background; never blocks the upload response.
+  await enqueueScan(id)
 
   return (await mongo.artefacts.findOne({ _id: id }))!
 }

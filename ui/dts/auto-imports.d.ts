@@ -12,6 +12,7 @@ declare global {
   const $sitePath: typeof import('~/context')['$sitePath']
   const $uiConfig: typeof import('~/context')['$uiConfig']
   const EffectScope: typeof import('vue')['EffectScope']
+  const SEVERITY_ORDER: typeof import('../src/utils/severity')['SEVERITY_ORDER']
   const categoryColor: typeof import('../src/utils/categories')['categoryColor']
   const categoryColors: typeof import('../src/utils/categories')['categoryColors']
   const categoryItems: typeof import('../src/utils/categories')['categoryItems']
@@ -58,6 +59,7 @@ declare global {
   const readonly: typeof import('vue')['readonly']
   const ref: typeof import('vue')['ref']
   const resolveComponent: typeof import('vue')['resolveComponent']
+  const severityColor: typeof import('../src/utils/severity')['severityColor']
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
@@ -107,6 +109,7 @@ declare global {
   const watchPostEffect: typeof import('vue')['watchPostEffect']
   const watchSyncEffect: typeof import('vue')['watchSyncEffect']
   const withUiNotif: typeof import('@data-fair/lib-vue/ui-notif.js')['withUiNotif']
+  const worstSeverity: typeof import('../src/utils/severity')['worstSeverity']
 }
 // for type re-export
 declare global {
