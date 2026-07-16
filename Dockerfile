@@ -72,6 +72,12 @@ RUN npm -w ui run build
 ##########################
 FROM installer AS api-installer
 
+# The installer stage's `npm install -w ui` rewrites the lock file against fresh
+# registry metadata (it can bump optional transitive edges without re-locking
+# their entries), which `npm ci` then rejects as out of sync. Restore the
+# pristine lock so `npm ci` validates the committed one.
+COPY --from=package-strip /app/package-lock.json package-lock.json
+
 # `npm ci --omit=optional` + clean-modules drop sharp's platform-specific
 # binaries (@img/sharp-*). Stash the musl/x64 ones from the full install and
 # restore them afterwards so the runtime image can load sharp on alpine.
