@@ -53,6 +53,10 @@ runs:
         REF_SUFFIX_OVERRIDE: ${{ inputs.ref-suffix }}
       run: |
         set -euo pipefail
+        # Strip any whitespace/newline picked up when the key was pasted into
+        # the CI secret — a raw line break in the x-api-key header corrupts
+        # the HTTP request (the registry then sees no Content-Type header).
+        REGISTRY_API_KEY=$(printf '%s' "$REGISTRY_API_KEY" | tr -d '[:space:]')
         PACKAGE_NAME=$(node -p "require('./package.json').name")
         PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
