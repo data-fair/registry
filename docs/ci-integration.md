@@ -13,6 +13,8 @@ Upload API keys are created by a superadmin in the registry UI ("Admin → API k
 
 The raw key is displayed **once** at creation time — copy it immediately and store it as a CI secret. It is never retrievable again (only a SHA-512 hash is stored server-side).
 
+> **Trailing newline gotcha.** A key pasted into a CI secret with a trailing line break (easy to pick up when copying, or via `echo "$KEY" | gh secret set ...`) ends up verbatim in the `x-api-key` header and corrupts the HTTP request: depending on the curl/server versions the upload fails with an opaque connection error, or the registry sees the request without its `Content-Type` header and rejects it. The recipes below strip whitespace from the key before use — keep that line when adapting them.
+
 You need **one key per registry environment**. A key issued by `koumoul.com/registry` will not authenticate against `staging-koumoul.com/registry` and vice-versa.
 
 ## Authentication
@@ -136,6 +138,10 @@ jobs:
           REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
         run: |
           set -euo pipefail
+          # Strip any whitespace/newline picked up when the key was pasted into
+          # the secret — a raw line break in the x-api-key header corrupts the
+          # HTTP request.
+          REGISTRY_API_KEY=$(printf '%s' "$REGISTRY_API_KEY" | tr -d '[:space:]')
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_MAJOR=$(node -p "require('./package.json').version.split('.')[0]")
           # Artefact id: package name with '/' flattened to '-', plus '-<major>'.
@@ -193,6 +199,8 @@ jobs:
         env:
           REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
         run: |
+          # Strip any whitespace/newline a copy-paste may have added to the key.
+          REGISTRY_API_KEY=$(printf '%s' "$REGISTRY_API_KEY" | tr -d '[:space:]')
           curl -sS --fail-with-body -X POST \
             "https://registry.example.com/api/v1/artefacts/file/my-tileset" \
             -H "x-api-key: ${REGISTRY_API_KEY}" \
@@ -285,6 +293,8 @@ jobs:
           REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
         run: |
           set -euo pipefail
+          # Strip any whitespace/newline a copy-paste may have added to the key.
+          REGISTRY_API_KEY=$(printf '%s' "$REGISTRY_API_KEY" | tr -d '[:space:]')
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           # Artefact id: package name with '/' flattened to '-', plus '-<branch>'.
           ARTEFACT_ID="${PACKAGE_NAME//\//-}-${GITHUB_REF_NAME}"
@@ -341,6 +351,8 @@ publish:
     - npm ci
     - npm pack
     - |
+      # Strip any whitespace/newline a copy-paste may have added to the key.
+      REGISTRY_API_KEY=$(printf '%s' "$REGISTRY_API_KEY" | tr -d '[:space:]')
       TARBALL=$(ls *.tgz)
       PACKAGE_NAME=$(node -p "require('./package.json').name")
       PACKAGE_MAJOR=$(node -p "require('./package.json').version.split('.')[0]")
@@ -367,6 +379,8 @@ publish-tileset:
   script:
     - ./build-tileset.sh
     - |
+      # Strip any whitespace/newline a copy-paste may have added to the key.
+      REGISTRY_API_KEY=$(printf '%s' "$REGISTRY_API_KEY" | tr -d '[:space:]')
       curl -sS --fail-with-body -X POST \
         "${REGISTRY_URL}/api/v1/artefacts/file/my-tileset" \
         -H "x-api-key: ${REGISTRY_API_KEY}" \
@@ -469,4 +483,5 @@ This is inherently more secure than GitHub's default model — the protection is
 - [ ] `architecture` form field set on upload (matches `process.arch` of the consumer)
 - [ ] `category` form field set on npm uploads (matches the artefact kind and any `allowedCategory` on the key)
 - [ ] Upload uses `curl --fail-with-body` so the registry's response is printed (no silent `curl -f`)
+- [ ] Upload step strips whitespace from the key before the curl call (guards against a secret stored with a trailing newline)
 - [ ] Key rotation process documented for your team

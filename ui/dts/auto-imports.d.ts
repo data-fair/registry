@@ -129,6 +129,7 @@ declare module 'vue' {
     readonly $sitePath: UnwrapRef<typeof import('~/context')['$sitePath']>
     readonly $uiConfig: UnwrapRef<typeof import('~/context')['$uiConfig']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly SEVERITY_ORDER: UnwrapRef<typeof import('../src/utils/severity')['SEVERITY_ORDER']>
     readonly categoryColor: UnwrapRef<typeof import('../src/utils/categories')['categoryColor']>
     readonly categoryColors: UnwrapRef<typeof import('../src/utils/categories')['categoryColors']>
     readonly categoryItems: UnwrapRef<typeof import('../src/utils/categories')['categoryItems']>
@@ -175,6 +176,7 @@ declare module 'vue' {
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
+    readonly severityColor: UnwrapRef<typeof import('../src/utils/severity')['severityColor']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
@@ -224,5 +226,6 @@ declare module 'vue' {
     readonly watchPostEffect: UnwrapRef<typeof import('vue')['watchPostEffect']>
     readonly watchSyncEffect: UnwrapRef<typeof import('vue')['watchSyncEffect']>
     readonly withUiNotif: UnwrapRef<typeof import('@data-fair/lib-vue/ui-notif.js')['withUiNotif']>
+    readonly worstSeverity: UnwrapRef<typeof import('../src/utils/severity')['worstSeverity']>
   }
 }

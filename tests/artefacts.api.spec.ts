@@ -97,6 +97,41 @@ test.describe('Artefacts', () => {
       expect(second.data.artefact.dataUpdatedAt).not.toBe(firstDataAt)
     })
 
+    test('upload without a Content-Type header returns 400, not 500', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      try {
+        // No body at all → axios sends no Content-Type header
+        await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'))
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
+    test('upload with a non-multipart Content-Type returns 400', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      try {
+        await ax.post(
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+          Buffer.from('not a multipart body'),
+          { headers: { 'Content-Type': 'application/octet-stream' } }
+        )
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
+    test('file upload without a Content-Type header returns 400, not 500', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      try {
+        await ax.post('/api/v1/artefacts/file/some-file')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
     test('re-upload with different manifest name on the same artefact id returns 409', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const form1 = new FormData()
