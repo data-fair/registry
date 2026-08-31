@@ -400,6 +400,35 @@ router.get('/:id/download', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// Helper: build the busboy parser for an upload request, or settle with a 400
+// when it can't be built. Busboy's constructor throws synchronously on a
+// missing Content-Type header, a non-multipart type, or a multipart type
+// without a boundary — plain Errors that would otherwise surface as 500s
+// (seen in production as "Missing Content-Type" from clients POSTing a raw
+// body without the multipart header).
+const createBusboy = (req: import('express').Request, settle: (err: Error | null) => void): ReturnType<typeof Busboy> | null => {
+  const contentType = req.headers['content-type']
+  if (!contentType || !contentType.toLowerCase().startsWith('multipart/form-data')) {
+    settle(httpError(400, 'request Content-Type must be multipart/form-data'))
+    return null
+  }
+  try {
+    return Busboy({
+      headers: req.headers,
+      limits: {
+        fileSize: MAX_UPLOAD_BYTES,
+        files: 1,
+        fields: 20,
+        fieldSize: 64 * 1024,
+        fieldNameSize: 200
+      }
+    })
+  } catch (err) {
+    settle(httpError(400, err instanceof Error ? err.message : 'invalid multipart request'))
+    return null
+  }
+}
+
 // Helper: stream a multipart upload containing a tarball to a caller-provided
 // sink (typically the configured files-storage backend), collecting the
 // `category` field if present. Enforces MAX_UPLOAD_BYTES at the busboy layer.
@@ -419,16 +448,8 @@ function streamTarballUpload (req: import('express').Request, writer: StreamWrit
     let fileSeen = false
     let pendingWrite: Promise<void> | null = null
 
-    const busboy = Busboy({
-      headers: req.headers,
-      limits: {
-        fileSize: MAX_UPLOAD_BYTES,
-        files: 1,
-        fields: 20,
-        fieldSize: 64 * 1024,
-        fieldNameSize: 200
-      }
-    })
+    const busboy = createBusboy(req, settle)
+    if (!busboy) return
 
     busboy.on('field', (name, val) => {
       // The artefact category comes solely from this multipart field; the
@@ -488,16 +509,8 @@ function streamFileUpload (req: import('express').Request, writer: StreamWriter)
     let fileSeen = false
     let pendingWrite: Promise<void> | null = null
 
-    const busboy = Busboy({
-      headers: req.headers,
-      limits: {
-        fileSize: MAX_UPLOAD_BYTES,
-        files: 1,
-        fields: 20,
-        fieldSize: 64 * 1024,
-        fieldNameSize: 200
-      }
-    })
+    const busboy = createBusboy(req, settle)
+    if (!busboy) return
 
     busboy.on('field', (name, val) => {
       fields[name] = val
