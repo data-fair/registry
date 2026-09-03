@@ -7,7 +7,7 @@ import { AddressInfo } from 'node:net'
 import FormData from 'form-data'
 import { superAdmin, axiosWithApiKey, clean } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
-import { ensureArtefact } from '../lib-node/index.ts'
+import { ensureArtefact, localNodeDir } from '../lib-node/index.ts'
 
 const registryUrl = `http://localhost:${process.env.DEV_API_PORT}`
 const secretKey = 'secret-internal'
@@ -187,6 +187,44 @@ test.describe('lib-node-registry', () => {
     const sentinel = join(result.path, 'node_modules', 'sentinel', 'SENTINEL')
     const fs = await import('node:fs/promises')
     await expect(fs.readFile(sentinel, 'utf-8')).resolves.toBe('ok')
+  })
+
+  test('build:true points node-gyp at the local Node headers', async () => {
+    // node-gyp downloads headers unless npm_config_nodedir is set, which
+    // breaks offline rebuilds. The postinstall records the env it ran with.
+    const subPkg = JSON.stringify({
+      name: 'nodedir-probe',
+      version: '1.0.0',
+      scripts: { postinstall: 'node -e "require(\'fs\').writeFileSync(__dirname + \'/NODEDIR\', process.env.npm_config_nodedir || \'\')"' }
+    })
+    const tarball = await createTestTarball({
+      name: '@test/nodedir-probe',
+      version: '1.0.0',
+      extraEntries: [
+        { name: 'package/node_modules/nodedir-probe/index.node', content: 'fake' },
+        { name: 'package/node_modules/nodedir-probe/package.json', content: subPkg }
+      ]
+    })
+    const ax = axiosWithApiKey(uploadApiKey)
+    const form = new FormData()
+    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/nodedir-probe@1'), form, { headers: form.getHeaders() })
+
+    const admin = await superAdmin
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/nodedir-probe@1'), { public: true })
+
+    const result = await ensureArtefact({
+      registryUrl,
+      secretKey,
+      artefactId: '@test/nodedir-probe@1',
+      cacheDir,
+      build: true
+    })
+    const recorded = await readFile(join(result.path, 'node_modules', 'nodedir-probe', 'NODEDIR'), 'utf-8')
+    // The dev/CI runtime ships headers (nvm, official docker images); the
+    // recorded dir must be the one lib-node derived from process.execPath.
+    expect(localNodeDir()).toBeTruthy()
+    expect(recorded).toBe(localNodeDir())
   })
 
   test('build:false skips rebuild even when hasNativeModules is true', async () => {

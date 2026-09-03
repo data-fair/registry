@@ -1,6 +1,6 @@
 import { createGunzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
-import { createWriteStream } from 'node:fs'
+import { createWriteStream, existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, rename, stat, utimes, readdir } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -252,12 +252,25 @@ export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise
   return { path: destPath, downloaded: true }
 }
 
+// node-gyp needs the Node headers to compile an addon and, by default,
+// downloads them from nodejs.org — `npm_config_offline` does not stop that
+// fetch, so a from-source rebuild fails in an egress-less consumer even with
+// the full toolchain installed. Official node distributions (docker images,
+// nvm) ship the headers next to the binary under <prefix>/include/node; point
+// node-gyp there when present so the rebuild is genuinely offline.
+export const localNodeDir = (): string | undefined => {
+  const prefix = dirname(dirname(process.execPath))
+  return existsSync(join(prefix, 'include', 'node', 'node_api.h')) ? prefix : undefined
+}
+
 const rebuildNativeModules = (dir: string): Promise<void> => new Promise((resolve, reject) => {
+  const nodedir = localNodeDir()
   const child = spawn('npm', ['rebuild'], {
     cwd: dir,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
+      ...(nodedir ? { npm_config_nodedir: nodedir } : {}),
       npm_config_offline: 'true',
       npm_config_audit: 'false',
       npm_config_fund: 'false',
