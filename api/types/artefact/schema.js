@@ -33,8 +33,8 @@ export default {
       additionalProperties: false,
       layout: { if: '!context.accessOnly' },
       properties: {
-        en: { type: 'string', title: 'Title - English', 'x-i18n-title': { fr: 'Titre - Anglais' }, layout: { cols: { md: 6 } } },
-        fr: { type: 'string', title: 'Title - French', 'x-i18n-title': { fr: 'Titre - Français' }, layout: { cols: { md: 6 } } }
+        en: { type: 'string', title: 'Title - English', 'x-i18n-title': { fr: 'Titre - Anglais' }, layout: { cols: { sm: 6 } } },
+        fr: { type: 'string', title: 'Title - French', 'x-i18n-title': { fr: 'Titre - Français' }, layout: { cols: { sm: 6 } } }
       }
     },
     description: {
@@ -42,8 +42,8 @@ export default {
       additionalProperties: false,
       layout: { if: '!context.accessOnly' },
       properties: {
-        en: { type: 'string', title: 'Description - English', 'x-i18n-title': { fr: 'Description - Anglais' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { md: 6 } } },
-        fr: { type: 'string', title: 'Description - French', 'x-i18n-title': { fr: 'Description - Français' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { md: 6 } } }
+        en: { type: 'string', title: 'Description - English', 'x-i18n-title': { fr: 'Description - Anglais' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { sm: 6 } } },
+        fr: { type: 'string', title: 'Description - French', 'x-i18n-title': { fr: 'Description - Français' }, layout: { comp: 'textarea', props: { autoGrow: true, rows: 3 }, cols: { sm: 6 } } }
       }
     },
     group: {
@@ -57,7 +57,7 @@ export default {
           'x-i18n-title': { fr: 'Groupe - Anglais' },
           layout: {
             comp: 'combobox',
-            cols: { md: 6 },
+            cols: { sm: 6 },
             getItems: {
               url: '${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=en',
               itemsResults: 'data.results'
@@ -70,7 +70,7 @@ export default {
           'x-i18n-title': { fr: 'Groupe - Français' },
           layout: {
             comp: 'combobox',
-            cols: { md: 6 },
+            cols: { sm: 6 },
             getItems: {
               url: '${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=fr',
               itemsResults: 'data.results'
@@ -90,18 +90,27 @@ export default {
         height: { type: 'integer' }
       }
     },
+    documentation: {
+      type: 'string',
+      format: 'uri',
+      title: 'Documentation URL',
+      'x-i18n-title': { fr: 'URL de documentation' },
+      layout: { if: '!context.accessOnly' }
+    },
+    // Property order is form order: documentation above, then the two
+    // switches side by side.
     deprecated: {
       type: 'boolean',
       title: 'Deprecated',
       'x-i18n-title': { fr: 'Déprécié' },
-      layout: { comp: 'switch', if: '!context.accessOnly' },
+      layout: { comp: 'switch', if: '!context.accessOnly', cols: { sm: 6 } },
       default: false
     },
     public: {
       type: 'boolean',
       title: 'Public',
       'x-i18n-title': { fr: 'Public' },
-      layout: { comp: 'switch', if: 'context.accessOnly || !context.mirrored' },
+      layout: { comp: 'switch', if: 'context.accessOnly || !context.mirrored', cols: { sm: 6 } },
       default: false
     },
     privateAccess: {
@@ -131,13 +140,6 @@ export default {
           }
         }
       }
-    },
-    documentation: {
-      type: 'string',
-      format: 'uri',
-      title: 'Documentation URL',
-      'x-i18n-title': { fr: 'URL de documentation' },
-      layout: { if: '!context.accessOnly' }
     },
     origin: { type: 'string', readOnly: true },
     // `fileName` is only used by format=file.

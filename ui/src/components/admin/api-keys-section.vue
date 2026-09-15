@@ -12,8 +12,6 @@
             <v-text-field
               v-model="newKey.name"
               :label="t('name')"
-              density="compact"
-              hide-details
               variant="outlined"
             />
           </v-col>
@@ -25,8 +23,6 @@
               v-model="newKey.allowedCategory"
               :items="categoryItems"
               :label="t('allowedCategory')"
-              density="compact"
-              hide-details
               variant="outlined"
               clearable
             />
@@ -38,8 +34,6 @@
             <v-text-field
               v-model="newKey.allowedNamePrefix"
               :label="t('allowedNamePrefix')"
-              density="compact"
-              hide-details
               variant="outlined"
               clearable
             />
@@ -51,8 +45,6 @@
             <v-date-input
               v-model="newKey.expiresAt"
               :label="t('expiresAt')"
-              density="compact"
-              hide-details
               variant="outlined"
               clearable
               prepend-icon=""
@@ -100,9 +92,9 @@
     />
 
     <v-card v-else-if="keysFetch.data.value">
-      <v-card-title>
+      <v-card-title class="d-flex align-center ga-2">
         {{ t('existingKeys') }}
-        <span class="text-medium-emphasis text-body-2 ml-2">({{ keysFetch.data.value.count }})</span>
+        <span class="text-medium-emphasis text-body-2">({{ keysFetch.data.value.count }})</span>
       </v-card-title>
       <v-table density="comfortable">
         <thead>

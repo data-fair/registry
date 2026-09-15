@@ -1,11 +1,12 @@
 import { Router } from 'express'
+import { pipeline } from 'node:stream/promises'
 import { session } from '@data-fair/lib-express/index.js'
 import { httpError } from '@data-fair/lib-utils/http-errors.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import mongo from '#mongo'
 import { cipher, decipher } from '../cipher.ts'
-import { startSync } from './sync.ts'
-import { filterSuggestedArtefacts, syncLockId, syncState } from './operations.ts'
+import { startSync, enqueueArtefactSync } from './sync.ts'
+import { filterSuggestedArtefacts, annotateLocalState, syncLockId, syncState } from './operations.ts'
 import * as postReqBody from '#doc/remote-registries/post-req/index.ts'
 import * as patchReqBody from '#doc/remote-registries/patch-req/index.ts'
 
@@ -135,10 +136,52 @@ router.get('/:id/remote-artefacts', async (req, res, next) => {
     // not already selected — a deprecated artefact is not suggested for new
     // mirroring but stays visible if it is already mirrored.
     const params: Record<string, string> = { size: String(size), skip: String(skip), includeDeprecated: 'true' }
-    if (req.query.q) params.q = req.query.q as string
+    for (const key of ['q', 'category', 'format'] as const) {
+      if (typeof req.query[key] === 'string' && req.query[key]) params[key] = req.query[key] as string
+    }
 
     const remote = await ax.get('/api/v1/artefacts', { params })
-    res.json(filterSuggestedArtefacts(remote.data, doc.selectedArtefacts))
+    const suggested = filterSuggestedArtefacts(remote.data, doc.selectedArtefacts)
+    // One local read for the page: the admin table shows, per row, whether the
+    // mirror exists and whether it is behind the upstream.
+    const locals = await mongo.artefacts
+      .find({ _id: { $in: suggested.results.map((a: { _id: string }) => a._id) } }, { projection: { dataUpdatedAt: 1, origin: 1 } })
+      .toArray()
+    res.json({ ...suggested, results: annotateLocalState(suggested.results, locals, doc._id) })
+  } catch (err) { next(err) }
+})
+
+const remoteThumbnailTypes = new Set(['image/webp', 'image/svg+xml'])
+
+// Proxy an upstream thumbnail for the admin's selection table. The upstream
+// url is the one the *server* reaches (possibly an internal one), and the
+// upstream sets Cross-Origin-Resource-Policy: same-origin on its assets, so the
+// browser cannot load them directly.
+router.get('/:id/remote-thumbnails/:thumbnailId/data', async (req, res, next) => {
+  try {
+    await session.reqAdminMode(req)
+    const doc = await mongo.remoteRegistries.findOne({ _id: req.params.id })
+    if (!doc) throw httpError(404, 'remote registry not found')
+    if (!/^[\w-]+$/.test(req.params.thumbnailId)) throw httpError(400, 'invalid thumbnail id')
+
+    const ax = axiosBuilder({ baseURL: doc._id, headers: { 'x-api-key': decipher(doc.apiKey) } })
+    const remote = await ax.get(`/api/v1/thumbnails/${req.params.thumbnailId}/data`, { responseType: 'stream', validateStatus: () => true })
+    if (remote.status !== 200) throw httpError(404, 'thumbnail not found')
+    // The upstream is another deployment: never relay its Content-Type blindly
+    // onto our origin. Only the types a registry stores are accepted, and SVG
+    // is served sandboxed so it cannot run scripts if opened as a document.
+    const contentType = String(remote.headers['content-type'] || '').split(';')[0].trim().toLowerCase()
+    if (!remoteThumbnailTypes.has(contentType)) {
+      remote.data.destroy()
+      throw httpError(415, 'unsupported thumbnail type')
+    }
+    res.set('Content-Type', contentType)
+    res.set('X-Content-Type-Options', 'nosniff')
+    res.set('Content-Security-Policy', "default-src 'none'; sandbox")
+    if (remote.headers['content-length']) res.set('Content-Length', remote.headers['content-length'])
+    // Upstream ids change on every replace, so the bytes behind one id never do.
+    res.set('Cache-Control', 'private, max-age=31536000, immutable')
+    await pipeline(remote.data, res)
   } catch (err) { next(err) }
 })
 
@@ -171,6 +214,9 @@ router.post('/:id/selected-artefacts', async (req, res, next) => {
         $set: { updatedAt: new Date().toISOString() }
       }
     )
+    // Mirror it right away rather than waiting for the daily job or a manual
+    // full sync; progress is published on the registry's ws channel.
+    await enqueueArtefactSync(req.params.id, artefactId)
     res.status(201).json({ artefactId })
   } catch (err) { next(err) }
 })
@@ -185,7 +231,7 @@ router.delete('/:id/selected-artefacts/:artefactId', async (req, res, next) => {
     await mongo.remoteRegistries.updateOne(
       { _id: req.params.id },
       {
-        $pull: { selectedArtefacts: req.params.artefactId },
+        $pull: { selectedArtefacts: req.params.artefactId, pendingSync: req.params.artefactId },
         $set: { updatedAt: new Date().toISOString() }
       }
     )

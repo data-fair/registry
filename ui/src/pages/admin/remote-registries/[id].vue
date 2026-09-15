@@ -8,13 +8,14 @@
       <v-card-title>{{ t('config') }}</v-card-title>
       <v-card-text>
         <v-row>
-          <v-col cols="12">
+          <v-col
+            cols="12"
+            sm="6"
+          >
             <v-text-field
               :model-value="registry._id"
               :label="t('url')"
-              density="compact"
               variant="outlined"
-              hide-details
               readonly
             />
           </v-col>
@@ -25,28 +26,32 @@
             <v-text-field
               v-model="editName"
               :label="t('name')"
-              density="compact"
               variant="outlined"
-              hide-details
+              autocomplete="off"
             />
           </v-col>
           <v-col
             cols="12"
             sm="6"
           >
-            <div class="text-medium-emphasis text-body-2 mb-1">
-              {{ t('apiKey') }}
-            </div>
-            <div class="mb-2">
-              <code>{{ registry.apiKeyShortId }}</code>
-            </div>
+            <v-text-field
+              :model-value="registry.apiKeyShortId"
+              :label="t('apiKey')"
+              variant="outlined"
+              readonly
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="6"
+          >
+            <!-- Masked text rather than type=password: see remote-registries-section. -->
             <v-text-field
               v-model="newApiKey"
               :label="t('changeApiKey')"
-              density="compact"
               variant="outlined"
-              hide-details
-              type="password"
+              class="masked-input"
+              autocomplete="off"
             />
           </v-col>
         </v-row>
@@ -91,7 +96,7 @@
           :color="registry.lastSyncStatus === 'success' ? 'success' : 'error'"
           class="ml-2"
         >
-          {{ registry.lastSyncStatus }}
+          {{ t(registry.lastSyncStatus === 'success' ? 'statusSuccess' : 'statusError') }}
         </v-chip>
       </v-card-title>
       <v-card-text>
@@ -153,7 +158,7 @@
           {{ t('neverSynced') }}
         </div>
       </v-card-text>
-      <v-card-actions>
+      <v-card-actions class="px-4 pb-4">
         <v-btn
           color="primary"
           variant="flat"
@@ -168,24 +173,58 @@
 
     <!-- Remote artefacts -->
     <v-card class="mb-4">
-      <v-card-title>
+      <v-card-title class="d-flex align-center ga-2">
         {{ t('remoteArtefacts') }}
         <span
           v-if="remoteFetch.data.value"
-          class="text-medium-emphasis text-body-2 ml-2"
+          class="text-medium-emphasis text-body-2"
         >({{ remoteFetch.data.value.count }})</span>
       </v-card-title>
       <v-card-text>
-        <v-text-field
-          v-model="searchQuery"
-          :label="t('search')"
-          density="compact"
-          variant="outlined"
-          hide-details
-          class="mb-3"
-          clearable
-          @update:model-value="debouncedRefreshRemote"
-        />
+        <v-row dense>
+          <v-col
+            cols="12"
+            sm="6"
+            md="5"
+          >
+            <v-text-field
+              v-model="searchQuery"
+              :append-inner-icon="mdiMagnify"
+              :placeholder="t('search')"
+              variant="outlined"
+              clearable
+              @update:model-value="debouncedRefreshRemote"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="3"
+            md="3"
+          >
+            <v-select
+              :model-value="remoteCategory || null"
+              :items="categoryOptions"
+              :label="t('category')"
+              variant="outlined"
+              clearable
+              @update:model-value="remoteCategory = $event ?? ''"
+            />
+          </v-col>
+          <v-col
+            cols="12"
+            sm="3"
+            md="2"
+          >
+            <v-select
+              :model-value="remoteFormat || null"
+              :items="formatOptions"
+              :label="t('format')"
+              variant="outlined"
+              clearable
+              @update:model-value="remoteFormat = $event ?? ''"
+            />
+          </v-col>
+        </v-row>
       </v-card-text>
 
       <v-skeleton-loader
@@ -193,65 +232,147 @@
         type="table-tbody"
       />
 
-      <v-table
-        v-else-if="remoteFetch.data.value"
-        density="comfortable"
-      >
-        <thead>
-          <tr>
-            <th>{{ t('artefactName') }}</th>
-            <th>{{ t('format') }}</th>
-            <th>{{ t('category') }}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="art in remoteFetch.data.value.results"
-            :key="art._id"
-          >
-            <td>{{ art.name }}</td>
-            <td>
-              <v-chip
-                size="small"
-                :color="art.format === 'npm' ? 'blue' : 'teal'"
-              >
-                {{ art.format }}
-              </v-chip>
-            </td>
-            <td>
-              <v-chip
-                size="small"
-                :color="categoryColor(art.category)"
-              >
-                {{ categoryLabel(art.category, locale) }}
-              </v-chip>
-            </td>
-            <td class="text-right">
-              <v-btn
-                v-if="registry.selectedArtefacts.includes(art._id)"
-                size="small"
-                variant="text"
-                color="error"
-                :loading="unselectingId === art._id"
-                @click="unselectArtefact(art._id)"
-              >
-                {{ t('unselect') }}
-              </v-btn>
-              <v-btn
-                v-else
-                size="small"
-                variant="flat"
-                color="primary"
-                :loading="selectingId === art._id"
-                @click="selectArtefact(art._id)"
-              >
-                {{ t('mirror') }}
-              </v-btn>
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
+      <template v-else-if="remoteFetch.data.value">
+        <v-table
+          density="comfortable"
+          hover
+        >
+          <thead>
+            <tr>
+              <th style="width: 56px;" />
+              <th>{{ t('artefactName') }}</th>
+              <th>{{ t('category') }}</th>
+              <th>{{ t('version') }}</th>
+              <th>{{ t('size') }}</th>
+              <th>{{ t('dataUpdatedAt') }}</th>
+              <th>{{ t('mirrorStatus') }}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="art in remoteFetch.data.value.results"
+              :key="art._id"
+            >
+              <td>
+                <img
+                  v-if="art.thumbnail"
+                  :src="`${$apiPath}/v1/remote-registries/${encodeURIComponent(registryId)}/remote-thumbnails/${art.thumbnail.id}/data`"
+                  :alt="art.title?.[locale] || art.name"
+                  width="40"
+                  height="40"
+                  style="object-fit: contain; display: block;"
+                >
+              </td>
+              <td>
+                <strong>{{ art.title?.[locale] || art.name }}</strong>
+                <v-chip
+                  v-if="art.deprecated"
+                  size="x-small"
+                  color="warning"
+                  class="ml-2"
+                >
+                  {{ t('deprecated') }}
+                </v-chip>
+                <br>
+                <span class="text-medium-emphasis text-body-2">{{ art._id }}</span>
+              </td>
+              <td>
+                <v-chip
+                  size="small"
+                  :color="categoryColor(art.category)"
+                >
+                  {{ categoryLabel(art.category, locale) }}
+                </v-chip>
+              </td>
+              <td>{{ art.version || '-' }}</td>
+              <td>{{ typeof art.size === 'number' ? formatBytes(art.size, locale) : '-' }}</td>
+              <td>{{ art.dataUpdatedAt ? dayjs(art.dataUpdatedAt).format('L LT') : '-' }}</td>
+              <td>
+                <template v-if="isSelected(art._id)">
+                  <v-progress-circular
+                    v-if="syncingId === art._id"
+                    indeterminate
+                    size="16"
+                    width="2"
+                    class="mr-1"
+                  />
+                  <v-chip
+                    v-if="syncingId === art._id"
+                    size="small"
+                    color="info"
+                  >
+                    {{ t('syncing') }}
+                  </v-chip>
+                  <v-chip
+                    v-else-if="!art.local?.synced"
+                    size="small"
+                    color="warning"
+                  >
+                    {{ t('pendingSync') }}
+                  </v-chip>
+                  <v-chip
+                    v-else-if="!art.local.upToDate"
+                    size="small"
+                    color="warning"
+                  >
+                    {{ t('updateAvailable') }}
+                  </v-chip>
+                  <v-chip
+                    v-else
+                    size="small"
+                    color="success"
+                  >
+                    {{ t('synced') }}
+                  </v-chip>
+                </template>
+                <v-chip
+                  v-else-if="art.local?.conflict"
+                  size="small"
+                  color="error"
+                  :title="t('conflictHint')"
+                >
+                  {{ t('conflict') }}
+                </v-chip>
+                <span
+                  v-else
+                  class="text-medium-emphasis"
+                >—</span>
+              </td>
+              <td class="text-right text-no-wrap">
+                <v-btn
+                  v-if="isSelected(art._id)"
+                  size="small"
+                  variant="text"
+                  color="error"
+                  :loading="unselectingId === art._id"
+                  @click="confirmUnselectId = art._id"
+                >
+                  {{ t('unselect') }}
+                </v-btn>
+                <v-btn
+                  v-else
+                  size="small"
+                  variant="flat"
+                  color="primary"
+                  :disabled="!!art.local?.conflict"
+                  :loading="selectingId === art._id"
+                  @click="selectArtefact(art._id)"
+                >
+                  {{ t('mirror') }}
+                </v-btn>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+
+        <v-pagination
+          v-if="nbRemotePages > 1"
+          v-model="remotePage"
+          :length="nbRemotePages"
+          class="my-4"
+        />
+      </template>
     </v-card>
 
     <!-- Delete -->
@@ -270,6 +391,34 @@
         </v-btn>
       </v-card-text>
     </v-card>
+
+    <!-- Unselecting keeps the local copy but unlocks it: it becomes a plain
+         local artefact, and its id can no longer be mirrored until it is
+         deleted. Worth a word before the click. -->
+    <v-dialog
+      :model-value="!!confirmUnselectId"
+      max-width="480"
+      @update:model-value="confirmUnselectId = null"
+    >
+      <v-card>
+        <v-card-title>{{ t('confirmUnselectTitle') }}</v-card-title>
+        <v-card-text>{{ t('confirmUnselectText', { id: confirmUnselectId }) }}</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="confirmUnselectId = null">
+            {{ t('cancel') }}
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="flat"
+            :loading="!!unselectingId"
+            @click="unselectArtefact(confirmUnselectId!)"
+          >
+            {{ t('unselect') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-dialog
       v-model="confirmDelete"
@@ -318,8 +467,8 @@ fr:
   syncNow: Synchroniser maintenant
   syncStarted: Synchronisation lancée
   syncStarting: Démarrage…
-  running: en cours
-  interrupted: interrompue
+  running: En cours
+  interrupted: Interrompue
   startedAt: Démarrée à
   stoppedAt: Arrêtée à {done}/{total} artefacts
   syncAlreadyRunning: Une synchronisation est déjà en cours
@@ -330,8 +479,26 @@ fr:
   category: Catégorie
   mirror: Sélectionner
   unselect: Désélectionner
+  version: Version
+  size: Taille
+  dataUpdatedAt: Données mises à jour
+  deprecated: Déprécié
+  mirrorStatus: Synchronisation
+  statusSuccess: Succès
+  statusError: Erreur
+  syncing: Synchronisation…
+  pendingSync: En attente de synchro
+  updateAvailable: Mise à jour disponible
+  synced: Synchronisé
+  conflict: Artefact local existant
+  selectionFailed: Échec de la sélection
+  conflictHint: Un artefact téléversé localement porte déjà cet identifiant ; supprimez-le pour pouvoir mirrorer celui du registre distant.
+  syncDone: "Synchronisation terminée ({n} artefact) | Synchronisation terminée ({n} artefacts)"
+  syncFailed: "Échec de la synchronisation : {error}"
   dangerZone: Zone de danger
   deleteRemote: Supprimer ce registre distant
+  confirmUnselectTitle: Arrêter le miroir ?
+  confirmUnselectText: "La copie locale de \"{id}\" est conservée mais devient un artefact local ordinaire, plus synchronisé. Tant qu'elle existe, cet identifiant ne pourra pas être mirroré à nouveau."
   confirmDeleteTitle: Confirmer la suppression
   confirmDeleteText: Cela déverrouillera les artefacts miroir locaux mais ne les supprimera pas.
   cancel: Annuler
@@ -352,8 +519,8 @@ en:
   syncNow: Sync Now
   syncStarted: Sync started
   syncStarting: Starting…
-  running: running
-  interrupted: interrupted
+  running: Running
+  interrupted: Interrupted
   startedAt: Started at
   stoppedAt: Stopped at {done}/{total} artefacts
   syncAlreadyRunning: A sync is already running
@@ -364,8 +531,26 @@ en:
   category: Category
   mirror: Select
   unselect: Unselect
+  version: Version
+  size: Size
+  dataUpdatedAt: Data updated
+  deprecated: Deprecated
+  mirrorStatus: Synchronization
+  statusSuccess: Success
+  statusError: Error
+  syncing: Syncing…
+  pendingSync: Pending sync
+  updateAvailable: Update available
+  synced: Synced
+  conflict: Local artefact exists
+  selectionFailed: Selection failed
+  conflictHint: A locally uploaded artefact already has this id; delete it to mirror the remote one.
+  syncDone: "Sync done ({n} artefact) | Sync done ({n} artefacts)"
+  syncFailed: "Sync failed: {error}"
   dangerZone: Danger Zone
   deleteRemote: Delete this remote registry
+  confirmUnselectTitle: Stop mirroring?
+  confirmUnselectText: "The local copy of \"{id}\" is kept but becomes a plain local artefact, no longer synced. While it exists, this id cannot be mirrored again."
   confirmDeleteTitle: Confirm Deletion
   confirmDeleteText: This will unlock local mirrored artefacts but will not delete them.
   cancel: Cancel
@@ -373,12 +558,13 @@ en:
 </i18n>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
+import { mdiMagnify } from '@mdi/js'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import { useRegistrySync } from '~/composables/registry-sync'
-import { categoryColor, categoryLabel } from '~/utils/categories'
+import { categoryColor, categoryLabel, categoryItems } from '~/utils/categories'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -398,14 +584,33 @@ const editName = ref('')
 const newApiKey = ref('')
 const confirmDelete = ref(false)
 const searchQuery = ref('')
+const remoteCategory = ref('')
+const remoteFormat = ref('')
+const remotePageSize = 20
+const remotePage = ref(1)
 const selectingId = ref<string | null>(null)
 const unselectingId = ref<string | null>(null)
+const confirmUnselectId = ref<string | null>(null)
 
 const { sendUiNotif } = useUiNotif()
 
-useRegistrySync(registryId.value, registry)
+useRegistrySync(registryId.value, registry, {
+  // A sync just ended (a selection's own, or a full one): the per-row mirror
+  // state comes from the server, so refetch it and tell the admin how it went.
+  onDone: (event) => {
+    remoteFetch.refresh()
+    if (event.lastSyncStatus === 'error') {
+      sendUiNotif({ type: 'error', msg: t('syncFailed', { error: event.lastSyncError ?? '' }) })
+    } else {
+      sendUiNotif({ type: 'success', msg: t('syncDone', event.total) })
+    }
+  }
+})
 
 const syncRunning = computed(() => registry.value?.syncState === 'running')
+// The row currently being mirrored, straight from the ws progress frames.
+const syncingId = computed(() => syncRunning.value ? registry.value?.syncProgress?.currentArtefact ?? null : null)
+const isSelected = (artefactId: string) => registry.value?.selectedArtefacts.includes(artefactId)
 const syncInterrupted = computed(() => registry.value?.syncState === 'interrupted')
 const syncPercent = computed(() => {
   const progress = registry.value?.syncProgress
@@ -431,13 +636,29 @@ async function fetchRegistry () {
 
 onMounted(fetchRegistry)
 
+const categoryOptions = computed(() => categoryItems(locale.value))
+const formatOptions = [{ title: 'npm', value: 'npm' }, { title: 'file', value: 'file' }]
+
 const remoteFetch = useFetch<{ results: any[], count: number }>(
   computed(() => {
-    const params = new URLSearchParams({ size: '100' })
+    const params = new URLSearchParams({
+      size: String(remotePageSize),
+      skip: String((remotePage.value - 1) * remotePageSize)
+    })
     if (searchQuery.value) params.set('q', searchQuery.value)
+    if (remoteCategory.value) params.set('category', remoteCategory.value)
+    if (remoteFormat.value) params.set('format', remoteFormat.value)
     return `${$apiPath}/v1/remote-registries/${encodeURIComponent(registryId.value)}/remote-artefacts?${params}`
   })
 )
+
+// `count` is the upstream's, before deprecated-and-unselected rows are dropped
+// locally, so a page can be a little short — acceptable for an admin table.
+const nbRemotePages = computed(() => {
+  if (!remoteFetch.data.value) return 0
+  return Math.ceil(remoteFetch.data.value.count / remotePageSize)
+})
+watch([searchQuery, remoteCategory, remoteFormat], () => { remotePage.value = 1 })
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
 function debouncedRefreshRemote () {
@@ -485,6 +706,10 @@ const syncAction = useAsyncAction(
   }
 )
 
+// A failed selection (409 on a conflicting local artefact, network error…)
+// must be visible: a silently swallowed error looks like a dead button.
+const notifyError = (error: unknown) => sendUiNotif({ msg: t('selectionFailed'), error })
+
 async function selectArtefact (artefactId: string) {
   selectingId.value = artefactId
   try {
@@ -492,7 +717,11 @@ async function selectArtefact (artefactId: string) {
       method: 'POST',
       body: { artefactId }
     })
+    // The server starts (or queues) a sync of this artefact; ws frames take
+    // over from here and refresh the table once it lands.
     await fetchRegistry()
+  } catch (err) {
+    notifyError(err)
   } finally {
     selectingId.value = null
   }
@@ -504,7 +733,11 @@ async function unselectArtefact (artefactId: string) {
     await $fetch(`/v1/remote-registries/${encodeURIComponent(registryId.value)}/selected-artefacts/${encodeURIComponent(artefactId)}`, {
       method: 'DELETE'
     })
+    confirmUnselectId.value = null
     await fetchRegistry()
+    remoteFetch.refresh()
+  } catch (err) {
+    notifyError(err)
   } finally {
     unselectingId.value = null
   }
@@ -519,3 +752,9 @@ const deleteAction = useAsyncAction(
   }
 )
 </script>
+
+<style scoped>
+.masked-input :deep(input) {
+  -webkit-text-security: disc;
+}
+</style>

@@ -96,6 +96,36 @@ const tryInternalSecret = (req: import('express').Request): boolean => {
   return timingSafeEqual(received, expected)
 }
 
+// `?sort=<key>` with an optional leading `-` for descending. Keys map to the
+// Mongo sort they stand for; a name tie-breaker keeps pages stable when many
+// docs share a value. `vulnerabilities` and `public` are admin-only: scan data
+// is stripped for non-admins (ordering by it would leak) and visibility is not
+// shown to them — they silently get the default sort.
+const sortKeys: Record<string, { sort: Record<string, 1 | -1>, admin?: boolean }> = {
+  dataUpdatedAt: { sort: { dataUpdatedAt: -1 } },
+  name: { sort: { name: 1 } },
+  category: { sort: { category: 1 } },
+  'group.en': { sort: { 'group.en': 1 } },
+  'group.fr': { sort: { 'group.fr': 1 } },
+  version: { sort: { version: 1 } },
+  size: { sort: { size: 1 } },
+  public: { sort: { public: 1 }, admin: true },
+  vulnerabilities: { sort: { 'scan.summary.critical': -1, 'scan.summary.high': -1, 'scan.summary.medium': -1 }, admin: true }
+}
+const parseSort = (raw: unknown, caller: Caller): Record<string, 1 | -1> => {
+  const fallback = { dataUpdatedAt: -1 as const, name: 1 as const }
+  if (typeof raw !== 'string' || !raw) return fallback
+  const desc = raw.startsWith('-')
+  const key = desc ? raw.slice(1) : raw
+  const def = sortKeys[key]
+  if (!def) throw httpError(400, `invalid sort, must be one of: ${Object.keys(sortKeys).join(', ')} (prefix with - for descending)`)
+  if (def.admin && !caller.admin) return fallback
+  const sort: Record<string, 1 | -1> = {}
+  for (const [field, dir] of Object.entries(def.sort)) sort[field] = desc ? (dir === 1 ? -1 : 1) : dir
+  if (!('name' in sort)) sort.name = 1
+  return sort
+}
+
 // List artefacts (filtered by access)
 router.get('/', async (req, res, next) => {
   try {
@@ -103,14 +133,7 @@ router.get('/', async (req, res, next) => {
     const filter = artefactAccessFilter(caller)
     const skip = Math.max(0, Math.min(parseInt(req.query.skip as string) || 0, 100000))
     const size = Math.min(parseInt(req.query.size as string) || 10, 100)
-    // `vulnerabilities` is admin-only: scan data is stripped for non-admins, so
-    // ordering by it would leak. Non-admins silently get the default sort.
-    let sort: Record<string, 1 | -1> = { dataUpdatedAt: -1 }
-    if (req.query.sort === 'name') {
-      sort = { name: 1 }
-    } else if (req.query.sort === 'vulnerabilities' && caller.admin) {
-      sort = { 'scan.summary.critical': -1, 'scan.summary.high': -1, 'scan.summary.medium': -1, dataUpdatedAt: -1 }
-    }
+    const sort = parseSort(req.query.sort, caller)
 
     // Text search on name
     if (req.query.q) {

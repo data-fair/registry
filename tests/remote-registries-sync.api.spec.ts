@@ -7,8 +7,9 @@
 
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
+import sharp from 'sharp'
 import {
-  superAdmin, clean,
+  superAdmin, clean, waitSyncIdle,
   upstreamBaseURL, upstreamSuperAdmin, upstreamAxiosAuth, upstreamAxiosWithApiKey, cleanUpstream
 } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
@@ -47,23 +48,55 @@ const seedUpstream = async () => {
   return { readKey: readRes.data.key as string, uploadKey: keyRes.data.key as string }
 }
 
+const selectArtefact = async (artefactId: string) => {
+  const admin = await superAdmin
+  await admin.post(
+    `/api/v1/remote-registries/${encodeURIComponent(upstreamBaseURL())}/selected-artefacts`,
+    { artefactId }
+  )
+}
+
+// Selecting kicks off a background sync of that artefact; wait for it so the
+// tests below start from a settled registry.
 const registerMirror = async (readKey: string, artefactIds: string[]) => {
   const admin = await superAdmin
   await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
-  for (const artefactId of artefactIds) {
-    await admin.post(
-      `/api/v1/remote-registries/${encodeURIComponent(upstreamBaseURL())}/selected-artefacts`,
-      { artefactId }
-    )
-  }
+  for (const artefactId of artefactIds) await selectArtefact(artefactId)
+  await waitSyncIdle(upstreamBaseURL())
 }
 
-// Triggers a sync and waits for it to settle. `previousLastSyncAt` distinguishes a
-// fresh completion from the previous one — a bare `lastSyncStatus` check would
-// return instantly on the second sync within a test.
-const runSync = async (previousLastSyncAt?: string) => {
+const republishUpstream = async (uploadKey: string, version: string) => {
+  const upload = upstreamAxiosWithApiKey(uploadKey)
+  const tarball = await createTestTarball({ name: '@up/pkg', version, licence: 'MIT' })
+  const form = new FormData()
+  form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+  form.append('category', 'processing')
+  await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent(NPM_ID), form, { headers: form.getHeaders() })
+}
+
+const uploadUpstreamThumbnail = async (artefactId: string) => {
+  const admin = await upstreamSuperAdmin()
+  const png = await sharp({ create: { width: 200, height: 100, channels: 3, background: { r: 10, g: 120, b: 200 } } }).png().toBuffer()
+  const form = new FormData()
+  form.append('file', png, { filename: 'thumb.png', contentType: 'image/png' })
+  const res = await admin.post(`/api/v1/artefacts/${encodeURIComponent(artefactId)}/thumbnail`, form, { headers: form.getHeaders() })
+  return res.data.thumbnail as { id: string, width: number, height: number }
+}
+
+const listRemote = async (params: Record<string, string> = {}) => {
+  const admin = await superAdmin
+  const res = await admin.get(`/api/v1/remote-registries/${encodeURIComponent(upstreamBaseURL())}/remote-artefacts`, { params })
+  return res.data as { results: any[], count: number }
+}
+
+// Triggers a full sync and waits for it to settle. The completion is told apart
+// from the previous one (a selection's auto-sync, or an earlier runSync) by a
+// fresh lastSyncAt — a bare `lastSyncStatus` check would return instantly.
+const runSync = async () => {
   const admin = await superAdmin
   const id = encodeURIComponent(upstreamBaseURL())
+  const before = await admin.get(`/api/v1/remote-registries/${id}`)
+  const previousLastSyncAt = before.data.lastSyncAt
   await admin.post(`/api/v1/remote-registries/${id}/sync`)
   for (let i = 0; i < 100; i++) {
     const res = await admin.get(`/api/v1/remote-registries/${id}`)
@@ -135,10 +168,10 @@ test.describe('Federation sync against a real upstream registry', () => {
 
   test('a re-sync with no upstream change does not re-download', async () => {
     await registerMirror(readKey, [NPM_ID])
-    const first = await runSync()
+    await runSync()
     const before = await getLocal(NPM_ID)
 
-    await runSync(first.lastSyncAt)
+    await runSync()
     const after = await getLocal(NPM_ID)
 
     // the dataUpdatedAt fast path in syncNpmArtefact short-circuits
@@ -148,17 +181,12 @@ test.describe('Federation sync against a real upstream registry', () => {
 
   test('an upstream republish is picked up on the next sync', async () => {
     await registerMirror(readKey, [NPM_ID])
-    const first = await runSync()
+    await runSync()
     const before = await getLocal(NPM_ID)
 
-    const upload = upstreamAxiosWithApiKey(uploadKey)
-    const tarball = await createTestTarball({ name: '@up/pkg', version: '2.0.0', licence: 'MIT' })
-    const form = new FormData()
-    form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    form.append('category', 'processing')
-    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent(NPM_ID), form, { headers: form.getHeaders() })
+    await republishUpstream(uploadKey, '2.0.0')
 
-    await runSync(first.lastSyncAt)
+    await runSync()
     const after = await getLocal(NPM_ID)
 
     expect(after.version).toBe('2.0.0')
@@ -215,5 +243,111 @@ test.describe('Federation sync against a real upstream registry', () => {
 
     const local = await getLocal(NPM_ID)
     expect(local.origin).toBeUndefined()
+  })
+
+  test('selecting an artefact mirrors it without a manual sync', async () => {
+    const admin = await superAdmin
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+    await selectArtefact(NPM_ID)
+    const registry = await waitSyncIdle(upstreamBaseURL())
+
+    expect(registry.lastSyncStatus).toBe('success')
+    const local = await getLocal(NPM_ID)
+    expect(local.origin).toBe(upstreamBaseURL())
+    expect(local.version).toBe('1.0.0')
+  })
+
+  test('selecting several artefacts in a row mirrors them all', async () => {
+    const admin = await superAdmin
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+    // no await between the two: the second lands while the first sync holds the lock
+    await Promise.all([selectArtefact(NPM_ID), selectArtefact(FILE_ID)])
+    const registry = await waitSyncIdle(upstreamBaseURL())
+
+    expect(registry.lastSyncStatus).toBe('success')
+    expect(registry.pendingSync ?? []).toEqual([])
+    expect((await getLocal(NPM_ID)).origin).toBe(upstreamBaseURL())
+    expect((await getLocal(FILE_ID)).origin).toBe(upstreamBaseURL())
+  })
+
+  test('the upstream thumbnail is mirrored under the same id', async () => {
+    const upstreamThumb = await uploadUpstreamThumbnail(NPM_ID)
+    await registerMirror(readKey, [NPM_ID])
+
+    const local = await getLocal(NPM_ID)
+    expect(local.thumbnail).toEqual(upstreamThumb)
+
+    const admin = await superAdmin
+    const res = await admin.get(`/api/v1/thumbnails/${upstreamThumb.id}/data`, { responseType: 'arraybuffer' })
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toBe('image/webp')
+    expect(Buffer.from(res.data).length).toBeGreaterThan(0)
+  })
+
+  test('an upstream thumbnail removal is mirrored on the next sync', async () => {
+    const upstreamThumb = await uploadUpstreamThumbnail(NPM_ID)
+    await registerMirror(readKey, [NPM_ID])
+    await runSync()
+
+    const upstreamAdmin = await upstreamSuperAdmin()
+    await upstreamAdmin.delete(`/api/v1/artefacts/${encodeURIComponent(NPM_ID)}/thumbnail`)
+    await runSync()
+
+    const local = await getLocal(NPM_ID)
+    expect(local.thumbnail).toBeUndefined()
+    const admin = await superAdmin
+    try {
+      await admin.get(`/api/v1/thumbnails/${upstreamThumb.id}/data`)
+      expect(true).toBe(false)
+    } catch (err: any) {
+      expect(err.status).toBe(404)
+    }
+  })
+
+  test('remote-artefacts reports the local mirror state of each artefact', async () => {
+    const admin = await superAdmin
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+
+    const before = (await listRemote()).results.find(a => a._id === NPM_ID)
+    expect(before.local).toEqual({ synced: false, upToDate: false })
+
+    await selectArtefact(NPM_ID)
+    await waitSyncIdle(upstreamBaseURL())
+    const synced = (await listRemote()).results.find(a => a._id === NPM_ID)
+    expect(synced.local.synced).toBe(true)
+    expect(synced.local.upToDate).toBe(true)
+    expect(synced.local.dataUpdatedAt).toBe(synced.dataUpdatedAt)
+
+    await republishUpstream(uploadKey, '2.0.0')
+    const stale = (await listRemote()).results.find(a => a._id === NPM_ID)
+    expect(stale.local.synced).toBe(true)
+    expect(stale.local.upToDate).toBe(false)
+  })
+
+  test('an upstream thumbnail is served through the local proxy for the admin table', async () => {
+    const upstreamThumb = await uploadUpstreamThumbnail(NPM_ID)
+    const admin = await superAdmin
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+
+    const res = await admin.get(
+      `/api/v1/remote-registries/${encodeURIComponent(upstreamBaseURL())}/remote-thumbnails/${upstreamThumb.id}/data`,
+      { responseType: 'arraybuffer' }
+    )
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toBe('image/webp')
+    expect(res.headers['x-content-type-options']).toBe('nosniff')
+    expect(res.headers['content-security-policy']).toContain('sandbox')
+    expect(Buffer.from(res.data).length).toBeGreaterThan(0)
+  })
+
+  test('remote-artefacts forwards category and format filters to the upstream', async () => {
+    const admin = await superAdmin
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+
+    const tilesets = await listRemote({ category: 'tileset' })
+    expect(tilesets.results.map(a => a._id)).toEqual([FILE_ID])
+
+    const npm = await listRemote({ format: 'npm' })
+    expect(npm.results.map(a => a._id)).toEqual([NPM_ID])
   })
 })

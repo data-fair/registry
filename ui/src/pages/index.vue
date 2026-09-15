@@ -26,8 +26,6 @@
             :append-inner-icon="mdiMagnify"
             clearable
             color="primary"
-            density="compact"
-            hide-details
             :placeholder="t('search')"
             variant="outlined"
           />
@@ -38,42 +36,18 @@
           md="3"
         >
           <v-select
-            v-model="category"
+            :model-value="category || null"
             :items="categoryOptions"
             clearable
-            density="compact"
-            hide-details
             :label="t('category')"
             variant="outlined"
+            @update:model-value="category = $event ?? ''"
           />
-        </v-col>
-        <v-col cols="auto">
-          <v-btn-toggle
-            v-model="sort"
-            color="primary"
-            density="compact"
-            mandatory
-          >
-            <v-btn value="dataUpdatedAt">
-              {{ t('recent') }}
-            </v-btn>
-            <v-btn value="name">
-              {{ t('name') }}
-            </v-btn>
-            <v-btn
-              v-if="showVulns"
-              value="vulnerabilities"
-            >
-              {{ t('vulns') }}
-            </v-btn>
-          </v-btn-toggle>
         </v-col>
         <v-col cols="auto">
           <v-checkbox
             v-model="showDeprecated"
             color="primary"
-            density="compact"
-            hide-details
             :label="t('showDeprecated')"
           />
         </v-col>
@@ -84,7 +58,11 @@
         type="table-tbody"
       />
 
-      <template v-else-if="artefactsFetch.data.value">
+      <v-card v-else-if="artefactsFetch.data.value">
+        <v-card-title class="d-flex align-center ga-2">
+          {{ t('artefacts') }}
+          <span class="text-medium-emphasis text-body-2">({{ artefactsFetch.data.value.count }})</span>
+        </v-card-title>
         <v-table
           density="comfortable"
           hover
@@ -92,25 +70,26 @@
           <thead>
             <tr>
               <th style="width: 56px;" />
-              <th>{{ t('name') }}</th>
-              <th>{{ t('category') }}</th>
-              <th>{{ t('group') }}</th>
-              <th>{{ t('version') }}</th>
-              <th>{{ t('size') }}</th>
-              <th v-if="showVulns">
-                {{ t('vulns') }}
+              <th
+                v-for="col in columns"
+                :key="col.key"
+                class="sortable-th text-no-wrap"
+                @click="toggleSort(col.key)"
+              >
+                {{ col.title }}
+                <v-icon
+                  v-if="sortField === col.key"
+                  :icon="sortDesc ? mdiArrowDown : mdiArrowUp"
+                  size="x-small"
+                />
               </th>
-              <th v-if="adminMode">
-                {{ t('visibility') }}
-              </th>
-              <th>{{ t('dataUpdatedAt') }}</th>
+              <th v-if="adminMode" />
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="artefact in artefactsFetch.data.value.results"
               :key="artefact._id"
-              class="artefact-row"
             >
               <td>
                 <img
@@ -194,6 +173,18 @@
                 />
               </td>
               <td>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</td>
+              <td
+                v-if="adminMode"
+                class="text-right"
+              >
+                <v-btn
+                  :icon="mdiPencil"
+                  size="small"
+                  variant="text"
+                  :title="t('edit')"
+                  :to="`/artefacts/${encodeURIComponent(artefact._id)}`"
+                />
+              </td>
             </tr>
           </tbody>
         </v-table>
@@ -202,13 +193,9 @@
           v-if="nbPages > 1"
           v-model="page"
           :length="nbPages"
-          class="mt-4"
+          class="my-4"
         />
-
-        <p class="text-medium-emphasis mt-2">
-          {{ artefactsFetch.data.value.count }} {{ t('total') }}
-        </p>
-      </template>
+      </v-card>
     </template>
 
     <!-- API Keys tab -->
@@ -228,8 +215,6 @@
               <v-text-field
                 v-model="newKeyName"
                 :label="t('keyName')"
-                density="compact"
-                hide-details
                 variant="outlined"
               />
             </v-col>
@@ -240,8 +225,6 @@
               <v-date-input
                 v-model="newKeyExpiresAt"
                 :label="t('expiresAt')"
-                density="compact"
-                hide-details
                 variant="outlined"
                 clearable
                 prepend-icon=""
@@ -289,9 +272,9 @@
       />
 
       <v-card v-else-if="keysFetch.data.value">
-        <v-card-title>
+        <v-card-title class="d-flex align-center ga-2">
           {{ t('existingKeys') }}
-          <span class="text-medium-emphasis text-body-2 ml-2">({{ keysFetch.data.value.count }})</span>
+          <span class="text-medium-emphasis text-body-2">({{ keysFetch.data.value.count }})</span>
         </v-card-title>
         <v-table density="comfortable">
           <thead>
@@ -337,7 +320,6 @@ fr:
   search: Rechercher
   category: "Cat\xE9gorie"
   group: Groupe
-  recent: "R\xE9cents"
   name: Nom
   version: Version
   size: Taille
@@ -349,12 +331,13 @@ fr:
   low: faible
   unknown: inconnue
   visibility: "Visibilit\xE9"
-  mirror: miroir
-  deprecated: "d\xE9pr\xE9ci\xE9"
+  mirror: Miroir
+  deprecated: "D\xE9pr\xE9ci\xE9"
   showDeprecated: "Afficher les versions d\xE9pr\xE9ci\xE9es"
   dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
-  total: artefact(s)
-  artefactsCount: "{count} artefact(s)"
+  artefacts: Artefacts
+  artefactsCount: "{n} artefact | {n} artefacts"
+  edit: Éditer
   createKey: "Cr\xE9er une cl\xE9 de lecture"
   keyName: "Nom de la cl\xE9"
   create: "Cr\xE9er"
@@ -369,7 +352,6 @@ en:
   search: Search
   category: Category
   group: Group
-  recent: Recent
   name: Name
   version: Version
   size: Size
@@ -381,12 +363,13 @@ en:
   low: low
   unknown: unknown
   visibility: Visibility
-  mirror: mirror
-  deprecated: deprecated
+  mirror: Mirror
+  deprecated: Deprecated
   showDeprecated: Show deprecated
   dataUpdatedAt: Data updated
-  total: artefact(s)
-  artefactsCount: "{count} artefact(s)"
+  artefacts: Artefacts
+  artefactsCount: "{n} artefact | {n} artefacts"
+  edit: Edit
   createKey: Create read key
   keyName: Key name
   create: Create
@@ -400,7 +383,7 @@ en:
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { mdiMagnify, mdiDelete, mdiEye, mdiEyeOff, mdiAlertCircle } from '@mdi/js'
+import { mdiMagnify, mdiArrowUp, mdiArrowDown, mdiPencil, mdiDelete, mdiEye, mdiEyeOff, mdiAlertCircle } from '@mdi/js'
 import { VDateInput } from 'vuetify/labs/VDateInput'
 // Explicit import (rather than the src/utils auto-import) so the helpers resolve
 // reliably even before the dev server's auto-import scan picks up severity.ts.
@@ -442,7 +425,35 @@ const tab = ref('browse')
 // --- Browse tab state ---
 const q = useStringSearchParam('q')
 const category = useStringSearchParam('category')
-const sort = ref('dataUpdatedAt')
+// Server-side sort, kept in the `sort` search param (`-` prefix = descending)
+// so it survives reloads and can be shared. Empty = the API's default order,
+// shown with no indicator. Dates, sizes and vulnerability counts read better
+// descending first, text columns ascending.
+const sort = useStringSearchParam('sort')
+const sortDesc = computed(() => sort.value.startsWith('-'))
+const sortField = computed(() => sortDesc.value ? sort.value.slice(1) : sort.value)
+const descFirst = new Set(['dataUpdatedAt', 'size', 'vulnerabilities'])
+// Three clicks on a header: natural direction, reverse, back to the default.
+const toggleSort = (key: string) => {
+  const natural = descFirst.has(key)
+  if (sortField.value !== key) {
+    sort.value = (natural ? '-' : '') + key
+  } else if (sortDesc.value === natural) {
+    sort.value = (natural ? '' : '-') + key
+  } else {
+    sort.value = ''
+  }
+}
+const columns = computed(() => [
+  { key: 'name', title: t('name') },
+  { key: 'category', title: t('category') },
+  { key: `group.${locale.value}`, title: t('group') },
+  { key: 'version', title: t('version') },
+  { key: 'size', title: t('size') },
+  ...(showVulns.value ? [{ key: 'vulnerabilities', title: t('vulns') }] : []),
+  ...(adminMode.value ? [{ key: 'public', title: t('visibility') }] : []),
+  { key: 'dataUpdatedAt', title: t('dataUpdatedAt') }
+])
 const showDeprecated = ref(false)
 const pageSize = 20
 const page = ref(1)
@@ -452,7 +463,7 @@ const categoryOptions = computed(() => categoryItems(locale.value))
 const fetchParams = computed(() => ({
   size: pageSize,
   skip: (page.value - 1) * pageSize,
-  sort: sort.value,
+  ...(sort.value ? { sort: sort.value } : {}),
   ...(q.value ? { q: q.value } : {}),
   ...(category.value ? { category: category.value } : {}),
   ...(showDeprecated.value ? { includeDeprecated: true } : {})
@@ -472,7 +483,7 @@ const nbPages = computed(() => {
 // is never left with an empty trail — mirrors the count breadcrumb that the
 // processings/catalogs list pages emit.
 useBreadcrumbs().setForPage(() => [
-  { title: t('artefactsCount', { count: artefactsFetch.data.value?.count ?? 0 }) }
+  { title: t('artefactsCount', artefactsFetch.data.value?.count ?? 0) }
 ])
 
 // --- API Keys tab state ---
@@ -520,18 +531,12 @@ async function deleteKey (id: string) {
 </script>
 
 <style scoped>
-.artefact-row {
-  position: relative;
-}
 .artefact-row-link {
   color: inherit;
   text-decoration: none;
 }
-/* Stretch the link over the whole row so the entire line is clickable while
-   staying a real <a> — middle-click / open-in-new-tab / hover preview work. */
-.artefact-row-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
 }
 </style>
