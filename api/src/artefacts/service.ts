@@ -176,6 +176,7 @@ export const commitNpmUpload = async (params: {
           packageName: manifest.name,
           version: manifest.version,
           ...(manifest.licence ? { licence: manifest.licence } : {}),
+          ...(manifest.description ? { packageDescription: manifest.description } : {}),
           category,
           path,
           size,
@@ -191,7 +192,8 @@ export const commitNpmUpload = async (params: {
           public: false,
           privateAccess: [],
           createdAt: now
-        }
+        },
+        ...(manifest.description ? {} : { $unset: { packageDescription: '' } })
       },
       { upsert: true }
     )

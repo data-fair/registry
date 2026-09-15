@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { Binary } from 'mongodb'
 import locks from '@data-fair/lib-node/locks.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import { internalError } from '@data-fair/lib-node/observer.js'
@@ -31,6 +32,40 @@ const emitSync = async (remoteRegistryId: string, event: SyncEvent) => {
   }
 }
 
+type RemoteThumbnail = NonNullable<Artefact['thumbnail']>
+
+// Mirror the upstream thumbnail, keeping its id: a thumbnail's id changes on
+// every replace upstream, so comparing ids is enough to know whether the local
+// copy is current. Runs after the artefact doc exists locally, and outside the
+// tarball fast path — a thumbnail change never bumps dataUpdatedAt.
+const syncThumbnail = async (
+  ax: AxiosInstance,
+  artefactId: string,
+  remoteThumbnail: RemoteThumbnail | undefined,
+  localThumbnail: RemoteThumbnail | undefined
+) => {
+  if (remoteThumbnail?.id === localThumbnail?.id) return
+  if (!remoteThumbnail) {
+    await mongo.thumbnails.deleteMany({ artefactId })
+    await mongo.artefacts.updateOne({ _id: artefactId }, { $unset: { thumbnail: '' } })
+    return
+  }
+  const res = await ax.get(`/api/v1/thumbnails/${remoteThumbnail.id}/data`, { responseType: 'arraybuffer' })
+  const data = Buffer.from(res.data)
+  await mongo.thumbnails.deleteMany({ artefactId })
+  await mongo.thumbnails.insertOne({
+    _id: remoteThumbnail.id,
+    artefactId,
+    data: new Binary(data),
+    mimeType: res.headers['content-type'] === 'image/svg+xml' ? 'image/svg+xml' : 'image/webp',
+    width: remoteThumbnail.width,
+    height: remoteThumbnail.height,
+    byteSize: data.byteLength,
+    createdAt: new Date().toISOString()
+  })
+  await mongo.artefacts.updateOne({ _id: artefactId }, { $set: { thumbnail: remoteThumbnail } })
+}
+
 const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
   const encodedId = encodeURIComponent(artefactId)
   const remoteRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
@@ -40,6 +75,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
 
   // Fast path: same upstream dataUpdatedAt means no new upload to mirror.
   if (local?.path && local.dataUpdatedAt === remoteArtefact.dataUpdatedAt) {
+    await syncThumbnail(ax, artefactId, remoteArtefact.thumbnail, local.thumbnail)
     return
   }
 
@@ -60,6 +96,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         packageName: remoteArtefact.packageName,
         version: remoteArtefact.version,
         licence: remoteArtefact.licence,
+        ...(remoteArtefact.packageDescription ? { packageDescription: remoteArtefact.packageDescription } : {}),
         category: remoteArtefact.category,
         deprecated: !!remoteArtefact.deprecated,
         hasNativeModules: !!remoteArtefact.hasNativeModules,
@@ -87,6 +124,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
   if (oldPath && oldPath !== localPath) {
     await filesStorage.delete(oldPath).catch(() => {})
   }
+  await syncThumbnail(ax, artefactId, remoteArtefact.thumbnail, local?.thumbnail)
 }
 
 const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
@@ -145,15 +183,32 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
       { $set: { origin: remoteUrl } }
     )
   }
+  await syncThumbnail(ax, artefactId, remoteArtefact.thumbnail, local?.thumbnail)
 }
 
-// The actual work. Callers own the lock.
-const runSync = async (remoteRegistryId: string) => {
+// Atomically take the queued selections, so two drains can't sync the same id twice.
+const drainPendingSync = async (remoteRegistryId: string): Promise<string[]> => {
+  const doc = await mongo.remoteRegistries.findOneAndUpdate(
+    { _id: remoteRegistryId },
+    { $unset: { pendingSync: '' } },
+    { returnDocument: 'before', projection: { pendingSync: 1 } }
+  )
+  return doc?.pendingSync ?? []
+}
+
+export type SyncScope = 'all' | 'pending'
+
+// The actual work. Callers own the lock. `pending` syncs only the artefacts
+// queued by selections (see pendingSync); `all` walks every selected artefact.
+// Either way, selections queued while this run was in flight are drained before
+// returning, so the lock is only released once nothing is left to sync.
+const runSync = async (remoteRegistryId: string, scope: SyncScope = 'all') => {
   const remote = await mongo.remoteRegistries.findOne({ _id: remoteRegistryId })
   if (!remote) return
 
+  const artefactIds = scope === 'pending' ? await drainPendingSync(remoteRegistryId) : remote.selectedArtefacts
   const startedAt = new Date().toISOString()
-  const total = remote.selectedArtefacts.length
+  const total = artefactIds.length
   let done = 0
 
   await mongo.remoteRegistries.updateOne(
@@ -171,7 +226,7 @@ const runSync = async (remoteRegistryId: string) => {
   let hasErrors = false
   let lastError = ''
 
-  for (const artefactId of remote.selectedArtefacts) {
+  for (const artefactId of artefactIds) {
     await mongo.remoteRegistries.updateOne(
       { _id: remoteRegistryId },
       { $set: { 'syncProgress.currentArtefact': artefactId } }
@@ -230,17 +285,39 @@ const runSync = async (remoteRegistryId: string) => {
     lastSyncStatus,
     ...(hasErrors ? { lastSyncError: lastError } : {})
   })
+
+  // A full run already covered anything queued meanwhile only if it was
+  // selected before the run read selectedArtefacts; draining is cheap (the
+  // dataUpdatedAt fast path) and keeps the queue semantics simple.
+  const pending = await mongo.remoteRegistries.findOne({ _id: remoteRegistryId }, { projection: { pendingSync: 1 } })
+  if (pending?.pendingSync?.length) await runSync(remoteRegistryId, 'pending')
 }
 
 // Returns as soon as the lock is taken; the work continues in the background.
 // A held lock is a conflict the caller (a human clicking a button) should see.
-export const startSync = async (remoteRegistryId: string): Promise<boolean> => {
+export const startSync = async (remoteRegistryId: string, scope: SyncScope = 'all'): Promise<boolean> => {
   const lockId = syncLockId(remoteRegistryId)
   if (!await locks.acquire(lockId)) return false
-  runSync(remoteRegistryId)
+  runSync(remoteRegistryId, scope)
     .catch(err => internalError('sync-remote-registry', err))
-    .finally(() => locks.release(lockId).catch(err => internalError('sync-remote-registry-release', err)))
+    .finally(async () => {
+      await locks.release(lockId).catch(err => internalError('sync-remote-registry-release', err))
+      // A selection can land between the final drain and the release above;
+      // its own startSync lost the lock race, so pick it up here.
+      const doc = await mongo.remoteRegistries.findOne({ _id: remoteRegistryId }, { projection: { pendingSync: 1 } })
+      if (doc?.pendingSync?.length) await startSync(remoteRegistryId, 'pending')
+    })
   return true
+}
+
+// Queue one freshly selected artefact and sync it in the background. If a sync
+// already holds the lock, that run drains the queue before releasing it.
+export const enqueueArtefactSync = async (remoteRegistryId: string, artefactId: string) => {
+  await mongo.remoteRegistries.updateOne(
+    { _id: remoteRegistryId },
+    { $addToSet: { pendingSync: artefactId } }
+  )
+  await startSync(remoteRegistryId, 'pending')
 }
 
 // Awaits completion. Used by the daily job, which syncs registries one at a time.

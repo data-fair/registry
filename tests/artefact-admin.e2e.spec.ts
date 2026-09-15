@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import FormData from 'form-data'
+import sharp from 'sharp'
 import { superAdmin, axiosWithApiKey, clean, setArtefactOrigin } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
@@ -44,7 +45,7 @@ test.describe('Artefact admin metadata editing', () => {
   // The e2e environment renders the UI in French.
   test('existing group and documentation values are loaded into the edit form', async ({ page }) => {
     await page.goto('/registry/artefacts/' + encodeURIComponent(pkgId))
-    await expect(page.locator('#artefact-admin')).toBeVisible()
+    await expect(page.locator('#artefact-edit')).toBeVisible()
     await expect(page.getByLabel('Groupe - Anglais')).toHaveValue('Geo tools')
     await expect(page.getByLabel('Groupe - Français')).toHaveValue('Outils géo')
     await expect(page.getByLabel('URL de documentation')).toHaveValue('https://example.com/docs')
@@ -52,12 +53,12 @@ test.describe('Artefact admin metadata editing', () => {
 
   test('editing the group and saving persists the new value', async ({ page }) => {
     await page.goto('/registry/artefacts/' + encodeURIComponent(pkgId))
-    await expect(page.locator('#artefact-admin')).toBeVisible()
+    await expect(page.locator('#artefact-edit')).toBeVisible()
 
     const groupEn = page.getByLabel('Groupe - Anglais')
     await groupEn.fill('Mapping tools')
     await groupEn.blur()
-    await page.locator('#artefact-admin').getByRole('button', { name: 'Enregistrer' }).click()
+    await page.locator('#artefact-edit').getByRole('button', { name: 'Enregistrer' }).click()
     await expect(page.getByText('Modifications enregistrées')).toBeVisible()
 
     await page.reload()
@@ -66,7 +67,7 @@ test.describe('Artefact admin metadata editing', () => {
 
   test('warns before navigating away with unsaved changes', async ({ page }) => {
     await page.goto('/registry/artefacts/' + encodeURIComponent(pkgId))
-    await expect(page.locator('#artefact-admin')).toBeVisible()
+    await expect(page.locator('#artefact-edit')).toBeVisible()
 
     const groupEn = page.getByLabel('Groupe - Anglais')
     await groupEn.fill('Unsaved change')
@@ -75,12 +76,30 @@ test.describe('Artefact admin metadata editing', () => {
     // Dismissing the confirmation keeps us on the page.
     page.once('dialog', dialog => dialog.dismiss())
     await page.getByRole('link', { name: 'Administration' }).click()
-    await expect(page.locator('#artefact-admin')).toBeVisible()
+    await expect(page.locator('#artefact-edit')).toBeVisible()
 
     // Accepting it lets the navigation through.
     page.once('dialog', dialog => dialog.accept())
     await page.getByRole('link', { name: 'Administration' }).click()
     await expect(page).toHaveURL(/\/admin/)
+  })
+
+  test('a picked thumbnail is staged and uploaded with the metadata save', async ({ page }) => {
+    await page.goto('/registry/artefacts/' + encodeURIComponent(pkgId))
+    const form = page.locator('#artefact-edit')
+    await expect(form).toBeVisible()
+    await expect(form.locator('img.thumbnail-preview')).toHaveCount(0)
+
+    const png = await sharp({ create: { width: 120, height: 80, channels: 3, background: { r: 200, g: 30, b: 30 } } }).png().toBuffer()
+    await form.locator('input[type=file]').setInputFiles({ name: 'thumb.png', mimeType: 'image/png', buffer: png })
+    // picking a file is an unsaved change like any other field
+    await expect(form.locator('img.thumbnail-preview')).toBeVisible()
+    await form.getByRole('button', { name: 'Enregistrer' }).click()
+    await expect(page.getByText('Modifications enregistrées')).toBeVisible()
+
+    await page.reload()
+    await expect(form.locator('img.thumbnail-preview')).toBeVisible()
+    await expect(form.locator('img.thumbnail-preview')).toHaveAttribute('src', /\/v1\/thumbnails\/.+\/data$/)
   })
 })
 
@@ -91,7 +110,7 @@ test.describe('Artefact admin metadata editing for a mirrored artefact', () => {
 
   test('remote-owned metadata is read-only while local access stays editable', async ({ page }) => {
     await page.goto('/registry/artefacts/' + encodeURIComponent(mirrorId))
-    await expect(page.locator('#artefact-admin')).toBeVisible()
+    await expect(page.locator('#artefact-edit')).toBeVisible()
 
     // Mirror notice is shown and the remote-owned metadata appears read-only.
     await expect(page.getByText('mirroré depuis un registre distant')).toBeVisible()
@@ -105,12 +124,12 @@ test.describe('Artefact admin metadata editing for a mirrored artefact', () => {
 
   test('toggling local access and saving succeeds (only public/privateAccess are sent)', async ({ page }) => {
     await page.goto('/registry/artefacts/' + encodeURIComponent(mirrorId))
-    await expect(page.locator('#artefact-admin')).toBeVisible()
+    await expect(page.locator('#artefact-edit')).toBeVisible()
 
     // Before the fix the form sent the remote-owned fields too and the API
     // answered 403; toggling Public and saving must now succeed.
     await page.getByLabel('Public').click()
-    await page.locator('#artefact-admin').getByRole('button', { name: 'Enregistrer' }).click()
+    await page.locator('#artefact-edit').getByRole('button', { name: 'Enregistrer' }).click()
     await expect(page.getByText('Modifications enregistrées')).toBeVisible()
 
     await page.reload()

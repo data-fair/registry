@@ -23,6 +23,12 @@ export default {
       type: 'array',
       items: { type: 'string' }
     },
+    // Artefacts selected while a sync was already running. The running sync
+    // drains this queue before releasing its lock, so a selection is never lost.
+    pendingSync: {
+      type: 'array',
+      items: { type: 'string' }
+    },
     lastSyncAt: { type: 'string', format: 'date-time' },
     lastSyncStatus: { type: 'string', enum: ['success', 'error'] },
     lastSyncError: { type: 'string' },

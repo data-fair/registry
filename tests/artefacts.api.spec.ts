@@ -26,7 +26,8 @@ test.describe('Artefacts', () => {
       const tarball = await createTestTarball({
         name: '@data-fair/processing-gpkg',
         version: '1.2.3',
-        licence: 'MIT'
+        licence: 'MIT',
+        description: 'GeoPackage import'
       })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
@@ -44,6 +45,7 @@ test.describe('Artefacts', () => {
       expect(res.data.artefact.packageName).toBe('@data-fair/processing-gpkg')
       expect(res.data.artefact.version).toBe('1.2.3')
       expect(res.data.artefact.category).toBe('processing')
+      expect(res.data.artefact.packageDescription).toBe('GeoPackage import')
       expect(typeof res.data.artefact.path).toBe('string')
       expect(typeof res.data.artefact.size).toBe('number')
       expect(res.data.artefact.size).toBeGreaterThan(0)
@@ -406,6 +408,63 @@ test.describe('Artefacts', () => {
       const list = await ax.get('/api/v1/artefacts?includeDeprecated=true')
       expect(list.data.count).toBe(1)
       expect(list.data.results[0]._id).toBe('@test/pkg@1')
+    })
+  })
+
+  test.describe('Sorting', () => {
+    const upload = async (name: string, version: string, group?: { en: string, fr: string }) => {
+      const id = name + '@1'
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form = new FormData()
+      form.append('file', await createTestTarball({ name, version }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent(id), form, { headers: form.getHeaders() })
+      if (group) {
+        const admin = await superAdmin
+        await admin.patch('/api/v1/artefacts/' + encodeURIComponent(id), { group })
+      }
+      return id
+    }
+
+    test.beforeEach(async () => {
+      await upload('@test/b', '2.0.0', { en: 'Zebra', fr: 'Zèbre' })
+      await upload('@test/a', '1.0.0', { en: 'Apple', fr: 'Pomme' })
+      await upload('@test/c', '3.0.0')
+    })
+
+    test('sort=group.en orders by the English group (ungrouped first, as Mongo sorts missing fields)', async () => {
+      const admin = await superAdmin
+      const res = await admin.get('/api/v1/artefacts?sort=group.en')
+      expect(res.data.results.map((a: any) => a._id)).toEqual(['@test/c@1', '@test/a@1', '@test/b@1'])
+    })
+
+    test('a leading dash reverses the order', async () => {
+      const admin = await superAdmin
+      const res = await admin.get('/api/v1/artefacts?sort=-name')
+      expect(res.data.results.map((a: any) => a._id)).toEqual(['@test/c@1', '@test/b@1', '@test/a@1'])
+    })
+
+    test('sort=version orders by version', async () => {
+      const admin = await superAdmin
+      const res = await admin.get('/api/v1/artefacts?sort=-version')
+      expect(res.data.results.map((a: any) => a.version)).toEqual(['3.0.0', '2.0.0', '1.0.0'])
+    })
+
+    test('an unknown sort key returns 400', async () => {
+      const admin = await superAdmin
+      try {
+        await admin.get('/api/v1/artefacts?sort=nope')
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
+    test('sort=public is admin-only and ignored for others', async () => {
+      const admin = await superAdmin
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/c@1'), { public: true })
+      const res = await anonymousAx.get('/api/v1/artefacts?sort=-public')
+      // anonymous only sees the public one anyway; the point is no 400
+      expect(res.status).toBe(200)
     })
   })
 })

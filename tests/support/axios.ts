@@ -52,6 +52,19 @@ export const syncLockExists = async (registryId: string): Promise<boolean> => {
   return res.data.exists
 }
 
+// Selecting an artefact starts a background sync of it. Tests that then depend on
+// the lock (a manual sync, a held-lock assertion) or on the mirrored copy must
+// wait for that sync — and any queued follow-up — to settle first.
+export const waitSyncIdle = async (registryId: string) => {
+  const admin = await superAdmin
+  for (let i = 0; i < 100; i++) {
+    const res = await admin.get('/api/v1/remote-registries/' + encodeURIComponent(registryId))
+    if (res.data.syncState !== 'running' && !res.data.pendingSync?.length) return res.data
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  throw new Error('sync did not settle within 10s')
+}
+
 // --- federation upstream --------------------------------------------------
 // A second registry process, used as a mirror source. See
 // docs/superpowers/specs/2026-07-10-federation-dev-testing-design.md

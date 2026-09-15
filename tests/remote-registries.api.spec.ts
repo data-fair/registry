@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin, holdSyncLock, releaseSyncLock, syncLockExists } from './support/axios.ts'
+import { superAdmin, axiosAuth, axiosWithApiKey, clean, setArtefactOrigin, holdSyncLock, releaseSyncLock, syncLockExists, waitSyncIdle } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -178,6 +178,9 @@ test.describe('Remote registries', () => {
 
       const registry = await ax.get(`/api/v1/remote-registries/${encodedRemoteUrl}`)
       expect(registry.data.selectedArtefacts).toContain('@test/pkg')
+      // selecting starts a sync of that artefact right away
+      expect(registry.data.syncState).toBe('running')
+      await waitSyncIdle(remoteUrl)
     })
 
     test('select duplicate returns 409', async () => {
@@ -193,6 +196,7 @@ test.describe('Remote registries', () => {
       } catch (err: any) {
         expect(err.status).toBe(409)
       }
+      await waitSyncIdle(remoteUrl)
     })
 
     test('select conflicts with existing local artefact', async () => {
@@ -220,6 +224,7 @@ test.describe('Remote registries', () => {
       await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
         artefactId: '@test/pkg'
       })
+      await waitSyncIdle(remoteUrl)
 
       const res = await ax.delete(
         `/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts/${encodeURIComponent('@test/pkg')}`
@@ -244,6 +249,7 @@ test.describe('Remote registries', () => {
       await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
         artefactId: '@test/pkg@1'
       })
+      await waitSyncIdle(remoteUrl)
       await ax.delete(
         `/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts/${encodeURIComponent('@test/pkg@1')}`
       )
@@ -468,11 +474,12 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
       const artefactId = '@test/pkg@1'
 
-      // Selecting doesn't contact the remote — only checks for a conflicting
-      // local artefact — so this is safe against a non-resolving remote URL.
+      // Selecting starts a background sync of the artefact, which fails against
+      // the non-resolving host. Let it settle so the manual sync below owns the lock.
       await ax.post(`/api/v1/remote-registries/${encodeURIComponent(url)}/selected-artefacts`, {
         artefactId
       })
+      const settled = await waitSyncIdle(url)
 
       await ax.post('/api/v1/remote-registries/' + encodeURIComponent(url) + '/sync')
 
@@ -481,7 +488,7 @@ test.describe('Remote registries', () => {
       for (let i = 0; i < 50; i++) {
         const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
         doc = res.data
-        if (doc.lastSyncStatus) break
+        if (doc.lastSyncAt && doc.lastSyncAt !== settled.lastSyncAt) break
         await new Promise(resolve => setTimeout(resolve, 100))
       }
 

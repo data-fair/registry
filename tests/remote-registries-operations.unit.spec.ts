@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { filterSuggestedArtefacts, syncLockId, syncChannel, syncState } from '../api/src/remote-registries/operations.ts'
+import { filterSuggestedArtefacts, syncLockId, syncChannel, syncState, annotateLocalState } from '../api/src/remote-registries/operations.ts'
 
 test.describe('filterSuggestedArtefacts', () => {
   test('keeps non-deprecated artefacts and recomputes count', () => {
@@ -68,5 +68,43 @@ test.describe('syncState', () => {
 
   test('a first-ever attempt that never finished is interrupted', () => {
     expect(syncState(false, { syncProgress: { startedAt: '2026-07-09T12:00:00.000Z' } })).toBe('interrupted')
+  })
+})
+
+test.describe('annotateLocalState', () => {
+  const remote = [
+    { _id: 'a', dataUpdatedAt: '2026-01-02T00:00:00.000Z' },
+    { _id: 'b', dataUpdatedAt: '2026-01-02T00:00:00.000Z' },
+    { _id: 'c', dataUpdatedAt: '2026-01-02T00:00:00.000Z' }
+  ]
+  const origin = 'https://up.example.com'
+  const local = [
+    { _id: 'a', dataUpdatedAt: '2026-01-02T00:00:00.000Z', origin },
+    { _id: 'b', dataUpdatedAt: '2026-01-01T00:00:00.000Z', origin }
+  ]
+
+  test('a mirrored artefact with the same dataUpdatedAt is up to date', () => {
+    const out = annotateLocalState(remote, local, origin)
+    expect(out[0].local).toEqual({ synced: true, upToDate: true, dataUpdatedAt: '2026-01-02T00:00:00.000Z' })
+  })
+
+  test('a mirrored artefact with an older dataUpdatedAt is stale', () => {
+    const out = annotateLocalState(remote, local, origin)
+    expect(out[1].local).toEqual({ synced: true, upToDate: false, dataUpdatedAt: '2026-01-01T00:00:00.000Z' })
+  })
+
+  test('an artefact absent locally is not synced', () => {
+    const out = annotateLocalState(remote, local, origin)
+    expect(out[2].local).toEqual({ synced: false, upToDate: false })
+  })
+
+  test('a local artefact with the same id but another (or no) origin is a conflict', () => {
+    const out = annotateLocalState(remote, [
+      { _id: 'a', dataUpdatedAt: '2026-01-02T00:00:00.000Z' },
+      { _id: 'b', dataUpdatedAt: '2026-01-02T00:00:00.000Z', origin: 'https://other.example.com' }
+    ], origin)
+    expect(out[0].local).toEqual({ synced: false, upToDate: false, conflict: true })
+    expect(out[1].local).toEqual({ synced: false, upToDate: false, conflict: true })
+    expect(out[2].local).toEqual({ synced: false, upToDate: false })
   })
 })

@@ -38,3 +38,33 @@ export const syncState = (
   if (startedAt && (!registry.lastSyncAt || startedAt > registry.lastSyncAt)) return 'interrupted'
   return 'idle'
 }
+
+// Local mirror state of each remote artefact, for the admin's selection table.
+// `upToDate` compares the upstream dataUpdatedAt with the mirrored copy's — the
+// same fast-path key the npm sync uses, so a stale row is exactly one the next
+// sync would re-download.
+// `conflict` flags a local artefact with the same id that this registry does
+// not own (uploaded locally, or unlocked when a registry was deleted): the
+// select endpoint would answer 409, so the UI can say so up front.
+export type LocalState = { synced: boolean, upToDate: boolean, dataUpdatedAt?: string, conflict?: boolean }
+
+export const annotateLocalState = <T extends { _id: string, dataUpdatedAt?: string }> (
+  remoteArtefacts: T[],
+  localArtefacts: { _id: string, dataUpdatedAt?: string, origin?: string }[],
+  registryId: string
+): (T & { local: LocalState })[] => {
+  const locals = new Map(localArtefacts.map(a => [a._id, a]))
+  return remoteArtefacts.map(remote => {
+    const local = locals.get(remote._id)
+    if (!local) return { ...remote, local: { synced: false, upToDate: false } }
+    if (local.origin !== registryId) return { ...remote, local: { synced: false, upToDate: false, conflict: true } }
+    return {
+      ...remote,
+      local: {
+        synced: true,
+        upToDate: !!local.dataUpdatedAt && local.dataUpdatedAt === remote.dataUpdatedAt,
+        dataUpdatedAt: local.dataUpdatedAt
+      }
+    }
+  })
+}
