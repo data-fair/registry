@@ -19,16 +19,17 @@
       density="compact"
     />
     <v-spacer />
-    <v-btn
-      v-if="session.state.user?.adminMode"
-      :prepend-icon="mdiCog"
-      variant="text"
-      color="admin"
-      to="/admin"
-      class="mr-2"
-    >
-      {{ t('admin') }}
-    </v-btn>
+    <!-- Full-height flat admin button, as in simple-directory's app bar. -->
+    <v-toolbar-items v-if="session.state.user?.adminMode">
+      <v-btn
+        :prepend-icon="mdiCog"
+        variant="flat"
+        color="admin"
+        to="/admin"
+      >
+        {{ t('admin') }}
+      </v-btn>
+    </v-toolbar-items>
     <personal-menu dark-mode-switch />
   </v-app-bar>
   <RouterView />

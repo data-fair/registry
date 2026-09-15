@@ -23,33 +23,6 @@
       {{ t('deprecatedNotice') }}
     </v-alert>
 
-    <!-- Download file artefact -->
-    <v-card
-      v-if="hasGrant && artefact.format === 'file' && artefact.path"
-      class="mb-4"
-    >
-      <v-card-title>{{ t('download') }}</v-card-title>
-      <v-card-text>
-        <div class="d-flex align-center">
-          <span class="text-body-1 mr-4">{{ artefact.fileName || artefact.name }}</span>
-          <span
-            v-if="typeof artefact.size === 'number'"
-            class="text-medium-emphasis text-body-2 mr-4"
-          >
-            {{ formatBytes(artefact.size, locale) }}
-          </span>
-          <v-btn
-            color="primary"
-            variant="flat"
-            :prepend-icon="mdiDownload"
-            :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/download`"
-          >
-            {{ t('download') }}
-          </v-btn>
-        </div>
-      </v-card-text>
-    </v-card>
-
     <!-- No access alert -->
     <v-alert
       v-if="!hasGrant && session.state.account"
@@ -67,61 +40,19 @@
     </v-alert>
 
     <!-- Metadata -->
-    <artefact-metadata :artefact="artefact" />
+    <artefact-metadata
+      :artefact="artefact"
+      :can-download="hasGrant && !!artefact.path"
+    />
 
-    <!-- Tarball (npm only) -->
-    <v-card
-      v-if="artefact.format === 'npm' && artefact.path"
-      class="mb-4"
-    >
-      <v-card-title>
-        {{ t('tarball') }}
-        <v-chip
-          v-if="artefact.hasNativeModules"
-          color="warning"
-          size="small"
-          class="ml-2"
-        >
-          {{ t('hasNativeModules') }}
-        </v-chip>
-      </v-card-title>
-      <v-card-text>
-        <v-table density="compact">
-          <thead>
-            <tr>
-              <th>{{ t('size') }}</th>
-              <th>{{ t('uploadedAt') }}</th>
-              <th v-if="adminMode">
-                {{ t('uploadedBy') }}
-              </th>
-              <th v-if="hasGrant" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</td>
-              <td>{{ artefact.dataUpdatedAt ? dayjs(artefact.dataUpdatedAt).format('L LT') : '-' }}</td>
-              <td v-if="adminMode">
-                {{ artefact.uploadedBy?.apiKeyName ?? (artefact.uploadedBy?.internal ? 'internal' : '') }}
-              </td>
-              <td
-                v-if="hasGrant"
-                class="text-right"
-              >
-                <v-btn
-                  :icon="mdiDownload"
-                  size="small"
-                  variant="text"
-                  :href="`${$apiPath}/v1/artefacts/${encodeURIComponent(artefactId)}/download`"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </v-card-text>
-    </v-card>
+    <!-- Admin edit form (metadata + thumbnail), ahead of the technical sections -->
+    <artefact-edit
+      v-if="adminMode"
+      :artefact="artefact"
+      @changed="fetchArtefact"
+    />
 
-    <!-- Admin editing sections (thumbnail, editable metadata, danger zone) -->
+    <!-- Admin tooling (vulnerability scan, danger zone) -->
     <artefact-admin
       v-if="adminMode"
       :artefact="artefact"
@@ -137,12 +68,6 @@
 <i18n lang="yaml">
 fr:
   artefacts: Artefacts
-  tarball: Tarball
-  hasNativeModules: "Modules natifs"
-  size: Taille
-  uploadedAt: "T\xE9l\xE9vers\xE9 le"
-  uploadedBy: "T\xE9l\xE9vers\xE9 par"
-  download: "T\xE9l\xE9charger"
   noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
   loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
   mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
@@ -150,11 +75,6 @@ fr:
 en:
   artefacts: Artefacts
   tarball: Tarball
-  hasNativeModules: "Has native modules"
-  size: Size
-  uploadedAt: Uploaded
-  uploadedBy: Uploaded by
-  download: Download
   noAccessGrant: Contact your administrator for download access.
   loginRequired: Log in to access downloads.
   mirroredFrom: "This artefact is mirrored from remote registry: {origin}"
@@ -165,14 +85,12 @@ en:
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { mdiDownload } from '@mdi/js'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
 const route = useRoute('/artefacts/[id]')
 const session = useSession()
-const { dayjs } = useLocaleDayjs()
 
 const artefactId = computed(() => decodeURIComponent(route.params.id as string))
 const adminMode = computed(() => !!session.state.user?.adminMode)

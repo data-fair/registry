@@ -21,8 +21,24 @@ import App from './App.vue'
   const session = await createSession({ directoryUrl: $sitePath + '/simple-directory' })
   const localeDayjs = createLocaleDayjs(session.state.lang)
   const uiNotif = createUiNotif()
+  const sessionOptions = vuetifySessionOptions(session, $cspNonce)
+  // Form fields: comfortable density and no reserved messages area unless a
+  // message shows. Applies to hand-written fields and to VJSF forms alike.
+  const fieldDefaults = { density: 'comfortable', hideDetails: 'auto' }
   const vuetify = createVuetify({
-    ...vuetifySessionOptions(session, $cspNonce),
+    ...sessionOptions,
+    defaults: {
+      ...sessionOptions.defaults,
+      VTextField: { ...sessionOptions.defaults?.VTextField, ...fieldDefaults },
+      VTextarea: { ...sessionOptions.defaults?.VTextarea, ...fieldDefaults },
+      VSelect: { ...sessionOptions.defaults?.VSelect, ...fieldDefaults },
+      VAutocomplete: { ...sessionOptions.defaults?.VAutocomplete, ...fieldDefaults },
+      VCombobox: { ...sessionOptions.defaults?.VCombobox, ...fieldDefaults },
+      VFileInput: { ...sessionOptions.defaults?.VFileInput, ...fieldDefaults },
+      VDateInput: { ...sessionOptions.defaults?.VDateInput, ...fieldDefaults },
+      VSwitch: { ...sessionOptions.defaults?.VSwitch, ...fieldDefaults },
+      VCheckbox: { ...sessionOptions.defaults?.VCheckbox, ...fieldDefaults }
+    },
     icons: { defaultSet: 'mdi', aliases, sets: { mdi } }
   })
 

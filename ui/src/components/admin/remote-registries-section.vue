@@ -12,9 +12,8 @@
             <v-text-field
               v-model="newRemote.name"
               :label="t('name')"
-              density="compact"
-              hide-details
               variant="outlined"
+              autocomplete="off"
             />
           </v-col>
           <v-col
@@ -24,8 +23,6 @@
             <v-text-field
               v-model="newRemote.url"
               :label="t('url')"
-              density="compact"
-              hide-details
               variant="outlined"
               placeholder="https://registry.example.com/registry"
             />
@@ -34,13 +31,15 @@
             cols="12"
             sm="3"
           >
+            <!-- Not type=password: Chrome would treat the form as a login form
+                 and autofill name + key from its password manager. A masked text
+                 field keeps the key hidden without triggering it. -->
             <v-text-field
               v-model="newRemote.apiKey"
               :label="t('apiKey')"
-              density="compact"
-              hide-details
               variant="outlined"
-              type="password"
+              class="masked-input"
+              autocomplete="off"
             />
           </v-col>
           <v-col
@@ -68,9 +67,9 @@
     />
 
     <v-card v-else-if="registriesFetch.data.value">
-      <v-card-title>
+      <v-card-title class="d-flex align-center ga-2">
         {{ t('remoteRegistries') }}
-        <span class="text-medium-emphasis text-body-2 ml-2">({{ registriesFetch.data.value.count }})</span>
+        <span class="text-medium-emphasis text-body-2">({{ registriesFetch.data.value.count }})</span>
       </v-card-title>
       <v-table density="comfortable">
         <thead>
@@ -88,10 +87,8 @@
             v-for="reg in registriesFetch.data.value.results"
             :key="reg._id"
           >
-            <td>
-              <router-link :to="`/admin/remote-registries/${encodeURIComponent(reg._id)}`">
-                {{ reg.name }}
-              </router-link>
+            <td class="font-weight-medium">
+              {{ reg.name }}
             </td>
             <td class="text-medium-emphasis">
               {{ reg._id }}
@@ -101,7 +98,10 @@
             </td>
             <td>{{ reg.selectedArtefacts.length }}</td>
             <td>
-              <template v-if="reg.syncState === 'running'">
+              <div
+                v-if="reg.syncState === 'running'"
+                class="d-flex align-center ga-2"
+              >
                 <v-chip
                   size="small"
                   color="info"
@@ -110,9 +110,9 @@
                 </v-chip>
                 <span
                   v-if="reg.syncProgress"
-                  class="text-medium-emphasis text-body-2 ml-1"
+                  class="text-medium-emphasis text-body-2"
                 >{{ reg.syncProgress.done }}/{{ reg.syncProgress.total }}</span>
-              </template>
+              </div>
               <template v-else-if="reg.syncState === 'interrupted'">
                 <v-chip
                   size="small"
@@ -121,34 +121,72 @@
                   {{ t('interrupted') }}
                 </v-chip>
               </template>
-              <template v-else-if="reg.lastSyncAt">
+              <div
+                v-else-if="reg.lastSyncAt"
+                class="d-flex align-center ga-2"
+              >
                 <v-chip
                   size="small"
                   :color="reg.lastSyncStatus === 'success' ? 'success' : 'error'"
                 >
-                  {{ reg.lastSyncStatus }}
+                  {{ t(reg.lastSyncStatus === 'success' ? 'statusSuccess' : 'statusError') }}
                 </v-chip>
                 {{ dayjs(reg.lastSyncAt).format('L LT') }}
-              </template>
+              </div>
               <span
                 v-else
                 class="text-medium-emphasis"
               >{{ t('neverSynced') }}</span>
             </td>
-            <td class="text-right">
+            <td class="text-right text-no-wrap">
+              <v-btn
+                color="primary"
+                size="small"
+                variant="tonal"
+                :prepend-icon="mdiCog"
+                :to="`/admin/remote-registries/${encodeURIComponent(reg._id)}`"
+              >
+                {{ t('manage') }}
+              </v-btn>
               <v-btn
                 :icon="mdiDelete"
                 color="error"
                 size="small"
                 variant="text"
-                :loading="deletingId === reg._id"
-                @click="deleteRemote(reg._id)"
+                class="ml-1"
+                :title="t('delete')"
+                @click="confirmDeleteId = reg._id"
               />
             </td>
           </tr>
         </tbody>
       </v-table>
     </v-card>
+
+    <v-dialog
+      :model-value="!!confirmDeleteId"
+      max-width="400"
+      @update:model-value="confirmDeleteId = null"
+    >
+      <v-card>
+        <v-card-title>{{ t('confirmDeleteTitle') }}</v-card-title>
+        <v-card-text>{{ t('confirmDeleteText', { name: confirmDeleteName }) }}</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="confirmDeleteId = null">
+            {{ t('cancel') }}
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="flat"
+            :loading="!!deletingId"
+            @click="deleteRemote(confirmDeleteId!)"
+          >
+            {{ t('delete') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -162,9 +200,16 @@ fr:
   selections: Sélections
   lastSync: Dernière synchro
   neverSynced: Jamais synchronisé
-  running: en cours
-  interrupted: interrompue
+  running: En cours
+  interrupted: Interrompue
+  statusSuccess: Succès
+  statusError: Erreur
   add: Ajouter
+  manage: Gérer
+  delete: Supprimer
+  cancel: Annuler
+  confirmDeleteTitle: Confirmer la suppression
+  confirmDeleteText: "Supprimer le registre distant \"{name}\" ? Ses artefacts miroir locaux seront déverrouillés mais pas supprimés."
 en:
   remoteRegistries: Remote Registries
   addRemote: Add Remote Registry
@@ -174,21 +219,32 @@ en:
   selections: Selections
   lastSync: Last Sync
   neverSynced: Never synced
-  running: running
-  interrupted: interrupted
+  running: Running
+  interrupted: Interrupted
+  statusSuccess: Success
+  statusError: Error
   add: Add
+  manage: Manage
+  delete: Delete
+  cancel: Cancel
+  confirmDeleteTitle: Confirm deletion
+  confirmDeleteText: "Delete the remote registry \"{name}\"? Its local mirrored artefacts will be unlocked but not deleted."
 </i18n>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { mdiDelete } from '@mdi/js'
+import { mdiDelete, mdiCog } from '@mdi/js'
 
 const { t } = useI18n()
 const { dayjs } = useLocaleDayjs()
 
 const newRemote = ref({ name: '', url: '', apiKey: '' })
 const deletingId = ref<string | null>(null)
+const confirmDeleteId = ref<string | null>(null)
+const confirmDeleteName = computed(() =>
+  registriesFetch.data.value?.results.find(r => r._id === confirmDeleteId.value)?.name ?? confirmDeleteId.value ?? ''
+)
 
 const registriesFetch = useFetch<{ results: any[], count: number }>(
   `${$apiPath}/v1/remote-registries`
@@ -209,9 +265,16 @@ async function deleteRemote (id: string) {
   deletingId.value = id
   try {
     await $fetch(`/v1/remote-registries/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    confirmDeleteId.value = null
     registriesFetch.refresh()
   } finally {
     deletingId.value = null
   }
 }
 </script>
+
+<style scoped>
+.masked-input :deep(input) {
+  -webkit-text-security: disc;
+}
+</style>

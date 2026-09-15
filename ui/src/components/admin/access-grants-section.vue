@@ -22,8 +22,6 @@
               return-object
               no-filter
               clearable
-              density="compact"
-              hide-details
               variant="outlined"
             />
           </v-col>
@@ -52,9 +50,9 @@
     />
 
     <v-card v-else-if="grantsFetch.data.value">
-      <v-card-title>
+      <v-card-title class="d-flex align-center ga-2">
         {{ t('existingGrants') }}
-        <span class="text-medium-emphasis text-body-2 ml-2">({{ grantsFetch.data.value.count }})</span>
+        <span class="text-medium-emphasis text-body-2">({{ grantsFetch.data.value.count }})</span>
       </v-card-title>
       <v-table density="comfortable">
         <thead>
@@ -71,17 +69,28 @@
             :key="grant._id"
           >
             <td>
-              <v-chip
-                size="small"
-                :color="grant.account.type === 'organization' ? 'blue' : 'green'"
-              >
-                {{ grant.account.type }}
-              </v-chip>
-              {{ grant.account.name || grant.account.id }}
-              <span
-                v-if="grant.account.name"
-                class="text-medium-emphasis text-body-2 ml-1"
-              >{{ grant.account.id }}</span>
+              <div class="d-flex align-center ga-2">
+                <!-- plain img: v-img's lazy sizing never settles inside a table cell -->
+                <v-avatar size="28">
+                  <img
+                    :src="avatarUrl(grant.account)"
+                    alt=""
+                    width="28"
+                    height="28"
+                  >
+                </v-avatar>
+                <v-chip
+                  size="small"
+                  :color="grant.account.type === 'organization' ? 'blue' : 'green'"
+                >
+                  {{ t(grant.account.type === 'organization' ? 'organization' : 'user') }}
+                </v-chip>
+                <span>{{ grant.account.name || grant.account.id }}</span>
+                <span
+                  v-if="grant.account.name"
+                  class="text-medium-emphasis text-body-2"
+                >{{ grant.account.id }}</span>
+              </div>
             </td>
             <td>{{ grant.grantedBy.name || grant.grantedBy.id }}</td>
             <td>{{ dayjs(grant.grantedAt).format('L LT') }}</td>
@@ -112,6 +121,8 @@ fr:
   account: Compte
   grantedBy: Accordé par
   grantedAt: Accordé le
+  organization: Organisation
+  user: Utilisateur
 en:
   grantAccess: Grant Access
   searchAccount: Search an account
@@ -121,12 +132,14 @@ en:
   account: Account
   grantedBy: Granted by
   grantedAt: Granted
+  organization: Organization
+  user: User
 </i18n>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { mdiDelete, mdiAccount, mdiDomain } from '@mdi/js'
+import { mdiDelete } from '@mdi/js'
 import { $sdUrl } from '~/context'
 
 type AccountItem = { type: string, id: string, name: string, title: string, key: string }
@@ -166,10 +179,15 @@ const accountItems = computed<AccountItem[]>(() =>
   }))
 )
 
+// simple-directory serves an avatar for every account (initials fallback),
+// so the picker and the table show the same face as the rest of the stack.
+const avatarUrl = (account: { type: string, id: string }) =>
+  `${$sdUrl}/api/avatars/${account.type}/${account.id}/avatar.png`
+
 const accountItemProps = (item: AccountItem) => ({
   title: item.name,
-  subtitle: item.id,
-  prependIcon: item.type === 'organization' ? mdiDomain : mdiAccount
+  subtitle: `${item.id} · ${t(item.type === 'organization' ? 'organization' : 'user')}`,
+  prependAvatar: avatarUrl(item)
 })
 
 const grantsFetch = useFetch<{ results: any[], count: number }>(

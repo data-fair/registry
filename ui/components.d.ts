@@ -10,6 +10,7 @@ declare module 'vue' {
     AccessGrantsSection: typeof import('./src/components/admin/access-grants-section.vue')['default']
     ApiKeysSection: typeof import('./src/components/admin/api-keys-section.vue')['default']
     ArtefactAdmin: typeof import('./src/components/artefact-admin.vue')['default']
+    ArtefactEdit: typeof import('./src/components/artefact-edit.vue')['default']
     ArtefactMetadata: typeof import('./src/components/artefact-metadata.vue')['default']
     DefaultLayout: typeof import('./src/components/default-layout.vue')['default']
     RemoteRegistriesSection: typeof import('./src/components/admin/remote-registries-section.vue')['default']

@@ -18,9 +18,16 @@ export type SyncEvent = {
 // `subscribe` registers its own onScopeDispose teardown, so callers need no onUnmounted.
 // useWS returns undefined when the browser has no WebSocket: the page then renders correct
 // state at load and simply does not animate.
-export const useRegistrySync = (registryId: string, registry: Ref<any>) => {
+// `onDone` fires on each terminal frame (running: false) — a partial sync
+// started by a selection ends with one too, so callers can react per selection.
+export const useRegistrySync = (
+  registryId: string,
+  registry: Ref<any>,
+  opts: { onDone?: (event: SyncEvent) => void } = {}
+) => {
   const ws = useWS($apiPath + '/')
   ws?.subscribe<SyncEvent>(`remote-registries/${encodeURIComponent(registryId)}/sync`, (event) => {
+    if (!event.running) opts.onDone?.(event)
     const reg = registry.value
     // an event can land before the initial fetch resolves; the next one supersedes it
     if (!reg) return
