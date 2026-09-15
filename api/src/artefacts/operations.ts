@@ -9,9 +9,6 @@ export interface Manifest {
   name: string
   version: string
   licence?: string
-  // package.json description, shown as the technical description next to the
-  // editable, localized one.
-  description?: string
 }
 
 export interface ExtractManifestResult {
@@ -118,8 +115,7 @@ export const extractManifest = async (
           manifest = {
             name: pkg.name,
             version: pkg.version,
-            licence: pkg.licence || pkg.license,
-            ...(typeof pkg.description === 'string' && pkg.description.trim() ? { description: pkg.description.trim() } : {})
+            licence: pkg.licence || pkg.license
           }
           next()
         } catch (err) {

@@ -55,22 +55,6 @@ test.describe('extractManifest', () => {
     expect(result.manifest.licence).toBe('MIT')
   })
 
-  test('extracts the package description, trimmed', async () => {
-    const tarball = await packTarball([
-      { name: 'package/package.json', content: manifest({ description: '  A demo plugin  ' }) }
-    ])
-    const result = await extractManifest(Readable.from(tarball))
-    expect(result.manifest.description).toBe('A demo plugin')
-  })
-
-  test('ignores a non-string package description', async () => {
-    const tarball = await packTarball([
-      { name: 'package/package.json', content: manifest({ description: { fr: 'nope' } }) }
-    ])
-    const result = await extractManifest(Readable.from(tarball))
-    expect(result.manifest.description).toBeUndefined()
-  })
-
   test('does not extract a category from package.json (category comes from the upload form field)', async () => {
     const tarball = await packTarball([
       { name: 'package/package.json', content: manifest({ registry: { category: 'processing' } }) }

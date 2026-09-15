@@ -46,15 +46,6 @@
             {{ field.value }}
           </div>
         </v-col>
-        <v-col
-          v-if="artefact.packageDescription"
-          cols="12"
-        >
-          <div class="text-medium-emphasis text-caption">
-            {{ t('packageDescription') }}
-          </div>
-          <div>{{ artefact.packageDescription }}</div>
-        </v-col>
       </v-row>
     </v-card-text>
   </v-card>
@@ -74,7 +65,6 @@ fr:
   internal: service interne
   hasNativeModules: Modules natifs
   download: "T\xE9l\xE9charger"
-  packageDescription: Description technique
 en:
   metadata: Metadata
   packageName: Package name
@@ -88,7 +78,6 @@ en:
   internal: internal service
   hasNativeModules: Native modules
   download: Download
-  packageDescription: Technical description
 </i18n>
 
 <script setup lang="ts">

@@ -96,7 +96,6 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         packageName: remoteArtefact.packageName,
         version: remoteArtefact.version,
         licence: remoteArtefact.licence,
-        ...(remoteArtefact.packageDescription ? { packageDescription: remoteArtefact.packageDescription } : {}),
         category: remoteArtefact.category,
         deprecated: !!remoteArtefact.deprecated,
         hasNativeModules: !!remoteArtefact.hasNativeModules,

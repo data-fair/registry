@@ -16,9 +16,6 @@ export default {
     packageName: { type: 'string', readOnly: true },
     version: { type: 'string', readOnly: true },
     licence: { type: 'string', readOnly: true },
-    // The npm manifest's own description (technical, not localized); the
-    // editable `description` below is the curated one.
-    packageDescription: { type: 'string', readOnly: true },
     category: {
       type: 'string',
       enum: ['processing', 'catalog', 'application', 'tileset', 'maplibre-style', 'other']

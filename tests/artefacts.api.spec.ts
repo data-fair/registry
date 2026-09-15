@@ -26,8 +26,7 @@ test.describe('Artefacts', () => {
       const tarball = await createTestTarball({
         name: '@data-fair/processing-gpkg',
         version: '1.2.3',
-        licence: 'MIT',
-        description: 'GeoPackage import'
+        licence: 'MIT'
       })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
@@ -45,7 +44,6 @@ test.describe('Artefacts', () => {
       expect(res.data.artefact.packageName).toBe('@data-fair/processing-gpkg')
       expect(res.data.artefact.version).toBe('1.2.3')
       expect(res.data.artefact.category).toBe('processing')
-      expect(res.data.artefact.packageDescription).toBe('GeoPackage import')
       expect(typeof res.data.artefact.path).toBe('string')
       expect(typeof res.data.artefact.size).toBe('number')
       expect(res.data.artefact.size).toBeGreaterThan(0)

@@ -13,7 +13,6 @@ export interface TarballOptions {
   name: string
   version: string
   licence?: string
-  description?: string
   /** Additional entries appended after package/package.json. Useful for native-module signal tests. */
   extraEntries?: TarballEntry[]
 }
@@ -23,8 +22,7 @@ export const createTestTarball = async (options: TarballOptions): Promise<Buffer
   const pkg = {
     name: options.name,
     version: options.version,
-    ...(options.licence ? { licence: options.licence } : {}),
-    ...(options.description ? { description: options.description } : {})
+    ...(options.licence ? { licence: options.licence } : {})
   }
   pack.entry({ name: 'package/package.json' }, JSON.stringify(pkg, null, 2))
   for (const entry of options.extraEntries ?? []) {

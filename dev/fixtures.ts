@@ -102,10 +102,10 @@ async function main () {
   // In the unified model each artefact id is one major line; uploading to
   // /npm/:id stores a single tarball (the `noarch` slot). The category is
   // taken from the multipart form field, never from the package manifest.
-  const npmSpecs: { name: string, category: string, version: string, description: string }[] = [
-    { name: '@koumoul/processing-hello', category: 'processing', version: '1.1.0', description: 'Hello world processing plugin for data-fair' },
-    { name: '@koumoul/application-demo', category: 'application', version: '1.0.0', description: 'Demo application showcasing the registry' },
-    { name: '@test/catalog-sample', category: 'catalog', version: '2.0.0', description: 'Sample catalog connector' }
+  const npmSpecs: { name: string, category: string, version: string }[] = [
+    { name: '@koumoul/processing-hello', category: 'processing', version: '1.1.0' },
+    { name: '@koumoul/application-demo', category: 'application', version: '1.0.0' },
+    { name: '@test/catalog-sample', category: 'catalog', version: '2.0.0' }
   ]
 
   for (const spec of npmSpecs) {
@@ -115,7 +115,7 @@ async function main () {
       console.log(`  ✓ npm ${id} (skipped)`)
       continue
     }
-    const tarball = await createTestTarball({ name: spec.name, version: spec.version, licence: 'MIT', description: spec.description })
+    const tarball = await createTestTarball({ name: spec.name, version: spec.version, licence: 'MIT' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     form.append('category', spec.category)
@@ -265,7 +265,7 @@ async function main () {
   if (await upstreamArtefactExists(UPSTREAM_NPM_ID)) {
     console.log(`  ✓ upstream npm ${UPSTREAM_NPM_ID} (skipped)`)
   } else {
-    const tarball = await createTestTarball({ name: '@upstream/processing-remote', version: '1.0.0', licence: 'MIT', description: 'Processing plugin published on the upstream registry' })
+    const tarball = await createTestTarball({ name: '@upstream/processing-remote', version: '1.0.0', licence: 'MIT' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     form.append('category', 'processing')
