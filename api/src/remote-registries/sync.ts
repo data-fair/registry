@@ -85,6 +85,10 @@ const syncMetadata = async (artefactId: string, remoteUrl: string, remoteArtefac
   await mongo.artefacts.updateOne({ _id: artefactId }, { $set, ...(Object.keys($unset).length ? { $unset } : {}) })
 }
 
+// The value stored as the mirror's dataUpdatedAt. Upstream docs predating the
+// field fall back to updatedAt, so the fast-path comparison must use it too.
+const remoteDataUpdatedAt = (remoteArtefact: Artefact) => remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
+
 const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
   const encodedId = encodeURIComponent(artefactId)
   const remoteRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
@@ -93,7 +97,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
   const local = await mongo.artefacts.findOne({ _id: artefactId })
 
   // Fast path: same upstream dataUpdatedAt means no new upload to mirror.
-  if (local?.path && local.dataUpdatedAt === remoteArtefact.dataUpdatedAt) {
+  if (local?.path && local.dataUpdatedAt === remoteDataUpdatedAt(remoteArtefact)) {
     await syncMetadata(artefactId, remoteUrl, remoteArtefact)
     await syncThumbnail(ax, artefactId, remoteArtefact.thumbnail, local.thumbnail)
     return
@@ -120,7 +124,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
         path: localPath,
         updatedAt: now,
-        dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
+        dataUpdatedAt: remoteDataUpdatedAt(remoteArtefact)
       },
       $setOnInsert: {
         _id: artefactId,
@@ -149,7 +153,7 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
   const local = await mongo.artefacts.findOne({ _id: artefactId })
 
   // Same fast path as npm: download only when the upstream bytes changed.
-  if (!local?.path || local.dataUpdatedAt !== remoteArtefact.dataUpdatedAt) {
+  if (!local?.path || local.dataUpdatedAt !== remoteDataUpdatedAt(remoteArtefact)) {
     const dlRes = await ax.get(`/api/v1/artefacts/${encodedId}/download`, {
       responseType: 'stream'
     })
@@ -168,7 +172,7 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
           fileName,
           ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
           updatedAt: now,
-          dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
+          dataUpdatedAt: remoteDataUpdatedAt(remoteArtefact)
         },
         $setOnInsert: {
           _id: artefactId,
