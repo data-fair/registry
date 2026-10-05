@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
+import { privateHttpAgent, privateHttpsAgent } from '@data-fair/lib-node/http-agents.js'
 import type { Readable } from 'node:stream'
 
 const nodeMajor = (): string => process.versions.node.split('.')[0]
@@ -106,7 +107,8 @@ const pruneOldVersionDirs = async (artefactDir: string): Promise<void> => {
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
   const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
   if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
-  const ax = axiosBuilder({ baseURL: opts.registryUrl, headers })
+  // the registry is a service of our own infrastructure (configuration, not user input)
+  const ax = axiosBuilder({ baseURL: opts.registryUrl, headers, httpAgent: privateHttpAgent, httpsAgent: privateHttpsAgent })
 
   const encodedId = encodeURIComponent(opts.artefactId)
   const artefactDir = join(opts.cacheDir, opts.artefactId)
@@ -206,7 +208,10 @@ export interface EnsureArtefactFileResult {
 export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise<EnsureArtefactFileResult> {
   const ax = axiosBuilder({
     baseURL: opts.registryUrl,
-    headers: { 'x-secret-key': opts.secretKey }
+    headers: { 'x-secret-key': opts.secretKey },
+    // the registry is a service of our own infrastructure (configuration, not user input)
+    httpAgent: privateHttpAgent,
+    httpsAgent: privateHttpsAgent
   })
 
   const destPath = join(opts.cacheDir, opts.fileName ?? opts.artefactId)
