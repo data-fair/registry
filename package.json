@@ -41,8 +41,8 @@
   "homepage": "https://github.com/data-fair/registry#readme",
   "devDependencies": {
     "@commitlint/config-conventional": "^19.2.2",
-    "@data-fair/lib-express": "^1.19.0",
-    "@data-fair/lib-node": "^2.8.1",
+    "@data-fair/lib-express": "^1.28.1",
+    "@data-fair/lib-node": "^2.15.0",
     "@koumoul/vjsf-compiler": "^1.2.3",
     "@playwright/test": "^1.58.2",
     "@reporters/bail": "^1.2.1",
