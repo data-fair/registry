@@ -194,6 +194,24 @@ test.describe('Federation sync against a real upstream registry', () => {
     expect(after.dataUpdatedAt).not.toBe(before.dataUpdatedAt)
   })
 
+  test('an upstream metadata edit is mirrored without re-downloading', async () => {
+    const upstreamAdmin = await upstreamSuperAdmin()
+    await upstreamAdmin.patch('/api/v1/artefacts/' + encodeURIComponent(NPM_ID), { title: { en: 'Old' }, group: { en: 'G' } })
+    await registerMirror(readKey, [NPM_ID])
+    const before = await getLocal(NPM_ID)
+    expect(before.title).toEqual({ en: 'Old' })
+
+    // a PATCH bumps updatedAt only, not dataUpdatedAt
+    await upstreamAdmin.patch('/api/v1/artefacts/' + encodeURIComponent(NPM_ID), { title: { en: 'New', fr: 'Nouveau' }, group: null, deprecated: true })
+    await runSync()
+    const after = await getLocal(NPM_ID)
+
+    expect(after.title).toEqual({ en: 'New', fr: 'Nouveau' })
+    expect(after.group).toBeUndefined()
+    expect(after.deprecated).toBe(true)
+    expect(after.path).toBe(before.path)
+  })
+
   test('a file artefact mirrors too, with its bytes', async () => {
     await registerMirror(readKey, [FILE_ID])
     const registry = await runSync()

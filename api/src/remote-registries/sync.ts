@@ -66,6 +66,29 @@ const syncThumbnail = async (
   await mongo.artefacts.updateOne({ _id: artefactId }, { $set: { thumbnail: remoteThumbnail } })
 }
 
+// Editable metadata is owned by the upstream (PATCH on a mirror rejects it), so
+// mirror it on every sync — an upstream PATCH only bumps updatedAt, never
+// dataUpdatedAt, and would otherwise be skipped by the download fast path.
+// Fields absent upstream are unset so a removal propagates too.
+const mirroredFields = ['title', 'description', 'group'] as const
+const syncMetadata = async (artefactId: string, remoteUrl: string, remoteArtefact: Artefact) => {
+  const $set: Record<string, unknown> = {
+    category: remoteArtefact.category,
+    deprecated: !!remoteArtefact.deprecated,
+    origin: remoteUrl
+  }
+  const $unset: Record<string, ''> = {}
+  for (const field of mirroredFields) {
+    if (remoteArtefact[field]) $set[field] = remoteArtefact[field]
+    else $unset[field] = ''
+  }
+  await mongo.artefacts.updateOne({ _id: artefactId }, { $set, ...(Object.keys($unset).length ? { $unset } : {}) })
+}
+
+// The value stored as the mirror's dataUpdatedAt. Upstream docs predating the
+// field fall back to updatedAt, so the fast-path comparison must use it too.
+const remoteDataUpdatedAt = (remoteArtefact: Artefact) => remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
+
 const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId: string) => {
   const encodedId = encodeURIComponent(artefactId)
   const remoteRes = await ax.get(`/api/v1/artefacts/${encodedId}`)
@@ -74,7 +97,8 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
   const local = await mongo.artefacts.findOne({ _id: artefactId })
 
   // Fast path: same upstream dataUpdatedAt means no new upload to mirror.
-  if (local?.path && local.dataUpdatedAt === remoteArtefact.dataUpdatedAt) {
+  if (local?.path && local.dataUpdatedAt === remoteDataUpdatedAt(remoteArtefact)) {
+    await syncMetadata(artefactId, remoteUrl, remoteArtefact)
     await syncThumbnail(ax, artefactId, remoteArtefact.thumbnail, local.thumbnail)
     return
   }
@@ -96,17 +120,11 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
         packageName: remoteArtefact.packageName,
         version: remoteArtefact.version,
         licence: remoteArtefact.licence,
-        category: remoteArtefact.category,
-        deprecated: !!remoteArtefact.deprecated,
         hasNativeModules: !!remoteArtefact.hasNativeModules,
-        ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
-        ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
-        ...(remoteArtefact.group ? { group: remoteArtefact.group } : {}),
         ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
         path: localPath,
-        origin: remoteUrl,
         updatedAt: now,
-        dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
+        dataUpdatedAt: remoteDataUpdatedAt(remoteArtefact)
       },
       $setOnInsert: {
         _id: artefactId,
@@ -119,6 +137,7 @@ const syncNpmArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId:
     },
     { upsert: true }
   )
+  await syncMetadata(artefactId, remoteUrl, remoteArtefact)
 
   if (oldPath && oldPath !== localPath) {
     await filesStorage.delete(oldPath).catch(() => {})
@@ -133,8 +152,8 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
 
   const local = await mongo.artefacts.findOne({ _id: artefactId })
 
-  // Download if remote is newer or doesn't exist locally
-  if (!local || local.updatedAt < remoteArtefact.updatedAt) {
+  // Same fast path as npm: download only when the upstream bytes changed.
+  if (!local?.path || local.dataUpdatedAt !== remoteDataUpdatedAt(remoteArtefact)) {
     const dlRes = await ax.get(`/api/v1/artefacts/${encodedId}/download`, {
       responseType: 'stream'
     })
@@ -152,13 +171,8 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
           path: localPath,
           fileName,
           ...(typeof remoteArtefact.size === 'number' ? { size: remoteArtefact.size } : {}),
-          category: remoteArtefact.category,
-          deprecated: !!remoteArtefact.deprecated,
-          ...(remoteArtefact.title ? { title: remoteArtefact.title } : {}),
-          ...(remoteArtefact.description ? { description: remoteArtefact.description } : {}),
-          origin: remoteUrl,
           updatedAt: now,
-          dataUpdatedAt: remoteArtefact.dataUpdatedAt || remoteArtefact.updatedAt
+          dataUpdatedAt: remoteDataUpdatedAt(remoteArtefact)
         },
         $setOnInsert: {
           _id: artefactId,
@@ -175,13 +189,8 @@ const syncFileArtefact = async (ax: AxiosInstance, remoteUrl: string, artefactId
     if (oldPath && oldPath !== localPath) {
       await filesStorage.delete(oldPath).catch(() => {})
     }
-  } else {
-    // Still ensure origin is set even if file unchanged
-    await mongo.artefacts.updateOne(
-      { _id: artefactId },
-      { $set: { origin: remoteUrl } }
-    )
   }
+  await syncMetadata(artefactId, remoteUrl, remoteArtefact)
   await syncThumbnail(ax, artefactId, remoteArtefact.thumbnail, local?.thumbnail)
 }
 
