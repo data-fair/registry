@@ -93,6 +93,17 @@ test.describe('API Keys', () => {
     expect(res.data.allowedCategory).toBe('tileset')
   })
 
+  test('superadmin can create an upload key restricted to the skill category', async () => {
+    const ax = await superAdmin
+    const res = await ax.post('/api/v1/api-keys', {
+      type: 'upload',
+      name: 'skill-only',
+      allowedCategory: 'skill'
+    })
+    expect(res.status).toBe(201)
+    expect(res.data.allowedCategory).toBe('skill')
+  })
+
   test('rejects invalid allowedCategory', async () => {
     const ax = await superAdmin
     try {
