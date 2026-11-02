@@ -38,7 +38,7 @@ const omitScan = <T extends { scan?: unknown }>(artefact: T): T => {
 const stripScan = <T extends { scan?: unknown }>(artefact: T, caller: Caller): T =>
   caller.admin ? artefact : omitScan(artefact)
 
-const npmCategories = ['processing', 'catalog', 'application', 'other'] as const
+const npmCategories = ['processing', 'catalog', 'application', 'skill', 'other'] as const
 const fileCategories = ['tileset', 'maplibre-style', 'other'] as const
 const allCategories = [...new Set<string>([...npmCategories, ...fileCategories])]
 

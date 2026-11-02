@@ -159,7 +159,7 @@ jobs:
             -F "file=@with-deps.tgz"
 ```
 
-> **Category & error handling.** The `category` form field tags the artefact's kind (`processing`, `catalog`, `application`, `other`). Send it explicitly so the artefact is filed correctly — even when `package.json` carries no `registry.category` — and so the upload satisfies any `allowedCategory` restriction on the key. For npm uploads the registry resolves the category as `category` form field → `package.json#registry.category` → `other`. The upload uses `curl --fail-with-body` (curl ≥ 7.76) instead of `curl -f`: the registry's response body is always printed — including its error message when an upload is rejected — and the step still fails on an HTTP error.
+> **Category & error handling.** The `category` form field tags the artefact's kind (`processing`, `catalog`, `application`, `skill`, `other`). Send it explicitly so the artefact is filed correctly — even when `package.json` carries no `registry.category` — and so the upload satisfies any `allowedCategory` restriction on the key. For npm uploads the registry resolves the category as `category` form field → `package.json#registry.category` → `other`. The upload uses `curl --fail-with-body` (curl ≥ 7.76) instead of `curl -f`: the registry's response body is always printed — including its error message when an upload is rejected — and the step still fails on an HTTP error.
 
 Then cut a release the usual way:
 
