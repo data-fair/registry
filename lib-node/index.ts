@@ -1,7 +1,7 @@
 import { createGunzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 import { createWriteStream, existsSync, type WriteStream } from 'node:fs'
-import { mkdir, readFile, writeFile, rm, rename, stat, utimes, readdir, access } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, rm, rename, stat, utimes, readdir } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -109,32 +109,6 @@ const pruneOldVersionDirs = async (artefactDir: string): Promise<void> => {
 // sharing a cache dir) must never write to the same temporary path.
 const tmpSuffix = (): string => `.tmp.${randomUUID()}`
 
-// Written in an extraction dir right before its atomic rename: a dir without it
-// was left partial by lib-node-registry <= 0.7.2 and must be downloaded again.
-const completeMarker = '.registry-complete'
-const isComplete = (dir: string): Promise<boolean> => access(join(dir, completeMarker)).then(() => true, () => false)
-
-// Move a complete extraction to its final dir.
-const install = async (tmpDir: string, extractDir: string): Promise<void> => {
-  try {
-    await rename(tmpDir, extractDir)
-    return
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code
-    if (code !== 'ENOTEMPTY' && code !== 'EEXIST') throw err
-  }
-  if (await isComplete(extractDir)) {
-    // another call (other account or process) installed this same version first:
-    // keep its copy, a caller may already be loading it
-    await rm(tmpDir, { recursive: true, force: true })
-    return
-  }
-  const stale = extractDir + tmpSuffix()
-  await rename(extractDir, stale)
-  await rename(tmpDir, extractDir)
-  await rm(stale, { recursive: true, force: true })
-}
-
 // In-flight calls by request identity, so concurrent calls on a cold cache share
 // one download. The account is part of the key: each account still gets its own access check.
 const inFlight = new Map<string, Promise<EnsureArtefactResult>>()
@@ -167,8 +141,7 @@ async function downloadArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefa
   try {
     const raw = await readFile(pointerPath, 'utf-8')
     const parsed = JSON.parse(raw) as Partial<CachePointer>
-    if (parsed.dataUpdatedAt && parsed.version !== undefined && parsed.dir &&
-      await isComplete(join(artefactDir, parsed.dir))) {
+    if (parsed.dataUpdatedAt && parsed.version !== undefined && parsed.dir) {
       pointer = parsed as CachePointer
     }
   } catch {
@@ -219,8 +192,14 @@ async function downloadArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefa
     if (opts.build && hasNativeModules) {
       await rebuildNativeModules(tmpDir)
     }
-    await writeFile(join(tmpDir, completeMarker), '')
-    await install(tmpDir, extractDir)
+    try {
+      await rename(tmpDir, extractDir)
+    } catch (err) {
+      // another call (other account or process) installed this same version first:
+      // keep its copy, a caller may already be loading it
+      if (!['ENOTEMPTY', 'EEXIST'].includes((err as NodeJS.ErrnoException).code ?? '')) throw err
+      await rm(tmpDir, { recursive: true, force: true })
+    }
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true })
     throw err

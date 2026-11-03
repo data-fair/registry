@@ -239,7 +239,7 @@ const manyFiles = (n: number) => Array.from({ length: n }, (_, i) => ({
   content: 'x'.repeat(200)
 }))
 
-// files of the tarball, without the cache's own dotfiles
+// files of the tarball, without the dotfiles the tests add
 const countFiles = async (dir: string) =>
   (await readdir(dir, { withFileTypes: true, recursive: true })).filter(e => e.isFile() && !e.name.startsWith('.')).length
 
@@ -304,29 +304,6 @@ test.describe('lib-node concurrent and failing extractions', () => {
       expect(await countFiles(r1.path)).toBe(201)
       expect(JSON.parse(await readFile(join(r1.path, 'package.json'), 'utf-8')).name).toBe('@test/pkg')
       expect(await tmpLeftovers(join(cacheDir, artefactId))).toEqual([])
-    } finally {
-      await registry.close()
-    }
-  })
-
-  test('a partial extraction left by an older release is downloaded again', async () => {
-    const registry = await startFakeRegistry(await stateWith(manyFiles(200)))
-    try {
-      // what lib-node-registry <= 0.7.2 could leave behind: a pointer on a dir missing most of its files
-      const artefactDir = join(cacheDir, artefactId)
-      const relDir = join(`1.0.0+${Math.floor(lastModified.getTime() / 1000)}`, 'js')
-      await mkdir(join(artefactDir, relDir, 'lib'), { recursive: true })
-      await writeFile(join(artefactDir, relDir, 'lib', 'f0.d.ts.map'), 'x')
-      await writeFile(join(artefactDir, '.pointer-js.json'), JSON.stringify({ dataUpdatedAt: lastModified.toISOString(), version: '1.0.0', dir: relDir }))
-
-      const opts = { registryUrl: registry.url, secretKey, artefactId, cacheDir }
-      const r1 = await ensureArtefact(opts)
-      expect(r1.downloaded).toBe(true)
-      expect(r1.path).toBe(join(artefactDir, relDir))
-      expect(await countFiles(r1.path)).toBe(201)
-      expect(await tmpLeftovers(artefactDir)).toEqual([])
-      // complete now: the next call is a conditional hit
-      expect((await ensureArtefact(opts)).downloaded).toBe(false)
     } finally {
       await registry.close()
     }
