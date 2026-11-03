@@ -458,7 +458,8 @@ test.describe('Remote registries', () => {
       for (let i = 0; i < 50; i++) {
         const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent(url))
         doc = res.data
-        if (doc.lastSyncStatus) break
+        // lastSyncStatus is written before the lock is released (syncState reads the lock)
+        if (doc.lastSyncStatus && doc.syncState !== 'running') break
         await new Promise(resolve => setTimeout(resolve, 100))
       }
 
