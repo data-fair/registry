@@ -1,9 +1,10 @@
 import { createGunzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
-import { createWriteStream, existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile, rm, rename, stat, utimes, readdir } from 'node:fs/promises'
+import { createWriteStream, existsSync, type WriteStream } from 'node:fs'
+import { mkdir, readFile, writeFile, rm, rename, stat, utimes, readdir, access } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
@@ -104,7 +105,51 @@ const pruneOldVersionDirs = async (artefactDir: string): Promise<void> => {
   }
 }
 
+// Unique per call, not per process: concurrent calls of one process (and processes
+// sharing a cache dir) must never write to the same temporary path.
+const tmpSuffix = (): string => `.tmp.${randomUUID()}`
+
+// Written in an extraction dir right before its atomic rename: a dir without it
+// was left partial by lib-node-registry <= 0.7.2 and must be downloaded again.
+const completeMarker = '.registry-complete'
+const isComplete = (dir: string): Promise<boolean> => access(join(dir, completeMarker)).then(() => true, () => false)
+
+// Move a complete extraction to its final dir.
+const install = async (tmpDir: string, extractDir: string): Promise<void> => {
+  try {
+    await rename(tmpDir, extractDir)
+    return
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code !== 'ENOTEMPTY' && code !== 'EEXIST') throw err
+  }
+  if (await isComplete(extractDir)) {
+    // another call (other account or process) installed this same version first:
+    // keep its copy, a caller may already be loading it
+    await rm(tmpDir, { recursive: true, force: true })
+    return
+  }
+  const stale = extractDir + tmpSuffix()
+  await rename(extractDir, stale)
+  await rename(tmpDir, extractDir)
+  await rm(stale, { recursive: true, force: true })
+}
+
+// In-flight calls by request identity, so concurrent calls on a cold cache share
+// one download. The account is part of the key: each account still gets its own access check.
+const inFlight = new Map<string, Promise<EnsureArtefactResult>>()
+
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
+  const key = JSON.stringify([opts.registryUrl, opts.secretKey, opts.account ?? null, opts.cacheDir, opts.artefactId, !!opts.build])
+  let pending = inFlight.get(key)
+  if (!pending) {
+    pending = downloadArtefact(opts).finally(() => inFlight.delete(key))
+    inFlight.set(key, pending)
+  }
+  return pending
+}
+
+async function downloadArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
   const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
   if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
   // the registry is a service of our own infrastructure (configuration, not user input)
@@ -122,7 +167,8 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   try {
     const raw = await readFile(pointerPath, 'utf-8')
     const parsed = JSON.parse(raw) as Partial<CachePointer>
-    if (parsed.dataUpdatedAt && parsed.version !== undefined && parsed.dir) {
+    if (parsed.dataUpdatedAt && parsed.version !== undefined && parsed.dir &&
+      await isComplete(join(artefactDir, parsed.dir))) {
       pointer = parsed as CachePointer
     }
   } catch {
@@ -166,24 +212,23 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   const relDir = join(`${version || '0.0.0'}+${discriminator(dataUpdatedAt)}`, buildTuple)
   const extractDir = join(artefactDir, relDir)
 
-  const tmpDir = `${extractDir}.tmp.${process.pid}`
-  await rm(tmpDir, { recursive: true, force: true })
+  const tmpDir = extractDir + tmpSuffix()
   await mkdir(tmpDir, { recursive: true })
   try {
     await extractTarball(res.data as Readable, tmpDir)
     if (opts.build && hasNativeModules) {
       await rebuildNativeModules(tmpDir)
     }
+    await writeFile(join(tmpDir, completeMarker), '')
+    await install(tmpDir, extractDir)
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true })
     throw err
   }
-  await rm(extractDir, { recursive: true, force: true })
-  await rename(tmpDir, extractDir)
 
   // Atomically repoint the stable pointer at the new dir, then prune the dirs
   // no pointer references anymore.
-  const tmpPointer = `${pointerPath}.tmp.${process.pid}`
+  const tmpPointer = pointerPath + tmpSuffix()
   await writeFile(tmpPointer, JSON.stringify({ dataUpdatedAt, version, dir: relDir } satisfies CachePointer))
   await rename(tmpPointer, pointerPath)
   await pruneOldVersionDirs(artefactDir)
@@ -236,8 +281,7 @@ export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise
   }
 
   await mkdir(dirname(destPath), { recursive: true })
-  const tmpPath = `${destPath}.tmp.${process.pid}`
-  await rm(tmpPath, { force: true })
+  const tmpPath = destPath + tmpSuffix()
   try {
     await pipeline(res.data as Readable, createWriteStream(tmpPath))
   } catch (err) {
@@ -301,34 +345,72 @@ const rebuildNativeModules = (dir: string): Promise<void> => new Promise((resolv
 export async function extractTarball (stream: Readable, destDir: string): Promise<void> {
   const extract = tar.extract()
 
-  const entries: Promise<void>[] = []
+  // Every write gets its handler as soon as it starts: a failure must reject this
+  // call, not surface as an unhandled rejection that kills the process.
+  const writes: Promise<void>[] = []
+  const openFiles = new Set<WriteStream>()
+  let failed = false
+  let failure: unknown
+  // the first error is the root cause, the next ones come from tearing the extraction down
+  const fail = (err: unknown) => {
+    if (failed) return
+    failed = true
+    failure = err
+    extract.destroy(err as Error)
+    for (const ws of openFiles) ws.destroy()
+  }
+  const track = (write: Promise<void>) => {
+    write.catch(fail)
+    writes.push(write)
+  }
+
+  const writeEntry = async (fullPath: string, entryStream: Readable) => {
+    await mkdir(dirname(fullPath), { recursive: true })
+    if (failed) return
+    await new Promise<void>((resolve, reject) => {
+      const ws = createWriteStream(fullPath)
+      openFiles.add(ws)
+      ws.on('error', reject)
+      ws.on('close', () => {
+        openFiles.delete(ws)
+        resolve()
+      })
+      entryStream.pipe(ws)
+    })
+  }
 
   extract.on('entry', (header, entryStream, next) => {
-    // npm tarballs prefix entries with "package/"
-    const entryPath = header.name.replace(/^package\//, '')
-
+    // a failure also destroys the current entry, its error is reported below
+    entryStream.on('error', () => {})
+    entryStream.on('end', next)
+    if (header.type !== 'directory' && header.type !== 'file') {
+      entryStream.resume()
+      return
+    }
+    let fullPath: string
+    try {
+      // npm tarballs prefix entries with "package/"
+      fullPath = resolvePath(destDir, header.name.replace(/^package\//, ''))
+    } catch (err) {
+      // not resolvePath's 403, consumers would report it as a refused access
+      fail(new Error(`invalid path in tarball: ${header.name}`, { cause: err }))
+      return
+    }
     if (header.type === 'directory') {
-      entries.push(mkdir(resolvePath(destDir, entryPath), { recursive: true }).then(() => {}))
+      track(mkdir(fullPath, { recursive: true }).then(() => {}))
       entryStream.resume()
-      entryStream.on('end', next)
-    } else if (header.type === 'file') {
-      const fullPath = resolvePath(destDir, entryPath)
-      const p = mkdir(dirname(fullPath), { recursive: true }).then(() => {
-        return new Promise<void>((resolve, reject) => {
-          const ws = createWriteStream(fullPath)
-          entryStream.pipe(ws)
-          ws.on('finish', resolve)
-          ws.on('error', reject)
-        })
-      })
-      entries.push(p)
-      entryStream.on('end', next)
     } else {
-      entryStream.resume()
-      entryStream.on('end', next)
+      track(writeEntry(fullPath, entryStream))
     }
   })
 
-  await pipeline(stream, createGunzip(), extract)
-  await Promise.all(entries)
+  try {
+    await pipeline(stream, createGunzip(), extract)
+  } catch (err) {
+    fail(err)
+  }
+  // Wait for every write to settle, so that nothing touches destDir any more once
+  // this returns and the caller can remove it.
+  await Promise.allSettled(writes)
+  if (failed) throw failure
 }
