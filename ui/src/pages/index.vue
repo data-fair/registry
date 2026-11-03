@@ -384,7 +384,7 @@ en:
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiMagnify, mdiArrowUp, mdiArrowDown, mdiPencil, mdiDelete, mdiEye, mdiEyeOff, mdiAlertCircle } from '@mdi/js'
-import { VDateInput } from 'vuetify/labs/VDateInput'
+import { VDateInput } from 'vuetify/components/VDateInput'
 // Explicit import (rather than the src/utils auto-import) so the helpers resolve
 // reliably even before the dev server's auto-import scan picks up severity.ts.
 import { severityColor, worstSeverity } from '~/utils/severity'

@@ -178,7 +178,8 @@ router.get('/:id/remote-thumbnails/:thumbnailId/data', async (req, res, next) =>
     res.set('Content-Type', contentType)
     res.set('X-Content-Type-Options', 'nosniff')
     res.set('Content-Security-Policy', "default-src 'none'; sandbox")
-    if (remote.headers['content-length']) res.set('Content-Length', remote.headers['content-length'])
+    const contentLength = remote.headers['content-length']
+    if (contentLength) res.set('Content-Length', String(contentLength))
     // Upstream ids change on every replace, so the bytes behind one id never do.
     res.set('Cache-Control', 'private, max-age=31536000, immutable')
     await pipeline(remote.data, res)

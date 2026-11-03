@@ -22,8 +22,7 @@
   },
   "dependencies": {
     "@types/resolve-path": "^1.4.3",
-    "@types/tar-stream": "^3.1.4",
     "resolve-path": "^1.4.0",
-    "tar-stream": "^3.1.0"
+    "tar-stream": "^3.2.2"
   }
 }
