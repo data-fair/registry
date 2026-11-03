@@ -13,7 +13,14 @@ import { commonjsDeps } from '@koumoul/vjsf/utils/build.js'
 import dotenv from 'dotenv'
 dotenv.config({ path: import.meta.resolve('../.env').replace('file://', '') })
 
-export default defineConfig({
+// the ports drawn in .env for this checkout (dev/dev.json "ports")
+const envPort = (name: string) => {
+  const port = Number(process.env[name])
+  if (!Number.isInteger(port) || port <= 0) throw new Error(`missing ${name} env variable, run "npx --no df-dev setup" to create the .env file`)
+  return port
+}
+
+export default defineConfig(({ command, isPreview }) => ({
   base: '/registry',
   optimizeDeps: {
     noDiscovery: true,
@@ -63,10 +70,10 @@ export default defineConfig({
       }
     }
   ],
-  server: {
-    port: parseInt(process.env.DEV_UI_PORT!),
-    hmr: { port: parseInt(process.env.DEV_UI_HMR_PORT!) }
-  },
+  // `vite preview` also runs as `serve` and must not require the dev ports
+  server: command === 'serve' && !isPreview
+    ? { port: envPort('DEV_UI_PORT'), strictPort: true, hmr: { port: envPort('DEV_UI_HMR_PORT') } }
+    : undefined,
   build: {
     outDir: 'dist',
     rolldownOptions: {
@@ -75,4 +82,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

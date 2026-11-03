@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: 'list',
 
   use: {
-    baseURL: 'http://localhost:' + process.env.NGINX_PORT,
+    baseURL: `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}`,
     trace: 'on-first-retry',
   },
 
@@ -18,11 +18,6 @@ export default defineConfig({
     {
       name: 'state-setup',
       testMatch: /state-setup\.ts/,
-      teardown: 'state-teardown'
-    },
-    {
-      name: 'state-teardown',
-      testMatch: /state-teardown\.ts/,
     },
     {
       name: 'unit',

@@ -23,37 +23,58 @@ jobs:
       run: npm run lint && npm run build-types && npm run check-types
 
     - name: Init env
-      run: bash dev/init-env.sh
+      run: ./node_modules/.bin/df-dev init-env
 
     - name: Build UI
       run: NODE_CONFIG_DIR=$PWD/api/config/ npm -w ui run build
 
+    # every profile: CI tests every integration
     - name: Start dev dependencies
-      run: docker compose up -d --wait
+      run: docker compose --profile '*' up -d --wait
 
+    # the pane commands of .zellij.kdl, each writing dev/logs/<pane>.log (uploaded on failure)
     - name: Start dev API
       run: |
         set -a && . ./.env && set +a
-        NODE_ENV=development NODE_CONFIG_DIR=$PWD/api/config/ node api/index.ts &
+        mkdir -p dev/logs
+        export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config)
+        cd api && NODE_ENV=development node index.ts > ../dev/logs/api.log 2>&1 &
 
     # Sync mirrors artefacts *from* an upstream registry, so exercising it needs a
     # second one. Same code, different port / database / data dir.
     - name: Start upstream registry API
       run: |
         set -a && . ./.env && set +a
-        NODE_ENV=development NODE_CONFIG_DIR=$PWD/api/config/ \
+        export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config)
+        cd api && NODE_ENV=development \
           PORT=$DEV_UPSTREAM_API_PORT \
           MONGO_URL=mongodb://localhost:$MONGO_PORT/data-fair-registry-upstream \
           DATA_DIR=./data-upstream \
-          node api/index.ts &
+          node index.ts > ../dev/logs/api-upstream.log 2>&1 &
 
     - name: Wait for both APIs
       run: |
         set -a && . ./.env && set +a
-        for p in $DEV_API_PORT $DEV_UPSTREAM_API_PORT; do
-          timeout 60 bash -c "until curl -sf http://localhost:$p/api/ping >/dev/null; do sleep 1; done"
-          echo "api on :$p is up"
+        for p in api:$DEV_API_PORT api-upstream:$DEV_UPSTREAM_API_PORT; do
+          if ! timeout 60 bash -c "until curl -sf http://localhost:${p#*:}/api/ping >/dev/null; do sleep 1; done"; then
+            tail -n 100 dev/logs/${p%%:*}.log
+            exit 1
+          fi
+          echo "${p%%:*} on :${p#*:} is up"
         done
 
     - name: Run tests
       run: npm run test-unit && npm run test-api
+
+    - name: Containers logs
+      if: failure()
+      run: docker compose --profile '*' logs
+
+    - name: Upload test results and process logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          test-results/
+          dev/logs/

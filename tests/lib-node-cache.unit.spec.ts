@@ -54,7 +54,7 @@ const startFakeRegistry = async (state: FakeState) => {
 test.describe('lib-node version-keyed extraction', () => {
   let cacheDir: string
   const artefactId = '@test/pkg@1'
-  const secretKey = 'secret-internal'
+  const secretKey = 'secret-registry-internal'
 
   test.beforeEach(async () => {
     cacheDir = join(tmpdir(), `registry-cache-unit-${process.pid}-${Math.floor(performance.now())}`)

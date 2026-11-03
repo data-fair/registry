@@ -1,32 +1,26 @@
+// Dev environment of registry, see @data-fair/lib-dev. Agents: npx --no df-dev status | logs <pane> | restart <pane>
 layout {
-    pane {
-      split_direction "vertical"
-      pane name="registry" borderless=true {
-        command "bash"
-        args "-ic" "nvm use > /dev/null 2>&1 && bash"
-      }
-      pane name="deps" {
-        command "bash"
-        args "-ic" "npm run dev-deps"
-      }
+  pane split_direction="vertical" {
+    pane name="registry" borderless=true
+    pane name="status" command="./node_modules/.bin/df-status" {
+      args "--start-deps"
     }
-    pane {
-      split_direction "vertical"
-      pane name="ui" {
-        command "bash"
-        args "-ic" "nvm use > /dev/null 2>&1 && npm -w ui run dev"
-      }
-      pane name="api" {
-        command "bash"
-        args "-ic" "nvm use > /dev/null 2>&1 && npm -w api run dev"
-      }
-      pane name="api-upstream" {
-        command "bash"
-        args "-ic" "nvm use > /dev/null 2>&1 && npm run dev-api-upstream"
-      }
+  }
+  pane split_direction="vertical" {
+    pane name="ui" command="bash" {
+      args "-c" "cd ui && FORCE_COLOR=1 NODE_CONFIG_DIR=../api/config/ exec ../node_modules/.bin/df-mem-cap ../node_modules/.bin/vite --port $DEV_UI_PORT"
     }
-    pane size=2 borderless=true {
-        command "bash"
-        args "-ic" "echo -n -e \"Dev server available at \\e[1;96mhttp://localhost:$NGINX_PORT\\033[0m\""
+    pane name="api" command="bash" {
+      // optional containers that do not run at start are unplugged from the config (dev/dev.json "optional")
+      args "-c" "./node_modules/.bin/df-dev wait-deps && export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config) && cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn exec ../node_modules/.bin/nodemon -e js,ts,json index.ts"
     }
+    // a second registry, the upstream of the federation mirror (AGENTS.md "Exercising federation sync"):
+    // same code, its own port, database and data dir (env variables win over NODE_CONFIG)
+    pane name="api-upstream" command="bash" {
+      args "-c" "./node_modules/.bin/df-dev wait-deps && export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config) && cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn PORT=$DEV_UPSTREAM_API_PORT MONGO_URL=mongodb://localhost:$MONGO_PORT/data-fair-registry-upstream DATA_DIR=./data-upstream exec ../node_modules/.bin/nodemon -e js,ts,json index.ts"
+    }
+  }
+  pane name="url" size=1 borderless=true command="bash" {
+    args "-c" "echo -n -e \"Dev server available at \\e[1;96mhttp://$DEV_HOST:$NGINX_PORT/registry/\\e[0m\"; exec sleep infinity"
+  }
 }

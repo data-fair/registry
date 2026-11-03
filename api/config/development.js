@@ -1,11 +1,12 @@
 import dotenv from 'dotenv'
 dotenv.config({ path: import.meta.resolve('../../.env').replace('file://', '') })
 
-if (!process.env.DEV_API_PORT) throw new Error('missing DEV_API_PORT env variable, use "source dev/init-env.sh" to init .env file')
+if (!process.env.DEV_API_PORT) throw new Error('missing DEV_API_PORT env variable, run "npx --no df-dev setup" to create the .env file')
 
 export default {
   port: process.env.DEV_API_PORT,
   privateDirectoryUrl: `http://localhost:${process.env.SD_PORT}`,
+  // unset by the api panes while the optional events container does not run (dev/dev.json "optional")
   privateEventsUrl: `http://localhost:${process.env.EVENTS_PORT}`,
   mongoUrl: `mongodb://localhost:${process.env.MONGO_PORT}/data-fair-registry-development`,
   dataDir: './data',
@@ -21,11 +22,12 @@ export default {
   observer: {
     active: false
   },
+  // the shared dev secrets of the data-fair services (data-fair-service skill, references/docker-compose.md)
   secretKeys: {
     events: 'secret-events',
-    internalServices: 'secret-internal',
-    apiKeysSalt: 'dev-api-keys-salt-minimum-32-chars!',
-    cipherPassword: 'dev-cipher-password-minimum-32-ch!'
+    internalServices: 'secret-registry-internal',
+    apiKeysSalt: 'dev-api-keys-salt-0123456789abcdef01',
+    cipherPassword: 'dev-cipher-password-0123456789abcdef'
   },
   upgradeRoot: '../'
 }

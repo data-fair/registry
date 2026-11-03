@@ -1,8 +1,10 @@
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import { axiosAuth as _axiosAuth } from '@data-fair/lib-node/axios-auth.js'
 
-export const directoryUrl = `http://localhost:${process.env.NGINX_PORT}/simple-directory`
-export const baseURL = `http://localhost:${process.env.DEV_API_PORT}`
+export const directoryUrl = `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/simple-directory`
+// the session cookies of simple-directory are set on DEV_HOST: authenticated calls reach the API on that
+// host too (cookies ignore the port), not on localhost
+export const baseURL = `http://${process.env.DEV_HOST}:${process.env.DEV_API_PORT}`
 
 const axiosOpts = { baseURL }
 
@@ -75,17 +77,20 @@ export const waitSyncIdle = async (registryId: string) => {
 const upstreamPort = (): string => {
   const port = process.env.DEV_UPSTREAM_API_PORT
   if (!port) {
-    throw new Error('DEV_UPSTREAM_API_PORT is not set — append it to .env (DEV_API_PORT + 5), do not re-run dev/init-env.sh')
+    throw new Error('DEV_UPSTREAM_API_PORT is not set — run "npx --no df-dev init-env --force" to draw the ports again (dev/dev.json "ports")')
   }
   return port
 }
 
+// the upstream's id as a remote registry: the downstream API calls it server to server
 export const upstreamBaseURL = () => `http://localhost:${upstreamPort()}`
+// session calls go to DEV_HOST, where the session cookies are set (see baseURL)
+const upstreamSessionURL = () => `http://${process.env.DEV_HOST}:${upstreamPort()}`
 
-export const upstreamSuperAdmin = () => axiosAuth('superadmin', { adminMode: true, baseURL: upstreamBaseURL() })
+export const upstreamSuperAdmin = () => axiosAuth('superadmin', { adminMode: true, baseURL: upstreamSessionURL() })
 
 export const upstreamAxiosAuth = (user: string, opts?: { org?: string }) =>
-  axiosAuth(user, { ...opts, baseURL: upstreamBaseURL() })
+  axiosAuth(user, { ...opts, baseURL: upstreamSessionURL() })
 
 export const upstreamAxiosWithApiKey = (key: string) =>
   axiosBuilder({ baseURL: upstreamBaseURL(), headers: { 'x-api-key': key } })
