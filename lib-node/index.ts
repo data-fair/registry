@@ -1,9 +1,10 @@
 import { createGunzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
-import { createWriteStream, existsSync } from 'node:fs'
+import { createWriteStream, existsSync, type WriteStream } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, rename, stat, utimes, readdir } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import * as tar from 'tar-stream'
 import resolvePath from 'resolve-path'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
@@ -104,7 +105,20 @@ const pruneOldVersionDirs = async (artefactDir: string): Promise<void> => {
   }
 }
 
+// identical concurrent calls share one download (the account is part of the key)
+const inFlight = new Map<string, Promise<EnsureArtefactResult>>()
+
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
+  const key = JSON.stringify([opts.registryUrl, opts.secretKey, opts.account ?? null, opts.cacheDir, opts.artefactId, !!opts.build])
+  let pending = inFlight.get(key)
+  if (!pending) {
+    pending = downloadArtefact(opts).finally(() => inFlight.delete(key))
+    inFlight.set(key, pending)
+  }
+  return pending
+}
+
+async function downloadArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
   const headers: Record<string, string> = { 'x-secret-key': opts.secretKey }
   if (opts.account) headers['x-account'] = JSON.stringify(opts.account)
   // the registry is a service of our own infrastructure (configuration, not user input)
@@ -166,24 +180,28 @@ export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureA
   const relDir = join(`${version || '0.0.0'}+${discriminator(dataUpdatedAt)}`, buildTuple)
   const extractDir = join(artefactDir, relDir)
 
-  const tmpDir = `${extractDir}.tmp.${process.pid}`
-  await rm(tmpDir, { recursive: true, force: true })
+  const tmpDir = `${extractDir}.tmp.${randomUUID()}`
   await mkdir(tmpDir, { recursive: true })
   try {
     await extractTarball(res.data as Readable, tmpDir)
     if (opts.build && hasNativeModules) {
       await rebuildNativeModules(tmpDir)
     }
+    try {
+      await rename(tmpDir, extractDir)
+    } catch (err) {
+      // another call installed this version first: keep its copy, it may be in use
+      if (!['ENOTEMPTY', 'EEXIST'].includes((err as NodeJS.ErrnoException).code ?? '')) throw err
+      await rm(tmpDir, { recursive: true, force: true })
+    }
   } catch (err) {
     await rm(tmpDir, { recursive: true, force: true })
     throw err
   }
-  await rm(extractDir, { recursive: true, force: true })
-  await rename(tmpDir, extractDir)
 
   // Atomically repoint the stable pointer at the new dir, then prune the dirs
   // no pointer references anymore.
-  const tmpPointer = `${pointerPath}.tmp.${process.pid}`
+  const tmpPointer = `${pointerPath}.tmp.${randomUUID()}`
   await writeFile(tmpPointer, JSON.stringify({ dataUpdatedAt, version, dir: relDir } satisfies CachePointer))
   await rename(tmpPointer, pointerPath)
   await pruneOldVersionDirs(artefactDir)
@@ -236,8 +254,7 @@ export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise
   }
 
   await mkdir(dirname(destPath), { recursive: true })
-  const tmpPath = `${destPath}.tmp.${process.pid}`
-  await rm(tmpPath, { force: true })
+  const tmpPath = `${destPath}.tmp.${randomUUID()}`
   try {
     await pipeline(res.data as Readable, createWriteStream(tmpPath))
   } catch (err) {
@@ -301,34 +318,68 @@ const rebuildNativeModules = (dir: string): Promise<void> => new Promise((resolv
 export async function extractTarball (stream: Readable, destDir: string): Promise<void> {
   const extract = tar.extract()
 
-  const entries: Promise<void>[] = []
+  const writes: Promise<void>[] = []
+  const openFiles = new Set<WriteStream>()
+  // the first error is the root cause, the next ones come from the teardown
+  let failure: Error | undefined
+  const fail = (err: unknown) => {
+    if (failure) return
+    failure = err as Error
+    extract.destroy(failure)
+    for (const ws of openFiles) ws.destroy()
+  }
+  // handled right away: a failed write must reject this call, not crash the process
+  const track = (write: Promise<void>) => {
+    write.catch(fail)
+    writes.push(write)
+  }
+
+  const writeEntry = async (fullPath: string, entryStream: Readable) => {
+    await mkdir(dirname(fullPath), { recursive: true })
+    if (failure) return
+    await new Promise<void>((resolve, reject) => {
+      const ws = createWriteStream(fullPath)
+      openFiles.add(ws)
+      ws.on('error', reject)
+      ws.on('close', () => {
+        openFiles.delete(ws)
+        resolve()
+      })
+      entryStream.pipe(ws)
+    })
+  }
 
   extract.on('entry', (header, entryStream, next) => {
-    // npm tarballs prefix entries with "package/"
-    const entryPath = header.name.replace(/^package\//, '')
-
+    // destroyed with the extractor on failure, the error is reported below
+    entryStream.on('error', () => {})
+    entryStream.on('end', next)
+    if (header.type !== 'directory' && header.type !== 'file') {
+      entryStream.resume()
+      return
+    }
+    let fullPath: string
+    try {
+      // npm tarballs prefix entries with "package/"
+      fullPath = resolvePath(destDir, header.name.replace(/^package\//, ''))
+    } catch (err) {
+      // not resolvePath's 403, consumers would report it as a refused access
+      fail(new Error(`invalid path in tarball: ${header.name}`, { cause: err }))
+      return
+    }
     if (header.type === 'directory') {
-      entries.push(mkdir(resolvePath(destDir, entryPath), { recursive: true }).then(() => {}))
+      track(mkdir(fullPath, { recursive: true }).then(() => {}))
       entryStream.resume()
-      entryStream.on('end', next)
-    } else if (header.type === 'file') {
-      const fullPath = resolvePath(destDir, entryPath)
-      const p = mkdir(dirname(fullPath), { recursive: true }).then(() => {
-        return new Promise<void>((resolve, reject) => {
-          const ws = createWriteStream(fullPath)
-          entryStream.pipe(ws)
-          ws.on('finish', resolve)
-          ws.on('error', reject)
-        })
-      })
-      entries.push(p)
-      entryStream.on('end', next)
     } else {
-      entryStream.resume()
-      entryStream.on('end', next)
+      track(writeEntry(fullPath, entryStream))
     }
   })
 
-  await pipeline(stream, createGunzip(), extract)
-  await Promise.all(entries)
+  try {
+    await pipeline(stream, createGunzip(), extract)
+  } catch (err) {
+    fail(err)
+  }
+  // nothing writes into destDir any more once this returns, the caller may remove it
+  await Promise.allSettled(writes)
+  if (failure) throw failure
 }
