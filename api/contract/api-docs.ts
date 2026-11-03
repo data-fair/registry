@@ -60,7 +60,7 @@ export const searchArtefacts: AgentOperation = {
     format: { description: 'npm for packages, file for raw files.' },
     // the admin-only keys are ignored for the accounts agents act for
     sort: { enum: withDesc(sortKeys.filter(key => key !== 'public' && key !== 'vulnerabilities')), description: 'Sort key, prefixed with - for a descending order. Defaults to the most recently updated first.' },
-    size: { default: 20, maximum: 100, description: 'Maximum number of artefacts. The response count says how many match in total.' }
+    size: { default: 10, maximum: 100, description: 'Maximum number of artefacts. The response count says how many match in total.' }
   },
   response: {
     rows: '/results',

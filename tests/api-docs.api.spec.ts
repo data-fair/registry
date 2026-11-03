@@ -29,6 +29,18 @@ test.describe('api docs', () => {
     expect(snapshot).toEqual(JSON.parse(readFileSync(goldenPath, 'utf8')))
   })
 
+  test('agent parameter defaults are the API defaults', async () => {
+    // openapi-mcp only shows a default to the agent, it never sends it: a default the API does not
+    // apply misleads an agent paging with skip
+    const doc: any = apiDocs()
+    const toolSet = await load(doc, { baseUrl: 'http://localhost/registry/api/v1', lint: 'error' })
+    const search = toolSet.tools.find(t => t.name === 'search_artefacts')!
+    for (const param of doc.paths['/artefacts'].get.parameters) {
+      const agentDefault = (search.inputSchema as any).properties[param.name]?.default
+      if (agentDefault !== undefined) expect(agentDefault, param.name).toBe(param.schema.default)
+    }
+  })
+
   test('every oauth2 requirement uses a declared scope and only shared or registry schemes', () => {
     const doc: any = apiDocs()
     const schemes = doc.components.securitySchemes
