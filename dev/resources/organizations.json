@@ -36,6 +36,10 @@
       {
         "id": "test1-user1",
         "role": "user1"
+      },
+      {
+        "id": "test1_scope_nhi",
+        "role": "admin"
       }
     ]
   }

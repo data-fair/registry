@@ -20,6 +20,7 @@ import * as patchReqBody from '#doc/artefacts/patch-req/index.ts'
 import { artefactThumbnailRouter } from '../thumbnails/router.ts'
 import scanRouter from '../scanning/router.ts'
 import type { Caller } from '../access.ts'
+import { requireOperationScope } from '../scopes.ts'
 
 const router = Router()
 export default router
@@ -127,7 +128,7 @@ const parseSort = (raw: unknown, caller: Caller): Record<string, 1 | -1> => {
 }
 
 // List artefacts (filtered by access)
-router.get('/', async (req, res, next) => {
+router.get('/', requireOperationScope('listArtefacts'), async (req, res, next) => {
   try {
     const caller = await resolveCaller(req)
     const filter = artefactAccessFilter(caller)
@@ -192,7 +193,7 @@ router.get('/scan-summary', async (req, res, next) => {
 
 // Get artefact detail
 // All formats carry their tarball references directly on the doc.
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', requireOperationScope('getArtefact'), async (req, res, next) => {
   try {
     const caller = await resolveCaller(req)
     const artefact = await getArtefact(req.params.id, artefactAccessFilter(caller))
@@ -371,7 +372,7 @@ router.post('/npm/:id', async (req, res, next) => {
 // For npm artefacts the response also carries X-Artefact-Version and
 // X-Artefact-Has-Native-Modules so the lib-node client can avoid a separate
 // GET /:id metadata roundtrip.
-router.get('/:id/download', async (req, res, next) => {
+router.get('/:id/download', requireOperationScope('downloadArtefact'), async (req, res, next) => {
   try {
     const caller = await resolveCaller(req)
     // Download is "I already know the id" — unlike listing, hiding the

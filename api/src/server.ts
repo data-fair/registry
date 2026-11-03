@@ -31,7 +31,8 @@ let rescanTimer: ReturnType<typeof setInterval> | undefined
 
 export const start = async () => {
   if (config.observer?.active) await startObserver(config.observer.port)
-  session.init(config.privateDirectoryUrl)
+  // scope-aware: scoped sessions reach the routes of api/src/scopes.ts only, the others refuse them
+  await session.init(config.privateDirectoryUrl, undefined, undefined, { scopeAware: true })
   await mongo.init()
   await renameFilePathToPath(mongo.db)
   await locks.start(mongo.db)
