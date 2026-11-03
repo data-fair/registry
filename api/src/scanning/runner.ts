@@ -45,12 +45,18 @@ const run = (args: string[], timeoutMs: number): Promise<{ code: number, stdout:
 
 // osv-scanner exits 0 = no vulns, 1 = vulns found, >1 = real error
 // (e.g. 128 = "no package sources found"). Flags pinned by the Task 1 spike
-// against osv-scanner v2.2.3.
+// against osv-scanner v2.2.3, output re-checked identical on v2.7.0.
 const EXIT_VULNS_FOUND = 1
 
 // The scalibr package.json extractor is NOT enabled by default; without it a
 // directory scan of bundled (lockfile-less) node_modules finds nothing.
+// v2.7 deprecates this flag for --x-plugins, which v2.2 does not know: keep the
+// old spelling while dev machines may still run v2.2.
 const PLUGIN_ARGS = ['--experimental-plugins', 'javascript/packagejson']
+
+// Sub-directory of --local-db-path the offline DB lands in: "osv-scalibr" since
+// v2.7, "osv-scanner" before. Current first.
+const DB_LAYOUTS = ['osv-scalibr', 'osv-scanner']
 
 class OsvScanner implements Scanner {
   // The binary doesn't change at runtime, so resolve the version once.
@@ -67,10 +73,13 @@ class OsvScanner implements Scanner {
   // Best-effort freshness timestamp of the local OSV DB (npm/all.zip mtime).
   private async dbUpdatedAt (): Promise<string | undefined> {
     const dbDir = config.scanning?.dbDir ?? 'osv-db'
-    try {
-      const { mtime } = await stat(join(dbDir, 'osv-scanner', 'npm', 'all.zip'))
-      return mtime.toISOString()
-    } catch { return undefined }
+    for (const layout of DB_LAYOUTS) {
+      try {
+        const { mtime } = await stat(join(dbDir, layout, 'npm', 'all.zip'))
+        return mtime.toISOString()
+      } catch { /* try the next layout */ }
+    }
+    return undefined
   }
 
   async refreshDb (): Promise<void> {
@@ -99,6 +108,11 @@ class OsvScanner implements Scanner {
       ]
       const { code, stderr } = await run(args, timeoutMs)
       if (code > EXIT_VULNS_FOUND) throw new Error(`osv-scanner db refresh failed (exit ${code}): ${stderr.slice(0, 500)}`)
+      // Once the current layout is in place, the legacy one is a stale ~200 MB copy.
+      const [current, ...legacy] = DB_LAYOUTS
+      if (await stat(join(dbDir, current, 'npm', 'all.zip')).then(() => true, () => false)) {
+        for (const layout of legacy) await rm(join(dbDir, layout), { recursive: true, force: true }).catch(() => {})
+      }
     } finally {
       await rm(dummy, { recursive: true, force: true }).catch(() => {})
     }

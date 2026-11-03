@@ -1,5 +1,8 @@
 ##########################
-FROM node:24.22.1-alpine3.24@sha256:1200d815de24f8dcca745fbf7651d166034a35adbcad8860a8538ffff44f1420 AS base
+FROM node:24.22.2-alpine3.24@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS base
+
+# Pick up alpine security fixes released after the base image was built.
+RUN apk upgrade --no-cache
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -8,6 +11,8 @@ ENV NODE_ENV=production
 FROM base AS native-deps
 
 RUN apk add --no-cache openssl
+# The runtime never calls npm or corepack: drop them and the CVEs they carry.
+RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 ##########################
 FROM base AS package-strip
@@ -20,7 +25,7 @@ RUN jq '.version="build"' package-lock.json | sponge package-lock.json
 ##########################
 FROM base AS osv-scanner
 # Advisory npm vulnerability scanner (statically-linked Go binary; runs on musl).
-ARG OSV_SCANNER_VERSION=v2.2.3
+ARG OSV_SCANNER_VERSION=v2.7.0
 ARG TARGETARCH=amd64
 RUN apk add --no-cache curl && \
     curl -sSfL -o /usr/local/bin/osv-scanner \

@@ -61,7 +61,7 @@ problem to the user with the relevant lines.
 
 Dev config enables npm vulnerability scanning (`api/config/development.js`), which shells out to the **osv-scanner v2** binary. Install it once so it's on your PATH (Linux x86_64):
 
-    OSV_VERSION=v2.2.3
+    OSV_VERSION=v2.7.0
     sudo curl -sSfL -o /usr/local/bin/osv-scanner \
       "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
     sudo chmod +x /usr/local/bin/osv-scanner
