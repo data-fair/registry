@@ -105,12 +105,7 @@ const pruneOldVersionDirs = async (artefactDir: string): Promise<void> => {
   }
 }
 
-// Unique per call, not per process: concurrent calls of one process (and processes
-// sharing a cache dir) must never write to the same temporary path.
-const tmpSuffix = (): string => `.tmp.${randomUUID()}`
-
-// In-flight calls by request identity, so concurrent calls on a cold cache share
-// one download. The account is part of the key: each account still gets its own access check.
+// identical concurrent calls share one download (the account is part of the key)
 const inFlight = new Map<string, Promise<EnsureArtefactResult>>()
 
 export async function ensureArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefactResult> {
@@ -185,7 +180,7 @@ async function downloadArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefa
   const relDir = join(`${version || '0.0.0'}+${discriminator(dataUpdatedAt)}`, buildTuple)
   const extractDir = join(artefactDir, relDir)
 
-  const tmpDir = extractDir + tmpSuffix()
+  const tmpDir = `${extractDir}.tmp.${randomUUID()}`
   await mkdir(tmpDir, { recursive: true })
   try {
     await extractTarball(res.data as Readable, tmpDir)
@@ -195,8 +190,7 @@ async function downloadArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefa
     try {
       await rename(tmpDir, extractDir)
     } catch (err) {
-      // another call (other account or process) installed this same version first:
-      // keep its copy, a caller may already be loading it
+      // another call installed this version first: keep its copy, it may be in use
       if (!['ENOTEMPTY', 'EEXIST'].includes((err as NodeJS.ErrnoException).code ?? '')) throw err
       await rm(tmpDir, { recursive: true, force: true })
     }
@@ -207,7 +201,7 @@ async function downloadArtefact (opts: EnsureArtefactOpts): Promise<EnsureArtefa
 
   // Atomically repoint the stable pointer at the new dir, then prune the dirs
   // no pointer references anymore.
-  const tmpPointer = pointerPath + tmpSuffix()
+  const tmpPointer = `${pointerPath}.tmp.${randomUUID()}`
   await writeFile(tmpPointer, JSON.stringify({ dataUpdatedAt, version, dir: relDir } satisfies CachePointer))
   await rename(tmpPointer, pointerPath)
   await pruneOldVersionDirs(artefactDir)
@@ -260,7 +254,7 @@ export async function ensureArtefactFile (opts: EnsureArtefactFileOpts): Promise
   }
 
   await mkdir(dirname(destPath), { recursive: true })
-  const tmpPath = destPath + tmpSuffix()
+  const tmpPath = `${destPath}.tmp.${randomUUID()}`
   try {
     await pipeline(res.data as Readable, createWriteStream(tmpPath))
   } catch (err) {
@@ -324,20 +318,17 @@ const rebuildNativeModules = (dir: string): Promise<void> => new Promise((resolv
 export async function extractTarball (stream: Readable, destDir: string): Promise<void> {
   const extract = tar.extract()
 
-  // Every write gets its handler as soon as it starts: a failure must reject this
-  // call, not surface as an unhandled rejection that kills the process.
   const writes: Promise<void>[] = []
   const openFiles = new Set<WriteStream>()
-  let failed = false
-  let failure: unknown
-  // the first error is the root cause, the next ones come from tearing the extraction down
+  // the first error is the root cause, the next ones come from the teardown
+  let failure: Error | undefined
   const fail = (err: unknown) => {
-    if (failed) return
-    failed = true
-    failure = err
-    extract.destroy(err as Error)
+    if (failure) return
+    failure = err as Error
+    extract.destroy(failure)
     for (const ws of openFiles) ws.destroy()
   }
+  // handled right away: a failed write must reject this call, not crash the process
   const track = (write: Promise<void>) => {
     write.catch(fail)
     writes.push(write)
@@ -345,7 +336,7 @@ export async function extractTarball (stream: Readable, destDir: string): Promis
 
   const writeEntry = async (fullPath: string, entryStream: Readable) => {
     await mkdir(dirname(fullPath), { recursive: true })
-    if (failed) return
+    if (failure) return
     await new Promise<void>((resolve, reject) => {
       const ws = createWriteStream(fullPath)
       openFiles.add(ws)
@@ -359,7 +350,7 @@ export async function extractTarball (stream: Readable, destDir: string): Promis
   }
 
   extract.on('entry', (header, entryStream, next) => {
-    // a failure also destroys the current entry, its error is reported below
+    // destroyed with the extractor on failure, the error is reported below
     entryStream.on('error', () => {})
     entryStream.on('end', next)
     if (header.type !== 'directory' && header.type !== 'file') {
@@ -388,8 +379,7 @@ export async function extractTarball (stream: Readable, destDir: string): Promis
   } catch (err) {
     fail(err)
   }
-  // Wait for every write to settle, so that nothing touches destDir any more once
-  // this returns and the caller can remove it.
+  // nothing writes into destDir any more once this returns, the caller may remove it
   await Promise.allSettled(writes)
-  if (failed) throw failure
+  if (failure) throw failure
 }
