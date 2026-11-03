@@ -5,7 +5,7 @@ inputs:
     description: 'Base URL of the registry, e.g. https://koumoul.com/registry'
     required: true
   category:
-    description: 'Artefact category (processing, catalog, application, ...)'
+    description: 'Artefact category (processing, catalog, application, skill, ...)'
     required: true
   artefact-id:
     description: 'Override the computed artefact id. Default: <name-with-slashes-as-dashes>-<ref-suffix>'

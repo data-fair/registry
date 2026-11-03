@@ -179,18 +179,12 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
 import { VDateInput } from 'vuetify/labs/VDateInput'
+import { categoryValues } from '../../utils/categories'
 
 const { t } = useI18n()
 const { dayjs } = useLocaleDayjs()
 
-const categoryItems = [
-  'processing',
-  'catalog',
-  'application',
-  'other',
-  'tileset',
-  'maplibre-style'
-]
+const categoryItems: string[] = [...categoryValues]
 
 type NewKey = {
   name: string

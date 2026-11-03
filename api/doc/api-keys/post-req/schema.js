@@ -26,7 +26,7 @@ export default {
     allowedCategory: {
       type: 'string',
       description: 'Restricts an upload key to a single artefact category. Only valid for upload keys.',
-      enum: ['processing', 'catalog', 'application', 'other', 'tileset', 'maplibre-style']
+      enum: ['processing', 'catalog', 'application', 'skill', 'other', 'tileset', 'maplibre-style']
     },
     expiresAt: {
       type: 'string',

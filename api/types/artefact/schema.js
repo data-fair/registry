@@ -18,7 +18,7 @@ export default {
     licence: { type: 'string', readOnly: true },
     category: {
       type: 'string',
-      enum: ['processing', 'catalog', 'application', 'tileset', 'maplibre-style', 'other']
+      enum: ['processing', 'catalog', 'application', 'skill', 'tileset', 'maplibre-style', 'other']
     },
     // Mirror-aware visibility (driven by the admin form's VJSF context):
     //   context.mirrored   -> artefact is mirrored from a remote registry

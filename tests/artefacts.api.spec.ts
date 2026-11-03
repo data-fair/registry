@@ -51,6 +51,43 @@ test.describe('Artefacts', () => {
       expect(res.data.artefact.uploadedBy.apiKeyName).toBe('test-upload')
     })
 
+    test('uploads and lists an npm artefact in the skill category', async () => {
+      const tarball = await createTestTarball({ name: '@test/skill-demo', version: '1.0.0' })
+      const form = new FormData()
+      form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
+      form.append('category', 'skill')
+
+      const ax = axiosWithApiKey(uploadApiKey)
+      const res = await ax.post(
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/skill-demo@1'),
+        form,
+        { headers: form.getHeaders() }
+      )
+      expect(res.status).toBe(201)
+      expect(res.data.artefact.category).toBe('skill')
+      expect(res.data.artefact.format).toBe('npm')
+
+      const admin = await superAdmin
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/skill-demo@1'), { public: true })
+      const list = await admin.get('/api/v1/artefacts?category=skill')
+      const found = list.data.results.find((a: any) => a._id === '@test/skill-demo@1')
+      expect(found).toBeTruthy()
+      expect(found.category).toBe('skill')
+    })
+
+    test('rejects a file upload in the skill category', async () => {
+      const ax = axiosWithApiKey(uploadApiKey)
+      const form = new FormData()
+      form.append('category', 'skill')
+      form.append('file', Buffer.from('hello'), { filename: 'a.txt', contentType: 'text/plain' })
+      try {
+        await ax.post('/api/v1/artefacts/file/some-skill-file', form, { headers: form.getHeaders() })
+        expect(true).toBe(false)
+      } catch (err: any) {
+        expect(err.status).toBe(400)
+      }
+    })
+
     test('upload of tarball with .node binary flags hasNativeModules=true', async () => {
       const tarball = await createTestTarball({
         name: '@test/native',
