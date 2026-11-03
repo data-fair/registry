@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import { session } from '@data-fair/lib-express/index.js'
-import { startObserver, stopObserver, internalError } from '@data-fair/lib-node/observer.js'
+import { startObserver, stopObserver } from '@data-fair/lib-node/observer.js'
+import log from '@data-fair/lib-node/log.js'
 import eventPromise from '@data-fair/lib-utils/event-promise.js'
 import eventsQueue from '@data-fair/lib-node/events-queue.js'
 import locks from '@data-fair/lib-node/locks.js'
@@ -22,8 +23,9 @@ server.headersTimeout = (60 * 1000) + 2000
 // Large artefact uploads (tilesets, etc.) can easily exceed Node's 5 min default.
 server.requestTimeout = 60 * 60 * 1000
 
-server.on('timeout', () => internalError('http-timeout', 'http socket timeout'))
-server.on('clientError', (err) => internalError('http-client-error', err))
+// both are client-side conditions (slow or broken peers), not internal failures
+server.on('timeout', () => log.warn('http socket timeout', { code: 'http-timeout' }))
+server.on('clientError', (err) => log.warn('http client error', { code: 'http-client-error', err }))
 let syncTimer: ReturnType<typeof setInterval> | undefined
 let rescanTimer: ReturnType<typeof setInterval> | undefined
 
@@ -41,7 +43,7 @@ export const start = async () => {
 
   if (config.privateEventsUrl) {
     if (!config.secretKeys?.events) {
-      internalError('registry', 'Missing secretKeys.events in config')
+      log.error('missing secretKeys.events in config', { code: 'config-events-secret' })
     } else {
       await eventsQueue.start({ eventsUrl: config.privateEventsUrl, eventsSecret: config.secretKeys.events })
     }
@@ -53,19 +55,19 @@ export const start = async () => {
   // Daily sync of all remote registries
   syncTimer = setInterval(() => {
     syncAllRemoteRegistries().catch(err => {
-      internalError('daily-sync', err)
+      log.error('daily sync of the remote registries failed', { code: 'daily-sync', err })
     })
   }, 24 * 60 * 60 * 1000)
 
   if (config.scanning?.enabled) {
     // Warm the DB + do an initial pass shortly after boot, then on the interval.
-    rescanAll().catch(err => internalError('rescan-all', err))
+    rescanAll().catch(err => log.error('periodic rescan failed', { code: 'rescan-all', err }))
     rescanTimer = setInterval(() => {
-      rescanAll().catch(err => internalError('rescan-all', err))
+      rescanAll().catch(err => log.error('periodic rescan failed', { code: 'rescan-all', err }))
     }, (config.scanning.rescanIntervalHours ?? 24) * 60 * 60 * 1000)
   }
 
-  console.log(`API server listening on port ${config.port}`)
+  log.info(`API server listening on port ${config.port}`)
 }
 
 export const stop = async () => {

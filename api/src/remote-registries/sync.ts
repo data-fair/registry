@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Binary } from 'mongodb'
 import locks from '@data-fair/lib-node/locks.js'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
-import { internalError } from '@data-fair/lib-node/observer.js'
+import log from '@data-fair/lib-node/log.js'
 import * as wsEmitter from '@data-fair/lib-node/ws-emitter.js'
 import type { AxiosInstance } from 'axios'
 import mongo from '#mongo'
@@ -28,7 +28,7 @@ const emitSync = async (remoteRegistryId: string, event: SyncEvent) => {
   try {
     await wsEmitter.emit(syncChannel(remoteRegistryId), event)
   } catch (err) {
-    internalError('sync-ws-emit', err)
+    log.warn('could not emit a sync progress event', { code: 'sync-ws-emit', remoteRegistryId, err })
   }
 }
 
@@ -254,7 +254,8 @@ const runSync = async (remoteRegistryId: string, scope: SyncScope = 'all') => {
     } catch (err: any) {
       hasErrors = true
       lastError = `${artefactId}: ${err.message || err}`
-      console.error(`[sync] Error syncing ${artefactId} from ${remote._id}:`, err.message || err)
+      // recorded on the registry doc as lastSyncError; an upstream failure is not an internal one
+      log.warn('could not sync an artefact from a remote registry', { code: 'sync-artefact', remoteRegistryId: remote._id, artefactId, err })
     }
 
     done++
@@ -307,9 +308,9 @@ export const startSync = async (remoteRegistryId: string, scope: SyncScope = 'al
   const lockId = syncLockId(remoteRegistryId)
   if (!await locks.acquire(lockId)) return false
   runSync(remoteRegistryId, scope)
-    .catch(err => internalError('sync-remote-registry', err))
+    .catch(err => log.error('remote registry sync failed', { code: 'sync-remote-registry', remoteRegistryId, err }))
     .finally(async () => {
-      await locks.release(lockId).catch(err => internalError('sync-remote-registry-release', err))
+      await locks.release(lockId).catch(err => log.error('could not release the sync lock', { code: 'sync-remote-registry-release', remoteRegistryId, err }))
       // A selection can land between the final drain and the release above;
       // its own startSync lost the lock race, so pick it up here.
       const doc = await mongo.remoteRegistries.findOne({ _id: remoteRegistryId }, { projection: { pendingSync: 1 } })
@@ -346,7 +347,7 @@ export const syncAllRemoteRegistries = async () => {
     // A held lock means a peer replica is already syncing this registry. That is the
     // normal outcome of N replicas firing the same daily timer — not an error.
     await syncRemoteRegistry(remote._id).catch(err => {
-      console.error(`[sync] Failed to sync ${remote._id}:`, err.message || err)
+      log.error('remote registry sync failed', { code: 'sync-remote-registry', remoteRegistryId: remote._id, err })
     })
   }
 }

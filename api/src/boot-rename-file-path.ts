@@ -1,4 +1,5 @@
 import type { Db } from 'mongodb'
+import log from '@data-fair/lib-node/log.js'
 
 // One-time idempotent migration: file-format artefacts used to carry
 // `filePath`; the new schema uses `path` everywhere. We $rename, so on
@@ -11,6 +12,6 @@ export const renameFilePathToPath = async (db: Db): Promise<void> => {
     { $rename: { filePath: 'path' } }
   )
   if (res.modifiedCount > 0) {
-    console.log(`[boot-rename] migrated ${res.modifiedCount} artefact(s): filePath -> path`)
+    log.info(`migrated ${res.modifiedCount} artefact(s): filePath -> path`, { code: 'boot-rename-file-path' })
   }
 }
