@@ -30,6 +30,7 @@ import selectNode from '@koumoul/vjsf/components/nodes/select.vue'
 import localizeErrors from "ajv-i18n/localize/en/index.js";
 import { fullFormats } from "ajv-formats/dist/formats.js";
 
+const export0 = validate22;
 const schema26 = {"$id":"export0","$ref":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items"};
 const schema28 = {"type":"object","title":"Account","additionalProperties":false,"required":["type","id","name"],"properties":{"type":{"type":"string","enum":["user","organization"],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type","errorMessage":{}},"id":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id","errorMessage":{}},"name":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name","errorMessage":{}}},"layout":{"getItems":{"url":{"type":"js-tpl","expr":"/simple-directory/api/accounts?size=20","pure":true,"dataAlias":"value","ref":8},"qSearchParam":"q","itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":4},"itemTitle":{"type":"js-eval","expr":"`${item.name} (${item.id})`","pure":true,"dataAlias":"item","ref":9},"itemKey":{"type":"js-eval","expr":"`${item.type}:${item.id}`","pure":true,"dataAlias":"item","ref":10},"itemIcon":{"type":"js-eval","expr":"`/simple-directory/api/avatars/${item.type}/${item.id}/avatar.png`","pure":true,"dataAlias":"item","ref":11},"returnObjects":true}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items","errorMessage":{"required":{"type":"required information","id":"required information","name":"required information"}}};
 const obj0 = {"required":"missingProperty","dependencies":"property","dependentRequired":"property"};
@@ -223,6 +224,7 @@ return errors === 0;
 }
 validate22.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
+const export1 = validate24;
 const schema29 = {"$id":"export1","$ref":"https://github.com/data-fair/registry/artefact-patch#"};
 const schema27 = {"$id":"https://github.com/data-fair/registry/artefact-patch","x-exports":["validate","types","vjsf"],"x-vjsf":{"xI18n":true},"x-vjsf-locales":["en","fr"],"title":"Artefact patch","type":"object","additionalProperties":false,"layout":{"title":null},"properties":{"title":{"anyOf":[{"type":"object","additionalProperties":false,"layout":{"if":"!context.accessOnly"},"properties":{"en":{"type":"string","title":"Title - English","layout":{"cols":{"sm":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Title - French","layout":{"cols":{"sm":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/title","errorMessage":{}},"description":{"anyOf":[{"type":"object","additionalProperties":false,"layout":{"if":"!context.accessOnly"},"properties":{"en":{"type":"string","title":"Description - English","layout":{"comp":"textarea","props":{"autoGrow":true,"rows":3},"cols":{"sm":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Description - French","layout":{"comp":"textarea","props":{"autoGrow":true,"rows":3},"cols":{"sm":6}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/description","errorMessage":{}},"group":{"anyOf":[{"type":"object","additionalProperties":false,"layout":{"if":"!context.accessOnly"},"properties":{"en":{"type":"string","title":"Group - English","layout":{"comp":"combobox","cols":{"sm":6},"getItems":{"url":{"type":"js-tpl","expr":"${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=en","pure":true,"dataAlias":"value","ref":3},"itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":4}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/en","errorMessage":{}},"fr":{"type":"string","title":"Group - French","layout":{"comp":"combobox","cols":{"sm":6},"getItems":{"url":{"type":"js-tpl","expr":"${context.apiPath}/v1/artefacts/groups?category=${context.category}&locale=fr","pure":true,"dataAlias":"value","ref":5},"itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":4}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/fr","errorMessage":{}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/group","errorMessage":{}},"documentation":{"anyOf":[{"type":"string","format":"uri","title":"Documentation URL","layout":{"if":"!context.accessOnly"}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/documentation","errorMessage":{}},"deprecated":{"anyOf":[{"type":"boolean","title":"Deprecated","layout":{"comp":"switch","if":"!context.accessOnly","cols":{"sm":6}},"default":false},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/deprecated","errorMessage":{}},"public":{"anyOf":[{"type":"boolean","title":"Public","layout":{"comp":"switch","if":"context.accessOnly || !context.mirrored","cols":{"sm":6}},"default":false},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/public","errorMessage":{}},"privateAccess":{"anyOf":[{"type":"array","title":"Private access","layout":{"if":"(context.accessOnly || !context.mirrored) && !parent.data?.public"},"items":{"type":"object","title":"Account","additionalProperties":false,"required":["type","id","name"],"properties":{"type":{"type":"string","enum":["user","organization"],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type","errorMessage":{}},"id":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id","errorMessage":{}},"name":{"type":"string","__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name","errorMessage":{}}},"layout":{"getItems":{"url":{"type":"js-tpl","expr":"/simple-directory/api/accounts?size=20","pure":true,"dataAlias":"value","ref":8},"qSearchParam":"q","itemsResults":{"type":"js-eval","expr":"data.results","pure":true,"dataAlias":"body","ref":4},"itemTitle":{"type":"js-eval","expr":"`${item.name} (${item.id})`","pure":true,"dataAlias":"item","ref":9},"itemKey":{"type":"js-eval","expr":"`${item.type}:${item.id}`","pure":true,"dataAlias":"item","ref":10},"itemIcon":{"type":"js-eval","expr":"`/simple-directory/api/avatars/${item.type}/${item.id}/avatar.png`","pure":true,"dataAlias":"item","ref":11},"returnObjects":true}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items","errorMessage":{"required":{"type":"required information","id":"required information","name":"required information"}}}},{"type":"null"}],"__pointer":"https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess","errorMessage":{}}},"__pointer":"https://github.com/data-fair/registry/artefact-patch#","errorMessage":{}};
 const formats0 = fullFormats.uri;
@@ -1121,9 +1123,9 @@ return (`/simple-directory/api/avatars/${item.type}/${item.id}/avatar.png`)
 ) {
 return ([{"key":"user","title":"user","value":"user"},{"key":"organization","title":"organization","value":"organization"}])
 }
-
 const compiledLayout = {
   mainTree: "https://github.com/data-fair/registry/artefact-patch#",
+  agentGuide: undefined,
 
   skeletonTrees: {
     "https://github.com/data-fair/registry/artefact-patch#": {
@@ -1148,11 +1150,30 @@ const compiledLayout = {
       pointer: "https://github.com/data-fair/registry/artefact-patch#",
       refPointer: "https://github.com/data-fair/registry/artefact-patch#",
       pure: false,
-      propertyKeys: ["title", "description", "group", "documentation", "deprecated", "public", "privateAccess"],
+
+      propertyKeys: [
+        "title",
+        "description",
+        "group",
+        "documentation",
+        "deprecated",
+        "public",
+        "privateAccess"
+      ],
+
       roPropertyKeys: [],
       nullable: false,
       required: true,
-      children: ["https://github.com/data-fair/registry/artefact-patch#/properties/title", "https://github.com/data-fair/registry/artefact-patch#/properties/description", "https://github.com/data-fair/registry/artefact-patch#/properties/group", "https://github.com/data-fair/registry/artefact-patch#/properties/documentation", "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated", "https://github.com/data-fair/registry/artefact-patch#/properties/public", "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess"]
+
+      children: [
+        "https://github.com/data-fair/registry/artefact-patch#/properties/title",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/description",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/group",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/documentation",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/public",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess"
+      ]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/title": {
@@ -1165,7 +1186,11 @@ const compiledLayout = {
       roPropertyKeys: [],
       nullable: true,
       required: undefined,
-      children: ["https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/en", "https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/fr"]
+
+      children: [
+        "https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/en",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/fr"
+      ]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/title/anyOf/0/properties/en": {
@@ -1202,7 +1227,11 @@ const compiledLayout = {
       roPropertyKeys: [],
       nullable: true,
       required: undefined,
-      children: ["https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/en", "https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/fr"]
+
+      children: [
+        "https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/en",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/fr"
+      ]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/description/anyOf/0/properties/en": {
@@ -1239,7 +1268,11 @@ const compiledLayout = {
       roPropertyKeys: [],
       nullable: true,
       required: undefined,
-      children: ["https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/en", "https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/fr"]
+
+      children: [
+        "https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/en",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/fr"
+      ]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/group/anyOf/0/properties/en": {
@@ -1275,7 +1308,11 @@ const compiledLayout = {
       propertyKeys: [],
       roPropertyKeys: [],
       nullable: true,
-      required: undefined
+      required: undefined,
+
+      constraints: {
+        format: "uri"
+      }
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/deprecated": {
@@ -1312,7 +1349,10 @@ const compiledLayout = {
       roPropertyKeys: [],
       nullable: true,
       required: undefined,
-      childrenTrees: ["https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items"]
+
+      childrenTrees: [
+        "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items"
+      ]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items": {
@@ -1325,7 +1365,12 @@ const compiledLayout = {
       roPropertyKeys: [],
       nullable: false,
       required: true,
-      children: ["https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type", "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id", "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name"]
+
+      children: [
+        "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/id",
+        "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/name"
+      ]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items/properties/type": {
@@ -1671,7 +1716,14 @@ const compiledLayout = {
       nullable: true,
       title: "Private access",
       listEditMode: "inline-single",
-      listActions: ["add", "edit", "delete", "sort", "duplicate"]
+
+      listActions: [
+        "add",
+        "edit",
+        "delete",
+        "sort",
+        "duplicate"
+      ]
     },
 
     "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items": {
@@ -1753,12 +1805,28 @@ const compiledLayout = {
   },
 
   validates: {
-    "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items": validate22,
-    "https://github.com/data-fair/registry/artefact-patch#": validate24
+    "https://github.com/data-fair/registry/artefact-patch#/properties/privateAccess/anyOf/0/items": export0,
+    "https://github.com/data-fair/registry/artefact-patch#": export1
   },
 
   validationErrors: {},
-  expressions: [expression0, expression1, expression2, expression3, expression4, expression5, expression6, expression7, expression8, expression9, expression10, expression11, expression12],
+
+  expressions: [
+    expression0,
+    expression1,
+    expression2,
+    expression3,
+    expression4,
+    expression5,
+    expression6,
+    expression7,
+    expression8,
+    expression9,
+    expression10,
+    expression11,
+    expression12
+  ],
+
   locale: "en",
 
   messages: {
@@ -1769,7 +1837,9 @@ const compiledLayout = {
     edit: "Edit",
     confirm: "Confirm",
     close: "Close",
+    actions: "Actions",
     duplicate: "Duplicate",
+    insertAfter: "Insert after",
     copy: "Copy",
     paste: "Paste",
     sort: "Sort",
@@ -1842,7 +1912,13 @@ const compiledLayout = {
 
           listEditMode: {
             type: "string",
-            enum: ["inline", "inline-single", "menu", "dialog"]
+
+            enum: [
+              "inline",
+              "inline-single",
+              "menu",
+              "dialog"
+            ]
           },
 
           listActions: {
@@ -1850,7 +1926,17 @@ const compiledLayout = {
 
             items: {
               type: "string",
-              enum: ["add", "edit", "delete", "sort", "duplicate", "copy", "paste"]
+
+              enum: [
+                "add",
+                "edit",
+                "delete",
+                "sort",
+                "duplicate",
+                "insertAfter",
+                "copy",
+                "paste"
+              ]
             }
           },
 
@@ -1896,6 +1982,10 @@ const compiledLayout = {
               },
 
               duplicate: {
+                type: "string"
+              },
+
+              insertAfter: {
                 type: "string"
               },
 
@@ -2202,7 +2292,7 @@ const compiledLayout = {
   },
 
   localizeErrors: localizeErrors
-};
+}
 
 const nodeComponents = {
   
@@ -2237,6 +2327,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(emits)
+
 
 const { el, statefulLayout, stateTree } = useVjsf(
   null,

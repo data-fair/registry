@@ -101,7 +101,9 @@ export const extractManifest = async (
       }
       let size = 0
       const chunks: Buffer[] = []
-      entryStream.on('data', (chunk: Buffer) => {
+      // tar-stream entries emit Buffers, its streamx-based types say unknown
+      entryStream.on('data', (data: unknown) => {
+        const chunk = data as Buffer
         size += chunk.length
         if (size > MAX_MANIFEST_BYTES) {
           entryStream.destroy(httpError(413, `package.json exceeds ${MAX_MANIFEST_BYTES} bytes`))
@@ -132,7 +134,9 @@ export const extractManifest = async (
       let size = 0
       let tooLarge = false
       const chunks: Buffer[] = []
-      entryStream.on('data', (chunk: Buffer) => {
+      // tar-stream entries emit Buffers, its streamx-based types say unknown
+      entryStream.on('data', (data: unknown) => {
+        const chunk = data as Buffer
         if (tooLarge) return
         size += chunk.length
         if (size > MAX_MANIFEST_BYTES) {

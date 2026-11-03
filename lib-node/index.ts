@@ -334,7 +334,7 @@ export async function extractTarball (stream: Readable, destDir: string): Promis
     writes.push(write)
   }
 
-  const writeEntry = async (fullPath: string, entryStream: Readable) => {
+  const writeEntry = async (fullPath: string, entryStream: tar.ExtractEvents['entry'][1]) => {
     await mkdir(dirname(fullPath), { recursive: true })
     if (failure) return
     await new Promise<void>((resolve, reject) => {

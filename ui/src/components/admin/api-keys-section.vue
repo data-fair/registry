@@ -178,7 +178,7 @@ en:
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
-import { VDateInput } from 'vuetify/labs/VDateInput'
+import { VDateInput } from 'vuetify/components/VDateInput'
 import { categoryValues } from '../../utils/categories'
 
 const { t } = useI18n()
