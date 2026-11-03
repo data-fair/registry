@@ -1,0 +1,180 @@
+{
+  "tools": [
+    {
+      "name": "search_artefacts",
+      "description": "Search the artefact catalog of the registry: plugins distributed as npm packages (processings, catalog connectors, applications, agent skills) and files (map tilesets, map styles). Only the artefacts visible to the active account are returned: public ones and those shared with it. Deprecated artefacts are hidden unless includeDeprecated is true. Use get_artefact for the full metadata of one artefact.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Full-text search on the artefact name, title, group and description."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "catalog",
+              "application",
+              "skill",
+              "tileset",
+              "maplibre-style",
+              "other"
+            ],
+            "description": "Restrict to one category."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "npm",
+              "file"
+            ],
+            "description": "npm for packages, file for raw files."
+          },
+          "includeDeprecated": {
+            "type": "boolean",
+            "default": false,
+            "description": "Include the deprecated artefacts."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "dataUpdatedAt",
+              "-dataUpdatedAt",
+              "name",
+              "-name",
+              "category",
+              "-category",
+              "group.en",
+              "-group.en",
+              "group.fr",
+              "-group.fr",
+              "version",
+              "-version",
+              "size",
+              "-size"
+            ],
+            "description": "Sort key, prefixed with - for a descending order. Defaults to the most recently updated first."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "Maximum number of artefacts. The response count says how many match in total."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000,
+            "default": 0,
+            "description": "Number of artefacts to skip."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "default": "concise",
+            "description": "concise: _id, title, category, format, version, deprecated. detailed: _id, name, title, description, category, group, format, packageName, version, licence, documentation, deprecated, public, dataUpdatedAt."
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      },
+      "security": [
+        {
+          "sdCookie": []
+        },
+        {
+          "oauth2": [
+            "registry:read"
+          ]
+        },
+        {
+          "oauth2": [
+            "registry"
+          ]
+        },
+        {
+          "oauth2": [
+            "all:read"
+          ]
+        },
+        {
+          "oauth2": [
+            "all:write"
+          ]
+        },
+        {
+          "oauth2": [
+            "all:admin"
+          ]
+        },
+        {
+          "registryApiKey": []
+        }
+      ]
+    },
+    {
+      "name": "get_artefact",
+      "description": "Read the metadata of one artefact of the registry by its id (as returned by search_artefacts): title, description, category, version, licence, documentation link. Not found when the active account cannot see it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id of the artefact, e.g. @data-fair/processing-gpkg@1."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      },
+      "security": [
+        {
+          "sdCookie": []
+        },
+        {
+          "oauth2": [
+            "registry:read"
+          ]
+        },
+        {
+          "oauth2": [
+            "registry"
+          ]
+        },
+        {
+          "oauth2": [
+            "all:read"
+          ]
+        },
+        {
+          "oauth2": [
+            "all:write"
+          ]
+        },
+        {
+          "oauth2": [
+            "all:admin"
+          ]
+        },
+        {
+          "registryApiKey": []
+        }
+      ]
+    }
+  ],
+  "skills": [],
+  "guides": []
+}

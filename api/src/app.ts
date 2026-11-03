@@ -13,6 +13,7 @@ import remoteRegistriesRouter from './remote-registries/router.ts'
 import mongo from '#mongo'
 import { filesStorage } from './files-storage/index.ts'
 import config from '#config'
+import apiDocs from '../contract/api-docs.ts'
 
 export const app = express()
 
@@ -31,6 +32,13 @@ app.use(createSiteMiddleware('registry'))
 app.use(session.middleware())
 
 app.use(express.json({ limit: '1mb' }))
+
+// public, read by data-fair (private url, no forwarded headers) to merge it into its platform document
+app.get('/api/v1/api-docs.json', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300')
+  res.vary('Accept-Language')
+  res.json(apiDocs(req.acceptsLanguages('fr', 'en') === 'en' ? 'en' : 'fr'))
+})
 
 app.use('/api/admin', adminRouter)
 app.use('/api/v1/artefacts', artefactsRouter)
