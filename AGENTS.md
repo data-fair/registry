@@ -107,6 +107,20 @@ Advisory, admin-only vulnerability scanning of `npm` artefacts (bundled `node_mo
 - The osv-scanner binary is bundled in the Docker image (see `Dockerfile`). The mapper's test fixture is `tests/resources/osv-sample-output.json`.
 - Extracted artefacts are cached as a mirror under `<tmpDir>/scan-cache/` (config `tmpDir`, env `TMP_DIR`; mount as a k8s `emptyDir`). A scan reuses the cached extraction when the artefact's bytes are unchanged (keyed on `artefact.path`); `rescanAll` prunes slots for deleted artefacts.
 
+## Logging
+
+Server code logs through `import log from '@data-fair/lib-node/log.js'` (pino: JSON on stdout in
+production, pretty in dev); the full API is in the "Logging" section of the `@data-fair/lib-node` README.
+eslint `no-console` applies to `api/src/**` and `api/index.ts`.
+
+- `log.info|warn|alert|error(msg, { code?, err?, ...fields })`: `code` is a **static string**, ids go in
+  their own fields (`artefactId`, `remoteRegistryId`), the error in `err`, never in the message.
+- `error` is for internal failures only (counted in `df_logs`, alerting); client errors, upstream
+  failures and expected situations are `warn`.
+- The actor (ip, host, user, account) is never passed by hand: `session.middleware()` opens the request
+  log context, and background work started from a request inherits it.
+- `debug` call sites are unchanged; their output is redirected into the logger.
+
 ## Code patterns
 
   - API route: @api/src/artefacts/router.ts
