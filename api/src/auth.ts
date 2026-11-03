@@ -121,7 +121,8 @@ export const resolveCaller = async (req: Request): Promise<Caller> => {
   const readAuth = await tryAuthenticateReadKey(req)
   if (readAuth) return { admin: false, account: readAuth.owner, viaReadKey: true }
   const session = reqSession(req)
-  if (session.user?.adminMode) return { admin: true }
+  // a scoped session is never admin, even a superadmin's: scopes grant the account's catalog only
+  if (session.user?.adminMode && !session.scopes) return { admin: true }
   if (session.account) return { admin: false, account: session.account }
   return { admin: false }
 }
