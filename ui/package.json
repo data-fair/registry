@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "mkdir -p ../dev/logs && NODE_CONFIG_DIR=../api/config/ vite 2>&1 | ts '[%Y-%m-%d %H:%M:%S]' | tee ../dev/logs/dev-ui.log",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",

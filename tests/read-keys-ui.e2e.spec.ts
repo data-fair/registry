@@ -24,7 +24,7 @@ test.describe('Read API key creation (UI)', () => {
 // Logs in as a regular org member (no admin mode) with the org as the active
 // account, by replaying the simple-directory password flow on the page context.
 async function loginOrg (page: Page, user: string, org: string) {
-  const directoryUrl = `http://localhost:${process.env.NGINX_PORT}/simple-directory`
+  const directoryUrl = `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/simple-directory`
   const res = await page.request.post(directoryUrl + '/api/auth/password', {
     data: { email: user + '@test.com', password: 'passwd', org },
     params: { redirect: directoryUrl },

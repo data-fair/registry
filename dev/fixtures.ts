@@ -219,7 +219,7 @@ async function main () {
 
   // --- Federation upstream ------------------------------------------------
   // Sync mirrors artefacts *from* an upstream registry, so exercising it needs a
-  // second registry. Requires the `api-upstream` process (npm run dev-api-upstream);
+  // second registry. Requires the `api-upstream` process (.zellij.kdl);
   // hard-fails if it is down, since that pane is part of the standard dev layout.
   const upstreamUrl = upstreamBaseURL()
   console.log(`\n→ Upstream registry ${upstreamUrl}`)
@@ -227,7 +227,7 @@ async function main () {
     await anonymousPing(upstreamUrl)
   } catch {
     throw new Error(
-      `upstream registry not reachable at ${upstreamUrl} — is the \`api-upstream\` zellij pane running? (npm run dev-api-upstream)`
+      `upstream registry not reachable at ${upstreamUrl} — is the \`api-upstream\` zellij pane running? (npx --no df-dev status)`
     )
   }
 

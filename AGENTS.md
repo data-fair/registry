@@ -17,13 +17,45 @@ Types are managed from JSON schemas (e.g., @api/config/type/index.ts). Run `npm 
 
 ## Dev environment
 
-The development processes are managed by the user using zellij and docker compose. An agent should never start/stop/restart processes in the dev environment.
+The dev environment is the shared one of the data-fair services (`@data-fair/lib-dev`, the
+`data-fair-service` skill of data-fair/lib): one zellij session per checkout, readable by humans,
+operated by agents only through `df-dev`. `dev/dev.json` declares what is specific to this repo (drawn
+ports, panes and their readiness URLs, optional containers), `.zellij.kdl` the panes: `status`
+(containers), `ui`, `api` (the registry), `api-upstream` (a second registry used as a federation mirror
+source, port `DEV_UPSTREAM_API_PORT`), and a free shell.
 
-Check if services are running: `bash dev/status.sh`
+The user starts the session (`npm run dev-zellij`). An agent never starts or kills it.
 
-Four dev processes run under zellij: `api` (the registry, port `DEV_API_PORT`), `api-upstream` (a second registry used as a federation mirror source, port `DEV_UPSTREAM_API_PORT`), `ui`, and `deps` (docker compose).
+| Need | Command |
+|---|---|
+| What runs, what is broken | `npx --no df-dev status` (containers, panes running / exited / **not ready**, memory) |
+| A process's output | `npx --no df-dev logs <pane> -n 100` (`api`, `api-upstream`, `ui`) |
+| Restart one process | `npx --no df-dev restart <pane>`: Ctrl+C, rerun, waits for the pane's readiness URL |
+| An optional container | `npx --no df-dev up events` / `down events`, then `restart api` so the config sees it |
 
-Log files are in `dev/logs/` (dev-api.log, dev-api-upstream.log, dev-ui.log, docker-compose.log).
+- Read the logs before restarting: nodemon and vite already reload on file changes.
+- "not ready" from `restart` → report to the user with the logs, never retry in a loop.
+- Never `docker compose restart`, `kill`, `zellij action`, nor `npm ci` / `npm install` while the env runs
+  (watchers restart on half-installed modules).
+- Always `npx --no`: a bare `npx df-dev` downloads an unrelated public package when the dependency is
+  missing (dependency confusion). Scripts and CI call `./node_modules/.bin/df-dev`.
+
+Containers: nginx, simple-directory and mongo are the core; `events` is optional (compose profile
+`events`, started with `npm run dev-zellij -- --services events` or `df-dev up events`). While it does not
+run, the api panes start with `privateEventsUrl` unset (`df-dev absent-config`, dev/dev.json "optional").
+CI starts every profile.
+
+The UI and simple-directory are served on `http://$DEV_HOST:$NGINX_PORT` (`<branch>.localhost`, so the
+session cookies of two worktrees never mix); the APIs answer directly on `localhost:<port>` too.
+
+Worktrees, from the main checkout: `npx --no df-worktree <branch>` / `npx --no df-worktree-delete <branch>`
+(branch names: letters, digits, `.`, `_`, `-`, no `/`, and `registry_<branch>` at most 60 characters).
+
+Ports are drawn per checkout into `.env` (`npx --no df-dev init-env`). Do not modify them.
+
+If a service is down, do not try to fix the infrastructure: run `npx --no df-dev status`, read the pane's
+logs (`npx --no df-dev logs <pane>`, or `docker compose logs <service>` for a container), and report the
+problem to the user with the relevant lines.
 
 ### Vulnerability scanner (osv-scanner)
 
@@ -39,7 +71,7 @@ Dev config enables npm vulnerability scanning (`api/config/development.js`), whi
 
 ## Testing
 
-Tests use Playwright as a test runner with 3 project types: unit (*.unit.spec.ts), api (*.api.spec.ts), and e2e (*.e2e.spec.ts). State setup/teardown fixtures run before api and e2e tests.
+Tests use Playwright as a test runner with 3 project types: unit (*.unit.spec.ts), api (*.api.spec.ts), and e2e (*.e2e.spec.ts). A state setup runs before api and e2e tests; if it reports the API unavailable, see "Dev environment" above.
 
 Run all tests:
 

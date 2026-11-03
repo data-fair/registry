@@ -145,7 +145,7 @@ test.describe('File artefacts', () => {
     })
 
     test('download with internal secret', async () => {
-      const ax = axiosInternal('secret-internal')
+      const ax = axiosInternal('secret-registry-internal')
       const res = await ax.get('/api/v1/artefacts/terrain/download', { responseType: 'arraybuffer' })
       expect(res.status).toBe(200)
       expect(res.headers['content-disposition']).toContain('terrain.mbtiles')

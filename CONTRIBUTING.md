@@ -2,29 +2,35 @@
 
 ## Prerequisites
 
-- Node.js 24
-- Docker & Docker Compose
+- Node.js, the version of `.nvmrc` (start zellij from a shell on it: the panes inherit its PATH)
+- Docker and Docker Compose v2
+- zellij >= 0.44
 
 ## Setup
 
-```bash
-# Install dependencies
-npm install
+The dev environment is the shared one of the data-fair services (`@data-fair/lib-dev`): a zellij
+session per checkout, described by `.zellij.kdl` and `dev/dev.json`.
 
-# Initialize .env with default ports
-./dev/init-env.sh
+1. Install dependencies, then write `.env` (free ports drawn for this checkout), build the types and the UI:
+   ```bash
+   npm ci
+   npx --no df-dev setup
+   ```
 
-# Start API and UI dev servers (uses zellij)
-npm run dev-zellij
-```
+2. Start the session (containers, API, upstream API, UI):
+   ```bash
+   npm run dev-zellij                       # core containers only
+   npm run dev-zellij -- --services events  # plus the optional events service
+   ```
+   The footer pane prints the URL. `npx --no df-dev status` shows what runs, `npx --no df-dev logs <pane>`
+   prints a pane's output.
 
-Check if services are running:
-
-```bash
-./dev/status.sh
-```
-
-Dev logs are written to `dev/logs/`.
+3. A new branch in its own worktree, from the main checkout:
+   ```bash
+   npx --no df-worktree <branch>          # creates ../registry_<branch>, npm ci + setup
+   npx --no df-worktree-delete <branch>   # removes it with its containers and zellij session
+   ```
+   Branch names: letters, digits, `.`, `_`, `-`, no `/`, and `registry_<branch>` at most 60 characters.
 
 ## Workspaces
 
@@ -38,11 +44,11 @@ Dev logs are written to `dev/logs/`.
 ## Scripts
 
 ```bash
-npm run dev-api       # Start API with nodemon
-npm run dev-ui        # Start UI with Vite HMR
+npm run dev-zellij    # Start the dev environment
+npm run dev:fixtures  # Seed the dev environment (upstream registry, mirror, artefacts)
 
 npm run test          # Run all tests (unit, api, e2e)
-npm run test tests/artefacts.api.spec.ts  # Run a specific test file
+npm run test-api -- tests/artefacts.api.spec.ts  # Run a specific test file
 
 npm run lint-fix      # Fix linting issues
 npm run check-types   # TypeScript type checking
@@ -66,7 +72,7 @@ Tests use [Playwright](https://playwright.dev/) as a test runner with 3 project 
 - **api** (`*.api.spec.ts`) -- API integration tests against a running dev environment
 - **e2e** (`*.e2e.spec.ts`) -- Browser-based end-to-end tests
 
-State setup/teardown fixtures run automatically before api and e2e tests. Test users are defined in `dev/resources/users.json`.
+A state setup runs automatically before api and e2e tests. Test users are defined in `dev/resources/users.json`.
 
 ## Commits
 

@@ -140,7 +140,7 @@ test.describe('Artefact admin metadata editing for a mirrored artefact', () => {
 // Logs in as an admin (admin mode on) by replaying the simple-directory password
 // flow on the page's request context, so the browser context carries the session.
 async function loginAdmin (page: Page) {
-  const directoryUrl = `http://localhost:${process.env.NGINX_PORT}/simple-directory`
+  const directoryUrl = `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/simple-directory`
   const res = await page.request.post(directoryUrl + '/api/auth/password', {
     data: { email: 'superadmin@test.com', password: 'passwd', adminMode: true },
     params: { redirect: directoryUrl },

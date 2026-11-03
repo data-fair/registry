@@ -1,0 +1,30 @@
+{
+  "ports": [
+    "NGINX_PORT",
+    "DEV_API_PORT",
+    "DEV_UPSTREAM_API_PORT",
+    "DEV_UI_PORT",
+    "DEV_UI_HMR_PORT",
+    "MONGO_PORT",
+    "SD_PORT",
+    "EVENTS_PORT",
+    "MAILDEV_SMTP_PORT"
+  ],
+  "panes": {
+    "api": {
+      "ready": "http://localhost:${DEV_API_PORT}/api/ping"
+    },
+    "api-upstream": {
+      "ready": "http://localhost:${DEV_UPSTREAM_API_PORT}/api/ping"
+    },
+    "ui": {
+      "ready": "http://localhost:${DEV_UI_PORT}/registry/"
+    }
+  },
+  "url": "http://${DEV_HOST}:${NGINX_PORT}/registry/",
+  "optional": {
+    "events": {
+      "privateEventsUrl": ""
+    }
+  }
+}

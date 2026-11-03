@@ -10,7 +10,7 @@ import { createTestTarball } from './support/test-tarball.ts'
 import { ensureArtefact, localNodeDir } from '../lib-node/index.ts'
 
 const registryUrl = `http://localhost:${process.env.DEV_API_PORT}`
-const secretKey = 'secret-internal'
+const secretKey = 'secret-registry-internal'
 let uploadApiKey: string
 let cacheDir: string
 
