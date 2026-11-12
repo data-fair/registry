@@ -6,8 +6,6 @@ if (!process.env.DEV_API_PORT) throw new Error('missing DEV_API_PORT env variabl
 export default {
   port: process.env.DEV_API_PORT,
   privateDirectoryUrl: `http://localhost:${process.env.SD_PORT}`,
-  // unset by the api panes while the optional events container does not run (dev/dev.json "optional")
-  privateEventsUrl: `http://localhost:${process.env.EVENTS_PORT}`,
   mongoUrl: `mongodb://localhost:${process.env.MONGO_PORT}/data-fair-registry-development`,
   dataDir: './data',
   // Vulnerability scanning is enabled in dev. Requires the osv-scanner binary
@@ -24,7 +22,6 @@ export default {
   },
   // the shared dev secrets of the data-fair services (data-fair-service skill, references/docker-compose.md)
   secretKeys: {
-    events: 'secret-events',
     internalServices: 'secret-registry-internal',
     apiKeysSalt: 'dev-api-keys-salt-0123456789abcdef01',
     cipherPassword: 'dev-cipher-password-0123456789abcdef'

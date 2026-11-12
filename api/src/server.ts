@@ -3,7 +3,6 @@ import { session } from '@data-fair/lib-express/index.js'
 import { startObserver, stopObserver } from '@data-fair/lib-node/observer.js'
 import log from '@data-fair/lib-node/log.js'
 import eventPromise from '@data-fair/lib-utils/event-promise.js'
-import eventsQueue from '@data-fair/lib-node/events-queue.js'
 import locks from '@data-fair/lib-node/locks.js'
 import * as wsEmitter from '@data-fair/lib-node/ws-emitter.js'
 import * as wsServer from '@data-fair/lib-express/ws-server.js'
@@ -41,14 +40,6 @@ export const start = async () => {
   // sessionState.user?.adminMode before calling it. Remote-registry sync is an
   // admin-only surface, so returning false refuses precisely everyone else.
   await wsServer.start(server, mongo.db, async () => false)
-
-  if (config.privateEventsUrl) {
-    if (!config.secretKeys?.events) {
-      log.error('missing secretKeys.events in config', { code: 'config-events-secret' })
-    } else {
-      await eventsQueue.start({ eventsUrl: config.privateEventsUrl, eventsSecret: config.secretKeys.events })
-    }
-  }
 
   server.listen(config.port)
   await eventPromise(server, 'listening')

@@ -1,6 +1,5 @@
 export default {
   privateDirectoryUrl: 'http://simple-directory:8080',
-  privateEventsUrl: undefined,
   mongoUrl: 'mongodb://localhost:27017/data-fair-registry',
   port: 8080,
   dataDir: '/data',
@@ -33,7 +32,6 @@ export default {
     port: 9090
   },
   secretKeys: {
-    events: undefined,
     internalServices: undefined,
     apiKeysSalt: undefined,
     cipherPassword: undefined
