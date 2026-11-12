@@ -12,12 +12,12 @@ layout {
     }
     pane name="api" command="bash" {
       // optional containers that do not run at start are unplugged from the config (dev/dev.json "optional")
-      args "-c" "./node_modules/.bin/df-dev wait-deps && export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config) && cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn exec ../node_modules/.bin/nodemon -e js,ts,json index.ts"
+      args "-c" "./node_modules/.bin/df-dev wait-deps && cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn exec ../node_modules/.bin/nodemon -e js,ts,json index.ts"
     }
     // a second registry, the upstream of the federation mirror (AGENTS.md "Exercising federation sync"):
     // same code, its own port, database and data dir (env variables win over NODE_CONFIG)
     pane name="api-upstream" command="bash" {
-      args "-c" "./node_modules/.bin/df-dev wait-deps && export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config) && cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn PORT=$DEV_UPSTREAM_API_PORT MONGO_URL=mongodb://localhost:$MONGO_PORT/data-fair-registry-upstream DATA_DIR=./data-upstream exec ../node_modules/.bin/nodemon -e js,ts,json index.ts"
+      args "-c" "./node_modules/.bin/df-dev wait-deps && cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn PORT=$DEV_UPSTREAM_API_PORT MONGO_URL=mongodb://localhost:$MONGO_PORT/data-fair-registry-upstream DATA_DIR=./data-upstream exec ../node_modules/.bin/nodemon -e js,ts,json index.ts"
     }
   }
   pane name="url" size=1 borderless=true command="bash" {

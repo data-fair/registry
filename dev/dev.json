@@ -7,7 +7,6 @@
     "DEV_UI_HMR_PORT",
     "MONGO_PORT",
     "SD_PORT",
-    "EVENTS_PORT",
     "MAILDEV_SMTP_PORT"
   ],
   "panes": {
@@ -21,10 +20,5 @@
       "ready": "http://localhost:${DEV_UI_PORT}/registry/"
     }
   },
-  "url": "http://${DEV_HOST}:${NGINX_PORT}/registry/",
-  "optional": {
-    "events": {
-      "privateEventsUrl": ""
-    }
-  }
+  "url": "http://${DEV_HOST}:${NGINX_PORT}/registry/"
 }

@@ -19,8 +19,7 @@ session per checkout, described by `.zellij.kdl` and `dev/dev.json`.
 
 2. Start the session (containers, API, upstream API, UI):
    ```bash
-   npm run dev-zellij                       # core containers only
-   npm run dev-zellij -- --services events  # plus the optional events service
+   npm run dev-zellij
    ```
    The footer pane prints the URL. `npx --no df-dev status` shows what runs, `npx --no df-dev logs <pane>`
    prints a pane's output.
