@@ -102,16 +102,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  editableMetadata: Métadonnées éditables
-  pickFile: Choisir une vignette
-  replaceFile: Remplacer la vignette
-  remove: Retirer la vignette
-  removalPending: La vignette sera retirée à l'enregistrement.
-  cancel: Annuler
-  mirroredNotice: Cet artefact est mirroré depuis un registre distant. Ses métadonnées sont en lecture seule ; seul l'accès local (public / accès privés) est modifiable ici.
-  save: Enregistrer
-  saved: Modifications enregistrées
 en:
   editableMetadata: Editable Metadata
   pickFile: Pick a thumbnail
@@ -122,6 +112,16 @@ en:
   mirroredNotice: This artefact is mirrored from a remote registry. Its metadata is read-only; only local access (public / private access) can be edited here.
   save: Save
   saved: Changes saved
+fr:
+  editableMetadata: Métadonnées éditables
+  pickFile: Choisir une vignette
+  replaceFile: Remplacer la vignette
+  remove: Retirer la vignette
+  removalPending: La vignette sera retirée à l'enregistrement.
+  cancel: Annuler
+  mirroredNotice: Cet artefact est mirroré depuis un registre distant. Ses métadonnées sont en lecture seule ; seul l'accès local (public / accès privés) est modifiable ici.
+  save: Enregistrer
+  saved: Modifications enregistrées
 </i18n>
 
 <script setup lang="ts">

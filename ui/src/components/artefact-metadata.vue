@@ -52,19 +52,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  metadata: "M\xE9tadonn\xE9es"
-  packageName: Nom du paquet
-  latestVersion: "Derni\xE8re version"
-  licence: Licence
-  category: "Cat\xE9gorie"
-  fileName: Fichier
-  size: Taille
-  dataUpdatedAt: "Donn\xE9es mises \xE0 jour le"
-  uploadedBy: "T\xE9l\xE9vers\xE9 par"
-  internal: service interne
-  hasNativeModules: Modules natifs
-  download: "T\xE9l\xE9charger"
 en:
   metadata: Metadata
   packageName: Package name
@@ -78,6 +65,19 @@ en:
   internal: internal service
   hasNativeModules: Native modules
   download: Download
+fr:
+  metadata: "M\xE9tadonn\xE9es"
+  packageName: Nom du paquet
+  latestVersion: "Derni\xE8re version"
+  licence: Licence
+  category: "Cat\xE9gorie"
+  fileName: Fichier
+  size: Taille
+  dataUpdatedAt: "Donn\xE9es mises \xE0 jour le"
+  uploadedBy: "T\xE9l\xE9vers\xE9 par"
+  internal: service interne
+  hasNativeModules: Modules natifs
+  download: "T\xE9l\xE9charger"
 </i18n>
 
 <script setup lang="ts">

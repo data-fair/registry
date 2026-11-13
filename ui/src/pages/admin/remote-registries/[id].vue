@@ -451,58 +451,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  admin: Administration
-  remoteRegistries: Registres distants
-  config: Configuration
-  name: Nom
-  url: URL
-  apiKey: Clé API
-  changeApiKey: Nouvelle clé API
-  save: Enregistrer
-  saved: Modifications enregistrées
-  syncStatus: Synchronisation
-  lastSyncAt: Dernière synchro
-  neverSynced: Jamais synchronisé
-  syncNow: Synchroniser maintenant
-  syncStarted: Synchronisation lancée
-  syncStarting: Démarrage…
-  running: En cours
-  interrupted: Interrompue
-  startedAt: Démarrée à
-  stoppedAt: Arrêtée à {done}/{total} artefacts
-  syncAlreadyRunning: Une synchronisation est déjà en cours
-  remoteArtefacts: Artefacts distants
-  search: Rechercher
-  artefactName: Nom
-  format: Format
-  category: Catégorie
-  mirror: Sélectionner
-  unselect: Désélectionner
-  version: Version
-  size: Taille
-  dataUpdatedAt: Données mises à jour
-  deprecated: Déprécié
-  mirrorStatus: Synchronisation
-  statusSuccess: Succès
-  statusError: Erreur
-  syncing: Synchronisation…
-  pendingSync: En attente de synchro
-  updateAvailable: Mise à jour disponible
-  synced: Synchronisé
-  conflict: Artefact local existant
-  selectionFailed: Échec de la sélection
-  conflictHint: Un artefact téléversé localement porte déjà cet identifiant ; supprimez-le pour pouvoir mirrorer celui du registre distant.
-  syncDone: "Synchronisation terminée ({n} artefact) | Synchronisation terminée ({n} artefacts)"
-  syncFailed: "Échec de la synchronisation : {error}"
-  dangerZone: Zone de danger
-  deleteRemote: Supprimer ce registre distant
-  confirmUnselectTitle: Arrêter le miroir ?
-  confirmUnselectText: "La copie locale de \"{id}\" est conservée mais devient un artefact local ordinaire, plus synchronisé. Tant qu'elle existe, cet identifiant ne pourra pas être mirroré à nouveau."
-  confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: Cela déverrouillera les artefacts miroir locaux mais ne les supprimera pas.
-  cancel: Annuler
-  delete: Supprimer
 en:
   admin: Administration
   remoteRegistries: Remote registries
@@ -555,6 +503,58 @@ en:
   confirmDeleteText: This will unlock local mirrored artefacts but will not delete them.
   cancel: Cancel
   delete: Delete
+fr:
+  admin: Administration
+  remoteRegistries: Registres distants
+  config: Configuration
+  name: Nom
+  url: URL
+  apiKey: Clé API
+  changeApiKey: Nouvelle clé API
+  save: Enregistrer
+  saved: Modifications enregistrées
+  syncStatus: Synchronisation
+  lastSyncAt: Dernière synchro
+  neverSynced: Jamais synchronisé
+  syncNow: Synchroniser maintenant
+  syncStarted: Synchronisation lancée
+  syncStarting: Démarrage…
+  running: En cours
+  interrupted: Interrompue
+  startedAt: Démarrée à
+  stoppedAt: Arrêtée à {done}/{total} artefacts
+  syncAlreadyRunning: Une synchronisation est déjà en cours
+  remoteArtefacts: Artefacts distants
+  search: Rechercher
+  artefactName: Nom
+  format: Format
+  category: Catégorie
+  mirror: Sélectionner
+  unselect: Désélectionner
+  version: Version
+  size: Taille
+  dataUpdatedAt: Données mises à jour
+  deprecated: Déprécié
+  mirrorStatus: Synchronisation
+  statusSuccess: Succès
+  statusError: Erreur
+  syncing: Synchronisation…
+  pendingSync: En attente de synchro
+  updateAvailable: Mise à jour disponible
+  synced: Synchronisé
+  conflict: Artefact local existant
+  selectionFailed: Échec de la sélection
+  conflictHint: Un artefact téléversé localement porte déjà cet identifiant ; supprimez-le pour pouvoir mirrorer celui du registre distant.
+  syncDone: "Synchronisation terminée ({n} artefact) | Synchronisation terminée ({n} artefacts)"
+  syncFailed: "Échec de la synchronisation : {error}"
+  dangerZone: Zone de danger
+  deleteRemote: Supprimer ce registre distant
+  confirmUnselectTitle: Arrêter le miroir ?
+  confirmUnselectText: "La copie locale de \"{id}\" est conservée mais devient un artefact local ordinaire, plus synchronisé. Tant qu'elle existe, cet identifiant ne pourra pas être mirroré à nouveau."
+  confirmDeleteTitle: Confirmer la suppression
+  confirmDeleteText: Cela déverrouillera les artefacts miroir locaux mais ne les supprimera pas.
+  cancel: Annuler
+  delete: Supprimer
 </i18n>
 
 <script setup lang="ts">

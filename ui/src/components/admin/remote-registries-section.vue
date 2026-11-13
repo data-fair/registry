@@ -191,25 +191,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  remoteRegistries: Registres distants
-  addRemote: Ajouter un registre distant
-  name: Nom
-  url: URL
-  apiKey: Clé API
-  selections: Sélections
-  lastSync: Dernière synchro
-  neverSynced: Jamais synchronisé
-  running: En cours
-  interrupted: Interrompue
-  statusSuccess: Succès
-  statusError: Erreur
-  add: Ajouter
-  manage: Gérer
-  delete: Supprimer
-  cancel: Annuler
-  confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: "Supprimer le registre distant \"{name}\" ? Ses artefacts miroir locaux seront déverrouillés mais pas supprimés."
 en:
   remoteRegistries: Remote Registries
   addRemote: Add Remote Registry
@@ -229,6 +210,25 @@ en:
   cancel: Cancel
   confirmDeleteTitle: Confirm deletion
   confirmDeleteText: "Delete the remote registry \"{name}\"? Its local mirrored artefacts will be unlocked but not deleted."
+fr:
+  remoteRegistries: Registres distants
+  addRemote: Ajouter un registre distant
+  name: Nom
+  url: URL
+  apiKey: Clé API
+  selections: Sélections
+  lastSync: Dernière synchro
+  neverSynced: Jamais synchronisé
+  running: En cours
+  interrupted: Interrompue
+  statusSuccess: Succès
+  statusError: Erreur
+  add: Ajouter
+  manage: Gérer
+  delete: Supprimer
+  cancel: Annuler
+  confirmDeleteTitle: Confirmer la suppression
+  confirmDeleteText: "Supprimer le registre distant \"{name}\" ? Ses artefacts miroir locaux seront déverrouillés mais pas supprimés."
 </i18n>
 
 <script setup lang="ts">

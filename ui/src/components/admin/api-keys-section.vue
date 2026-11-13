@@ -142,21 +142,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  createKey: Créer une clé d'upload
-  name: Nom
-  allowedCategory: Catégorie autorisée
-  allowedNamePrefix: Préfixe de nom autorisé
-  create: Créer
-  keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
-  keyWarning: Cette clé ne sera plus affichée après fermeture.
-  existingKeys: Clés existantes
-  prefix: Préfixe
-  createdBy: Créé par
-  createdAt: Créé le
-  expiresAt: Expiration
-  lastUsedAt: Dernière utilisation
-  never: Jamais
 en:
   createKey: Create upload key
   name: Name
@@ -172,6 +157,21 @@ en:
   expiresAt: Expires
   lastUsedAt: Last used
   never: Never
+fr:
+  createKey: Créer une clé d'upload
+  name: Nom
+  allowedCategory: Catégorie autorisée
+  allowedNamePrefix: Préfixe de nom autorisé
+  create: Créer
+  keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
+  keyWarning: Cette clé ne sera plus affichée après fermeture.
+  existingKeys: Clés existantes
+  prefix: Préfixe
+  createdBy: Créé par
+  createdAt: Créé le
+  expiresAt: Expiration
+  lastUsedAt: Dernière utilisation
+  never: Jamais
 </i18n>
 
 <script setup lang="ts">

@@ -112,17 +112,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  grantAccess: Accorder l'accès
-  searchAccount: Rechercher un compte
-  noAccounts: Aucun compte trouvé
-  grant: Accorder
-  existingGrants: Accès accordés
-  account: Compte
-  grantedBy: Accordé par
-  grantedAt: Accordé le
-  organization: Organisation
-  user: Utilisateur
 en:
   grantAccess: Grant Access
   searchAccount: Search an account
@@ -134,6 +123,17 @@ en:
   grantedAt: Granted
   organization: Organization
   user: User
+fr:
+  grantAccess: Accorder l'accès
+  searchAccount: Rechercher un compte
+  noAccounts: Aucun compte trouvé
+  grant: Accorder
+  existingGrants: Accès accordés
+  account: Compte
+  grantedBy: Accordé par
+  grantedAt: Accordé le
+  organization: Organisation
+  user: Utilisateur
 </i18n>
 
 <script setup lang="ts">

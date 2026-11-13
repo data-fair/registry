@@ -66,18 +66,18 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  artefacts: Artefacts
-  noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
-  loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
-  mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
-  deprecatedNotice: "Cet artefact est d\xE9pr\xE9ci\xE9. Il reste disponible mais n'est plus recommand\xE9."
 en:
   artefacts: Artefacts
   noAccessGrant: Contact your administrator for download access.
   loginRequired: Log in to access downloads.
   mirroredFrom: "This artefact is mirrored from remote registry: {origin}"
   deprecatedNotice: "This artefact is deprecated. It remains available but is no longer recommended."
+fr:
+  artefacts: Artefacts
+  noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
+  loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
+  mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
+  deprecatedNotice: "Cet artefact est d\xE9pr\xE9ci\xE9. Il reste disponible mais n'est plus recommand\xE9."
 </i18n>
 
 <script setup lang="ts">

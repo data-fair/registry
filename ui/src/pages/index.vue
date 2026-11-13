@@ -314,38 +314,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  browse: Parcourir
-  apiKeys: "Cl\xE9s API"
-  search: Rechercher
-  category: "Cat\xE9gorie"
-  group: Groupe
-  name: Nom
-  version: Version
-  size: Taille
-  vulns: "Vuln\xE9rabilit\xE9s"
-  scanError: "\xC9chec de l'analyse"
-  critical: critique
-  high: "\xE9lev\xE9e"
-  medium: moyenne
-  low: faible
-  unknown: inconnue
-  visibility: "Visibilit\xE9"
-  mirror: Miroir
-  deprecated: "D\xE9pr\xE9ci\xE9"
-  showDeprecated: "Afficher les versions d\xE9pr\xE9ci\xE9es"
-  dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
-  artefacts: Artefacts
-  artefactsCount: "{n} artefact | {n} artefacts"
-  edit: Éditer
-  createKey: "Cr\xE9er une cl\xE9 de lecture"
-  keyName: "Nom de la cl\xE9"
-  create: "Cr\xE9er"
-  keyCreated: "Cl\xE9 cr\xE9\xE9e avec succ\xE8s. Copiez-la maintenant :"
-  keyWarning: "Cette cl\xE9 ne sera plus affich\xE9e apr\xE8s fermeture."
-  existingKeys: "Cl\xE9s existantes"
-  createdAt: "Cr\xE9\xE9 le"
-  expiresAt: Expiration
 en:
   browse: Browse
   apiKeys: API Keys
@@ -378,6 +346,38 @@ en:
   existingKeys: Existing keys
   createdAt: Created
   expiresAt: Expires
+fr:
+  browse: Parcourir
+  apiKeys: "Cl\xE9s API"
+  search: Rechercher
+  category: "Cat\xE9gorie"
+  group: Groupe
+  name: Nom
+  version: Version
+  size: Taille
+  vulns: "Vuln\xE9rabilit\xE9s"
+  scanError: "\xC9chec de l'analyse"
+  critical: critique
+  high: "\xE9lev\xE9e"
+  medium: moyenne
+  low: faible
+  unknown: inconnue
+  visibility: "Visibilit\xE9"
+  mirror: Miroir
+  deprecated: "D\xE9pr\xE9ci\xE9"
+  showDeprecated: "Afficher les versions d\xE9pr\xE9ci\xE9es"
+  dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
+  artefacts: Artefacts
+  artefactsCount: "{n} artefact | {n} artefacts"
+  edit: Éditer
+  createKey: "Cr\xE9er une cl\xE9 de lecture"
+  keyName: "Nom de la cl\xE9"
+  create: "Cr\xE9er"
+  keyCreated: "Cl\xE9 cr\xE9\xE9e avec succ\xE8s. Copiez-la maintenant :"
+  keyWarning: "Cette cl\xE9 ne sera plus affich\xE9e apr\xE8s fermeture."
+  existingKeys: "Cl\xE9s existantes"
+  createdAt: "Cr\xE9\xE9 le"
+  expiresAt: Expiration
 </i18n>
 
 <script setup lang="ts">

@@ -154,32 +154,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  dangerZone: Zone de danger
-  deleteArtefact: Supprimer l'artefact
-  confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: "Voulez-vous vraiment supprimer l'artefact \"{name}\" et ses données ?"
-  cancel: Annuler
-  delete: Supprimer
-  deleted: Artefact supprimé
-  scanTitle: Analyse de vulnérabilités
-  rescan: Réanalyser
-  rescanQueued: Analyse demandée
-  scanNever: Pas encore analysé
-  scanClean: Aucune vulnérabilité connue
-  scanStatus: Statut
-  scanFailed: Échec de l'analyse
-  hasInstallScripts: Ce paquet exécute des scripts d'installation (preinstall/postinstall) — à vérifier avant utilisation.
-  critical: critique
-  high: élevée
-  medium: moyenne
-  low: faible
-  unknown: inconnue
-  package: Paquet
-  installed: Installée
-  fixedIn: Corrigé dans
-  severity: Gravité
-  advisory: Avis
 en:
   dangerZone: Danger Zone
   deleteArtefact: Delete Artefact
@@ -206,6 +180,32 @@ en:
   fixedIn: Fixed in
   severity: Severity
   advisory: Advisory
+fr:
+  dangerZone: Zone de danger
+  deleteArtefact: Supprimer l'artefact
+  confirmDeleteTitle: Confirmer la suppression
+  confirmDeleteText: "Voulez-vous vraiment supprimer l'artefact \"{name}\" et ses données ?"
+  cancel: Annuler
+  delete: Supprimer
+  deleted: Artefact supprimé
+  scanTitle: Analyse de vulnérabilités
+  rescan: Réanalyser
+  rescanQueued: Analyse demandée
+  scanNever: Pas encore analysé
+  scanClean: Aucune vulnérabilité connue
+  scanStatus: Statut
+  scanFailed: Échec de l'analyse
+  hasInstallScripts: Ce paquet exécute des scripts d'installation (preinstall/postinstall) — à vérifier avant utilisation.
+  critical: critique
+  high: élevée
+  medium: moyenne
+  low: faible
+  unknown: inconnue
+  package: Paquet
+  installed: Installée
+  fixedIn: Corrigé dans
+  severity: Gravité
+  advisory: Avis
 </i18n>
 
 <script setup lang="ts">

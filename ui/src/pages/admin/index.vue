@@ -44,16 +44,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  admin: Administration
-  vulnerabilities: "Vuln\xE9rabilit\xE9s"
-  vulnerabilitiesSubtitle: "Synth\xE8se des analyses de vuln\xE9rabilit\xE9s des artefacts npm du parc."
-  apiKeys: Clés API
-  apiKeysSubtitle: Les clés d'upload permettent aux services externes de téléverser des artefacts dans le registre.
-  accessGrants: Accès accordés
-  accessGrantsSubtitle: Autoriser des comptes à télécharger les ressources du registre qui leur sont visibles. La visibilité est contrôlée séparément sur chaque artefact (public ou restreint) ; un accès accordé ici permet ensuite le téléchargement effectif des artefacts auxquels le compte a accès.
-  remoteRegistries: Registres distants
-  remoteRegistriesSubtitle: Synchronisez des artefacts depuis d'autres registres pour les mettre en miroir localement.
 en:
   admin: Administration
   vulnerabilities: Vulnerabilities
@@ -64,6 +54,16 @@ en:
   accessGrantsSubtitle: Authorize accounts to download registry resources visible to them. Visibility is controlled separately on each artefact (public or restricted); a grant here enables the actual download of the artefacts the account can see.
   remoteRegistries: Remote Registries
   remoteRegistriesSubtitle: Mirror artefacts locally by syncing from other registries.
+fr:
+  admin: Administration
+  vulnerabilities: "Vuln\xE9rabilit\xE9s"
+  vulnerabilitiesSubtitle: "Synth\xE8se des analyses de vuln\xE9rabilit\xE9s des artefacts npm du parc."
+  apiKeys: Clés API
+  apiKeysSubtitle: Les clés d'upload permettent aux services externes de téléverser des artefacts dans le registre.
+  accessGrants: Accès accordés
+  accessGrantsSubtitle: Autoriser des comptes à télécharger les ressources du registre qui leur sont visibles. La visibilité est contrôlée séparément sur chaque artefact (public ou restreint) ; un accès accordé ici permet ensuite le téléchargement effectif des artefacts auxquels le compte a accès.
+  remoteRegistries: Registres distants
+  remoteRegistriesSubtitle: Synchronisez des artefacts depuis d'autres registres pour les mettre en miroir localement.
 </i18n>
 
 <script setup lang="ts">
