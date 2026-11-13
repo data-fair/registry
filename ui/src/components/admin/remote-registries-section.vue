@@ -155,6 +155,7 @@
                 variant="text"
                 class="ml-1"
                 :title="t('delete')"
+                :aria-label="t('delete')"
                 @click="confirmDeleteId = reg._id"
               />
             </td>

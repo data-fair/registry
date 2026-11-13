@@ -95,7 +95,7 @@
                 <img
                   v-if="artefact.thumbnail"
                   :src="`${$apiPath}/v1/thumbnails/${artefact.thumbnail.id}/data`"
-                  :alt="(artefact.title as any)?.[locale] || artefact.name"
+                  :alt="localized(artefact.title, locale) || artefact.name"
                   width="40"
                   height="40"
                   style="object-fit: contain; display: block;"
@@ -106,7 +106,7 @@
                   :to="`/artefacts/${encodeURIComponent(artefact._id)}`"
                   class="artefact-row-link"
                 >
-                  <strong>{{ (artefact.title as any)?.[locale] || artefact.name }}</strong>
+                  <strong>{{ localized(artefact.title, locale) || artefact.name }}</strong>
                 </router-link>
                 <v-chip
                   v-if="adminMode && artefact.origin"
@@ -135,7 +135,7 @@
                   {{ categoryLabel(artefact.category, locale) }}
                 </v-chip>
               </td>
-              <td>{{ (artefact.group as any)?.[locale] || '-' }}</td>
+              <td>{{ localized(artefact.group, locale) || '-' }}</td>
               <td>{{ artefact.version || '-' }}</td>
               <td>{{ typeof artefact.size === 'number' ? formatBytes(artefact.size, locale) : '-' }}</td>
               <td v-if="showVulns">
@@ -145,7 +145,7 @@
                   size="x-small"
                   label
                 >
-                  {{ vulnChip(artefact)!.count }} {{ t(vulnChip(artefact)!.severity) }}
+                  {{ t(`${vulnChip(artefact)!.severity}Count`, vulnChip(artefact)!.count) }}
                 </v-chip>
                 <v-icon
                   v-else-if="artefact.scan?.status === 'error'"
@@ -301,6 +301,8 @@
                   color="error"
                   size="small"
                   variant="text"
+                  :title="t('delete')"
+                  :aria-label="t('delete')"
                   :loading="deletingKeyId === key._id"
                   @click="deleteKey(key._id)"
                 />
@@ -325,11 +327,11 @@ en:
   size: Size
   vulns: Vulnerabilities
   scanError: Scan failed
-  critical: critical
-  high: high
-  medium: medium
-  low: low
-  unknown: unknown
+  criticalCount: "{n} critical | {n} critical"
+  highCount: "{n} high | {n} high"
+  mediumCount: "{n} medium | {n} medium"
+  lowCount: "{n} low | {n} low"
+  unknownCount: "{n} unknown | {n} unknown"
   visibility: Visibility
   mirror: Mirror
   deprecated: Deprecated
@@ -346,6 +348,7 @@ en:
   existingKeys: Existing keys
   createdAt: Created
   expiresAt: Expires
+  delete: Delete
 fr:
   browse: Parcourir
   apiKeys: "Cl\xE9s API"
@@ -357,11 +360,11 @@ fr:
   size: Taille
   vulns: "Vuln\xE9rabilit\xE9s"
   scanError: "\xC9chec de l'analyse"
-  critical: critique
-  high: "\xE9lev\xE9e"
-  medium: moyenne
-  low: faible
-  unknown: inconnue
+  criticalCount: "{n} critique | {n} critiques"
+  highCount: "{n} élevée | {n} élevées"
+  mediumCount: "{n} moyenne | {n} moyennes"
+  lowCount: "{n} faible | {n} faibles"
+  unknownCount: "{n} inconnue | {n} inconnues"
   visibility: "Visibilit\xE9"
   mirror: Miroir
   deprecated: "D\xE9pr\xE9ci\xE9"
@@ -378,6 +381,7 @@ fr:
   existingKeys: "Cl\xE9s existantes"
   createdAt: "Cr\xE9\xE9 le"
   expiresAt: Expiration
+  delete: Supprimer
 </i18n>
 
 <script setup lang="ts">
@@ -388,6 +392,7 @@ import { VDateInput } from 'vuetify/components/VDateInput'
 // Explicit import (rather than the src/utils auto-import) so the helpers resolve
 // reliably even before the dev server's auto-import scan picks up severity.ts.
 import { severityColor, worstSeverity } from '~/utils/severity'
+import { contentLocale, localized } from '~/utils/localized'
 import type { Artefact } from '#api/types'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 
@@ -447,7 +452,7 @@ const toggleSort = (key: string) => {
 const columns = computed(() => [
   { key: 'name', title: t('name') },
   { key: 'category', title: t('category') },
-  { key: `group.${locale.value}`, title: t('group') },
+  { key: `group.${contentLocale(locale.value)}`, title: t('group') },
   { key: 'version', title: t('version') },
   { key: 'size', title: t('size') },
   ...(showVulns.value ? [{ key: 'vulnerabilities', title: t('vulns') }] : []),

@@ -85,6 +85,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
+import { localized } from '~/utils/localized'
 import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
@@ -98,7 +99,7 @@ const artefact = ref<Artefact | null>(null)
 
 useBreadcrumbs().setForPage(() => [
   { title: t('artefacts'), to: '/' },
-  { title: (artefact.value?.title as any)?.[locale.value] || artefact.value?.name || artefactId.value, disabled: true }
+  { title: localized(artefact.value?.title, locale.value) || artefact.value?.name || artefactId.value, disabled: true }
 ])
 const fetchLoading = ref(true)
 const hasGrant = ref(false)

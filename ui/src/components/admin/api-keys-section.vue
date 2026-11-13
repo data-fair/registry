@@ -118,7 +118,7 @@
           >
             <td><code>reg_{{ key.shortId }}</code></td>
             <td>{{ key.name }}</td>
-            <td>{{ key.allowedCategory || '—' }}</td>
+            <td>{{ key.allowedCategory ? categoryLabel(key.allowedCategory, locale) : '—' }}</td>
             <td>{{ key.allowedNamePrefix || '—' }}</td>
             <td>{{ key.createdBy.name || key.createdBy.id }}</td>
             <td>{{ dayjs(key.createdAt).format('L LT') }}</td>
@@ -130,6 +130,8 @@
                 color="error"
                 size="small"
                 variant="text"
+                :title="t('delete')"
+                :aria-label="t('delete')"
                 :loading="deletingKeyId === key._id"
                 @click="deleteKey(key._id)"
               />
@@ -157,6 +159,7 @@ en:
   expiresAt: Expires
   lastUsedAt: Last used
   never: Never
+  delete: Delete
 fr:
   createKey: Créer une clé d'upload
   name: Nom
@@ -172,19 +175,20 @@ fr:
   expiresAt: Expiration
   lastUsedAt: Dernière utilisation
   never: Jamais
+  delete: Supprimer
 </i18n>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
 import { VDateInput } from 'vuetify/components/VDateInput'
-import { categoryValues } from '../../utils/categories'
+import { categoryItems as buildCategoryItems, categoryLabel } from '~/utils/categories'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { dayjs } = useLocaleDayjs()
 
-const categoryItems: string[] = [...categoryValues]
+const categoryItems = computed(() => buildCategoryItems(locale.value))
 
 type NewKey = {
   name: string

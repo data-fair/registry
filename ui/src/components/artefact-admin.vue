@@ -34,7 +34,7 @@
                 size="small"
                 label
               >
-                {{ artefact.scan.summary?.[sev] }} {{ t(sev) }}
+                {{ t(`${sev}Count`, artefact.scan.summary?.[sev] ?? 0) }}
               </v-chip>
             </template>
             <span v-if="(artefact.scan.summary?.total ?? 0) === 0 && artefact.scan.status === 'success'">{{ t('scanClean') }}</span>
@@ -58,8 +58,8 @@
             {{ artefact.scan.error || t('scanFailed') }}
           </v-alert>
           <div class="text-caption mb-2">
-            {{ t('scanStatus') }}: {{ artefact.scan.status }}<template v-if="artefact.scan.finishedAt">
-              — {{ new Date(artefact.scan.finishedAt).toLocaleString(locale) }}
+            {{ t('scanStatus', { status: t(`status.${artefact.scan.status}`) }) }}<template v-if="artefact.scan.finishedAt">
+              — {{ dayjs(artefact.scan.finishedAt).format('L LT') }}
             </template>
           </div>
           <v-table
@@ -167,7 +167,12 @@ en:
   rescanQueued: Scan queued
   scanNever: Not scanned yet
   scanClean: No known vulnerabilities
-  scanStatus: Status
+  scanStatus: "Status: {status}"
+  status:
+    pending: pending
+    running: running
+    success: done
+    error: failed
   scanFailed: Scan failed
   hasInstallScripts: This package runs install scripts (preinstall/postinstall) — review before use.
   critical: critical
@@ -175,6 +180,11 @@ en:
   medium: medium
   low: low
   unknown: unknown
+  criticalCount: "{n} critical | {n} critical"
+  highCount: "{n} high | {n} high"
+  mediumCount: "{n} medium | {n} medium"
+  lowCount: "{n} low | {n} low"
+  unknownCount: "{n} unknown | {n} unknown"
   package: Package
   installed: Installed
   fixedIn: Fixed in
@@ -193,7 +203,12 @@ fr:
   rescanQueued: Analyse demandée
   scanNever: Pas encore analysé
   scanClean: Aucune vulnérabilité connue
-  scanStatus: Statut
+  scanStatus: "Statut : {status}"
+  status:
+    pending: en attente
+    running: en cours
+    success: terminée
+    error: en échec
   scanFailed: Échec de l'analyse
   hasInstallScripts: Ce paquet exécute des scripts d'installation (preinstall/postinstall) — à vérifier avant utilisation.
   critical: critique
@@ -201,6 +216,11 @@ fr:
   medium: moyenne
   low: faible
   unknown: inconnue
+  criticalCount: "{n} critique | {n} critiques"
+  highCount: "{n} élevée | {n} élevées"
+  mediumCount: "{n} moyenne | {n} moyennes"
+  lowCount: "{n} faible | {n} faibles"
+  unknownCount: "{n} inconnue | {n} inconnues"
   package: Paquet
   installed: Installée
   fixedIn: Corrigé dans
@@ -219,7 +239,8 @@ import type { Artefact } from '#api/types'
 const { artefact } = defineProps<{ artefact: Artefact }>()
 const emit = defineEmits<{ changed: [] }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { dayjs } = useLocaleDayjs()
 const router = useRouter()
 
 const confirmDelete = ref(false)

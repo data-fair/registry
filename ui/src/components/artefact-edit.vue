@@ -74,14 +74,14 @@
         />
         <vjsf-patch-req
           :model-value="readonlyData"
-          :locale="locale"
+          :locale="vjsfLocale"
           :options="readonlyVjsfOptions"
         />
       </template>
       <v-form v-model="valid">
         <vjsf-patch-req
           v-model="editData"
-          :locale="locale"
+          :locale="vjsfLocale"
           :options="vjsfOptions"
         />
       </v-form>
@@ -133,11 +133,15 @@ import { computedDeepDiff } from '@data-fair/lib-vue/deep-diff.js'
 import { useLeaveGuard } from '@data-fair/lib-vue/leave-guard.js'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
 import type { Artefact } from '#api/types'
+import { contentLocale } from '~/utils/localized'
 
 const { artefact } = defineProps<{ artefact: Artefact }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const { t, locale } = useI18n()
+// The form is compiled for en and fr only (vjsf-patch-req-en/fr): other session
+// languages get the English one.
+const vjsfLocale = computed(() => contentLocale(locale.value))
 
 // Mirrored artefacts: the remote registry owns the metadata. Only `public`
 // and `privateAccess` can be patched locally (the API rejects anything else
@@ -202,7 +206,7 @@ const vjsfOptions = computed<Partial<VjsfOptions>>(() => ({
   density: 'comfortable',
   readOnlyPropertiesMode: 'hide',
   initialValidation: 'always',
-  locale: locale.value,
+  locale: vjsfLocale.value,
   xI18n: true,
   // accessOnly mirrors mirrored: on a mirror the editable form shows only the
   // local access fields; on a normal artefact it shows everything.

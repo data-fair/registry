@@ -100,6 +100,8 @@
                 color="error"
                 size="small"
                 variant="text"
+                :title="t('revoke')"
+                :aria-label="t('revoke')"
                 :loading="revokingGrantId === grant._id"
                 @click="revokeGrant(grant._id)"
               />
@@ -123,6 +125,7 @@ en:
   grantedAt: Granted
   organization: Organization
   user: User
+  revoke: Revoke
 fr:
   grantAccess: Accorder l'accès
   searchAccount: Rechercher un compte
@@ -134,6 +137,7 @@ fr:
   grantedAt: Accordé le
   organization: Organisation
   user: Utilisateur
+  revoke: Révoquer
 </i18n>
 
 <script setup lang="ts">

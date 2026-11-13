@@ -258,14 +258,14 @@
                 <img
                   v-if="art.thumbnail"
                   :src="`${$apiPath}/v1/remote-registries/${encodeURIComponent(registryId)}/remote-thumbnails/${art.thumbnail.id}/data`"
-                  :alt="art.title?.[locale] || art.name"
+                  :alt="localized(art.title, locale) || art.name"
                   width="40"
                   height="40"
                   style="object-fit: contain; display: block;"
                 >
               </td>
               <td>
-                <strong>{{ art.title?.[locale] || art.name }}</strong>
+                <strong>{{ localized(art.title, locale) || art.name }}</strong>
                 <v-chip
                   v-if="art.deprecated"
                   size="x-small"
@@ -565,6 +565,7 @@ import { mdiMagnify } from '@mdi/js'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
 import { useRegistrySync } from '~/composables/registry-sync'
 import { categoryColor, categoryLabel, categoryItems } from '~/utils/categories'
+import { localized } from '~/utils/localized'
 
 const { t, locale } = useI18n()
 const router = useRouter()
