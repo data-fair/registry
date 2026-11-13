@@ -118,7 +118,7 @@
           >
             <td><code>reg_{{ key.shortId }}</code></td>
             <td>{{ key.name }}</td>
-            <td>{{ key.allowedCategory || '—' }}</td>
+            <td>{{ key.allowedCategory ? categoryLabel(key.allowedCategory, locale) : '—' }}</td>
             <td>{{ key.allowedNamePrefix || '—' }}</td>
             <td>{{ key.createdBy.name || key.createdBy.id }}</td>
             <td>{{ dayjs(key.createdAt).format('L LT') }}</td>
@@ -130,6 +130,8 @@
                 color="error"
                 size="small"
                 variant="text"
+                :title="t('delete')"
+                :aria-label="t('delete')"
                 :loading="deletingKeyId === key._id"
                 @click="deleteKey(key._id)"
               />
@@ -142,21 +144,6 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  createKey: Créer une clé d'upload
-  name: Nom
-  allowedCategory: Catégorie autorisée
-  allowedNamePrefix: Préfixe de nom autorisé
-  create: Créer
-  keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
-  keyWarning: Cette clé ne sera plus affichée après fermeture.
-  existingKeys: Clés existantes
-  prefix: Préfixe
-  createdBy: Créé par
-  createdAt: Créé le
-  expiresAt: Expiration
-  lastUsedAt: Dernière utilisation
-  never: Jamais
 en:
   createKey: Create upload key
   name: Name
@@ -164,27 +151,44 @@ en:
   allowedNamePrefix: Allowed name prefix
   create: Create
   keyCreated: "Key created successfully. Copy it now:"
-  keyWarning: This key will not be shown again after you close this.
-  existingKeys: Existing Keys
+  keyWarning: This key will not be shown again once this message is closed.
+  existingKeys: Existing keys
   prefix: Prefix
   createdBy: Created by
   createdAt: Created
   expiresAt: Expires
   lastUsedAt: Last used
   never: Never
+  delete: Delete
+fr:
+  createKey: Créer une clé de téléversement
+  name: Nom
+  allowedCategory: Catégorie autorisée
+  allowedNamePrefix: Préfixe de nom autorisé
+  create: Créer
+  keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
+  keyWarning: Cette clé ne sera plus affichée une fois ce message fermé.
+  existingKeys: Clés existantes
+  prefix: Préfixe
+  createdBy: Créée par
+  createdAt: Créée le
+  expiresAt: Expiration
+  lastUsedAt: Dernière utilisation
+  never: Jamais
+  delete: Supprimer
 </i18n>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { mdiDelete } from '@mdi/js'
 import { VDateInput } from 'vuetify/components/VDateInput'
-import { categoryValues } from '../../utils/categories'
+import { categoryItems as buildCategoryItems, categoryLabel } from '~/utils/categories'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { dayjs } = useLocaleDayjs()
 
-const categoryItems: string[] = [...categoryValues]
+const categoryItems = computed(() => buildCategoryItems(locale.value))
 
 type NewKey = {
   name: string

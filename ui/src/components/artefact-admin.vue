@@ -34,7 +34,7 @@
                 size="small"
                 label
               >
-                {{ artefact.scan.summary?.[sev] }} {{ t(sev) }}
+                {{ t(`${sev}Count`, artefact.scan.summary?.[sev] ?? 0) }}
               </v-chip>
             </template>
             <span v-if="(artefact.scan.summary?.total ?? 0) === 0 && artefact.scan.status === 'success'">{{ t('scanClean') }}</span>
@@ -58,8 +58,8 @@
             {{ artefact.scan.error || t('scanFailed') }}
           </v-alert>
           <div class="text-caption mb-2">
-            {{ t('scanStatus') }}: {{ artefact.scan.status }}<template v-if="artefact.scan.finishedAt">
-              — {{ new Date(artefact.scan.finishedAt).toLocaleString(locale) }}
+            {{ t('scanStatus', { status: t(`status.${artefact.scan.status}`) }) }}<template v-if="artefact.scan.finishedAt">
+              — {{ dayjs(artefact.scan.finishedAt).format('L LT') }}
             </template>
           </div>
           <v-table
@@ -154,37 +154,11 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  dangerZone: Zone de danger
-  deleteArtefact: Supprimer l'artefact
-  confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: "Voulez-vous vraiment supprimer l'artefact \"{name}\" et ses données ?"
-  cancel: Annuler
-  delete: Supprimer
-  deleted: Artefact supprimé
-  scanTitle: Analyse de vulnérabilités
-  rescan: Réanalyser
-  rescanQueued: Analyse demandée
-  scanNever: Pas encore analysé
-  scanClean: Aucune vulnérabilité connue
-  scanStatus: Statut
-  scanFailed: Échec de l'analyse
-  hasInstallScripts: Ce paquet exécute des scripts d'installation (preinstall/postinstall) — à vérifier avant utilisation.
-  critical: critique
-  high: élevée
-  medium: moyenne
-  low: faible
-  unknown: inconnue
-  package: Paquet
-  installed: Installée
-  fixedIn: Corrigé dans
-  severity: Gravité
-  advisory: Avis
 en:
-  dangerZone: Danger Zone
-  deleteArtefact: Delete Artefact
-  confirmDeleteTitle: Confirm Deletion
-  confirmDeleteText: "Are you sure you want to delete artefact \"{name}\" and its data?"
+  dangerZone: Danger zone
+  deleteArtefact: Delete artefact
+  confirmDeleteTitle: Confirm deletion
+  confirmDeleteText: "Are you sure you want to delete the artefact \"{name}\" and its data?"
   cancel: Cancel
   delete: Delete
   deleted: Artefact deleted
@@ -193,7 +167,12 @@ en:
   rescanQueued: Scan queued
   scanNever: Not scanned yet
   scanClean: No known vulnerabilities
-  scanStatus: Status
+  scanStatus: "Status: {status}"
+  status:
+    pending: pending
+    running: running
+    success: done
+    error: failed
   scanFailed: Scan failed
   hasInstallScripts: This package runs install scripts (preinstall/postinstall) — review before use.
   critical: critical
@@ -201,11 +180,52 @@ en:
   medium: medium
   low: low
   unknown: unknown
+  criticalCount: "{n} critical | {n} critical"
+  highCount: "{n} high | {n} high"
+  mediumCount: "{n} medium | {n} medium"
+  lowCount: "{n} low | {n} low"
+  unknownCount: "{n} unknown | {n} unknown"
   package: Package
-  installed: Installed
+  installed: Installed version
   fixedIn: Fixed in
   severity: Severity
   advisory: Advisory
+fr:
+  dangerZone: Zone de danger
+  deleteArtefact: Supprimer l'artefact
+  confirmDeleteTitle: Confirmer la suppression
+  confirmDeleteText: Voulez-vous vraiment supprimer l'artefact « {name} » et ses données ?
+  cancel: Annuler
+  delete: Supprimer
+  deleted: Artefact supprimé
+  scanTitle: Analyse de vulnérabilités
+  rescan: Réanalyser
+  rescanQueued: Analyse demandée
+  scanNever: Pas encore analysé
+  scanClean: Aucune vulnérabilité connue
+  scanStatus: "Statut : {status}"
+  status:
+    pending: en attente
+    running: en cours
+    success: terminée
+    error: en échec
+  scanFailed: Échec de l'analyse
+  hasInstallScripts: Ce paquet exécute des scripts d'installation (preinstall/postinstall) — à vérifier avant utilisation.
+  critical: critique
+  high: élevée
+  medium: moyenne
+  low: faible
+  unknown: inconnue
+  criticalCount: "{n} critique | {n} critiques"
+  highCount: "{n} élevée | {n} élevées"
+  mediumCount: "{n} moyenne | {n} moyennes"
+  lowCount: "{n} faible | {n} faibles"
+  unknownCount: "{n} inconnue | {n} inconnues"
+  package: Paquet
+  installed: Version installée
+  fixedIn: Corrigée en
+  severity: Gravité
+  advisory: Avis
 </i18n>
 
 <script setup lang="ts">
@@ -219,7 +239,8 @@ import type { Artefact } from '#api/types'
 const { artefact } = defineProps<{ artefact: Artefact }>()
 const emit = defineEmits<{ changed: [] }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { dayjs } = useLocaleDayjs()
 const router = useRouter()
 
 const confirmDelete = ref(false)

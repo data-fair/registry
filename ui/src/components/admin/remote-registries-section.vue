@@ -155,6 +155,7 @@
                 variant="text"
                 class="ml-1"
                 :title="t('delete')"
+                :aria-label="t('delete')"
                 @click="confirmDeleteId = reg._id"
               />
             </td>
@@ -191,33 +192,14 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  remoteRegistries: Registres distants
-  addRemote: Ajouter un registre distant
-  name: Nom
-  url: URL
-  apiKey: Clé API
-  selections: Sélections
-  lastSync: Dernière synchro
-  neverSynced: Jamais synchronisé
-  running: En cours
-  interrupted: Interrompue
-  statusSuccess: Succès
-  statusError: Erreur
-  add: Ajouter
-  manage: Gérer
-  delete: Supprimer
-  cancel: Annuler
-  confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: "Supprimer le registre distant \"{name}\" ? Ses artefacts miroir locaux seront déverrouillés mais pas supprimés."
 en:
-  remoteRegistries: Remote Registries
-  addRemote: Add Remote Registry
+  remoteRegistries: Remote registries
+  addRemote: Add a remote registry
   name: Name
   url: URL
-  apiKey: API Key
+  apiKey: API key
   selections: Selections
-  lastSync: Last Sync
+  lastSync: Last sync
   neverSynced: Never synced
   running: Running
   interrupted: Interrupted
@@ -228,7 +210,26 @@ en:
   delete: Delete
   cancel: Cancel
   confirmDeleteTitle: Confirm deletion
-  confirmDeleteText: "Delete the remote registry \"{name}\"? Its local mirrored artefacts will be unlocked but not deleted."
+  confirmDeleteText: "Delete the remote registry \"{name}\"? The artefacts mirrored locally from it will be unlocked but not deleted."
+fr:
+  remoteRegistries: Registres distants
+  addRemote: Ajouter un registre distant
+  name: Nom
+  url: URL
+  apiKey: Clé API
+  selections: Sélections
+  lastSync: Dernière synchronisation
+  neverSynced: Jamais synchronisé
+  running: En cours
+  interrupted: Interrompue
+  statusSuccess: Succès
+  statusError: Erreur
+  add: Ajouter
+  manage: Gérer
+  delete: Supprimer
+  cancel: Annuler
+  confirmDeleteTitle: Confirmer la suppression
+  confirmDeleteText: Supprimer le registre distant « {name} » ? Les artefacts mis en miroir localement depuis ce registre seront déverrouillés mais pas supprimés.
 </i18n>
 
 <script setup lang="ts">

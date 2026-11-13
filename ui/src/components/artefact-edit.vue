@@ -74,14 +74,14 @@
         />
         <vjsf-patch-req
           :model-value="readonlyData"
-          :locale="locale"
+          :locale="vjsfLocale"
           :options="readonlyVjsfOptions"
         />
       </template>
       <v-form v-model="valid">
         <vjsf-patch-req
           v-model="editData"
-          :locale="locale"
+          :locale="vjsfLocale"
           :options="vjsfOptions"
         />
       </v-form>
@@ -102,19 +102,9 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  editableMetadata: Métadonnées éditables
-  pickFile: Choisir une vignette
-  replaceFile: Remplacer la vignette
-  remove: Retirer la vignette
-  removalPending: La vignette sera retirée à l'enregistrement.
-  cancel: Annuler
-  mirroredNotice: Cet artefact est mirroré depuis un registre distant. Ses métadonnées sont en lecture seule ; seul l'accès local (public / accès privés) est modifiable ici.
-  save: Enregistrer
-  saved: Modifications enregistrées
 en:
-  editableMetadata: Editable Metadata
-  pickFile: Pick a thumbnail
+  editableMetadata: Editable metadata
+  pickFile: Choose a thumbnail
   replaceFile: Replace the thumbnail
   remove: Remove the thumbnail
   removalPending: The thumbnail will be removed on save.
@@ -122,6 +112,16 @@ en:
   mirroredNotice: This artefact is mirrored from a remote registry. Its metadata is read-only; only local access (public / private access) can be edited here.
   save: Save
   saved: Changes saved
+fr:
+  editableMetadata: Métadonnées modifiables
+  pickFile: Choisir une vignette
+  replaceFile: Remplacer la vignette
+  remove: Retirer la vignette
+  removalPending: La vignette sera retirée à l'enregistrement.
+  cancel: Annuler
+  mirroredNotice: Cet artefact est mis en miroir depuis un registre distant. Ses métadonnées sont en lecture seule ; seul l'accès local (public / accès privés) est modifiable ici.
+  save: Enregistrer
+  saved: Modifications enregistrées
 </i18n>
 
 <script setup lang="ts">
@@ -133,11 +133,15 @@ import { computedDeepDiff } from '@data-fair/lib-vue/deep-diff.js'
 import { useLeaveGuard } from '@data-fair/lib-vue/leave-guard.js'
 import type { VjsfOptions } from '@koumoul/vjsf/types.js'
 import type { Artefact } from '#api/types'
+import { contentLocale } from '~/utils/localized'
 
 const { artefact } = defineProps<{ artefact: Artefact }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const { t, locale } = useI18n()
+// The form is compiled for en and fr only (vjsf-patch-req-en/fr): other session
+// languages get the English one.
+const vjsfLocale = computed(() => contentLocale(locale.value))
 
 // Mirrored artefacts: the remote registry owns the metadata. Only `public`
 // and `privateAccess` can be patched locally (the API rejects anything else
@@ -202,7 +206,7 @@ const vjsfOptions = computed<Partial<VjsfOptions>>(() => ({
   density: 'comfortable',
   readOnlyPropertiesMode: 'hide',
   initialValidation: 'always',
-  locale: locale.value,
+  locale: vjsfLocale.value,
   xI18n: true,
   // accessOnly mirrors mirrored: on a mirror the editable form shows only the
   // local access fields; on a normal artefact it shows everything.

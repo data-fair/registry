@@ -100,6 +100,8 @@
                 color="error"
                 size="small"
                 variant="text"
+                :title="t('revoke')"
+                :aria-label="t('revoke')"
                 :loading="revokingGrantId === grant._id"
                 @click="revokeGrant(grant._id)"
               />
@@ -112,6 +114,18 @@
 </template>
 
 <i18n lang="yaml">
+en:
+  grantAccess: Grant access
+  searchAccount: Search for an account
+  noAccounts: No account found
+  grant: Grant
+  existingGrants: Existing grants
+  account: Account
+  grantedBy: Granted by
+  grantedAt: Granted
+  organization: Organization
+  user: User
+  revoke: Revoke
 fr:
   grantAccess: Accorder l'accès
   searchAccount: Rechercher un compte
@@ -123,17 +137,7 @@ fr:
   grantedAt: Accordé le
   organization: Organisation
   user: Utilisateur
-en:
-  grantAccess: Grant Access
-  searchAccount: Search an account
-  noAccounts: No account found
-  grant: Grant
-  existingGrants: Existing Grants
-  account: Account
-  grantedBy: Granted by
-  grantedAt: Granted
-  organization: Organization
-  user: User
+  revoke: Révoquer
 </i18n>
 
 <script setup lang="ts">
