@@ -31,7 +31,6 @@ The user starts the session (`npm run dev-zellij`). An agent never starts or kil
 | What runs, what is broken | `npx --no df-dev status` (containers, panes running / exited / **not ready**, memory) |
 | A process's output | `npx --no df-dev logs <pane> -n 100` (`api`, `api-upstream`, `ui`) |
 | Restart one process | `npx --no df-dev restart <pane>`: Ctrl+C, rerun, waits for the pane's readiness URL |
-| An optional container | `npx --no df-dev up events` / `down events`, then `restart api` so the config sees it |
 
 - Read the logs before restarting: nodemon and vite already reload on file changes.
 - "not ready" from `restart` → report to the user with the logs, never retry in a loop.
@@ -40,10 +39,8 @@ The user starts the session (`npm run dev-zellij`). An agent never starts or kil
 - Always `npx --no`: a bare `npx df-dev` downloads an unrelated public package when the dependency is
   missing (dependency confusion). Scripts and CI call `./node_modules/.bin/df-dev`.
 
-Containers: nginx, simple-directory and mongo are the core; `events` is optional (compose profile
-`events`, started with `npm run dev-zellij -- --services events` or `df-dev up events`). While it does not
-run, the api panes start with `privateEventsUrl` unset (`df-dev absent-config`, dev/dev.json "optional").
-CI starts every profile.
+Containers: nginx, simple-directory and mongo. registry sends no events, so the dev env has no events
+service.
 
 The UI and simple-directory are served on `http://$DEV_HOST:$NGINX_PORT` (`<branch>.localhost`, so the
 session cookies of two worktrees never mix); the APIs answer directly on `localhost:<port>` too.

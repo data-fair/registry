@@ -90,17 +90,11 @@
       "type": "string",
       "pattern": "^https?://"
     },
-    "privateEventsUrl": {
-      "type": "string"
-    },
     "secretKeys": {
       "type": "object",
       "additionalProperties": false,
       "required": ["apiKeysSalt", "cipherPassword"],
       "properties": {
-        "events": {
-          "type": "string"
-        },
         "internalServices": {
           "type": "string"
         },

@@ -13,7 +13,6 @@ services:
       - DEV_API_PORT=${DEV_API_PORT}
       - DEV_UI_PORT=${DEV_UI_PORT}
       - SD_PORT=${SD_PORT}
-      - EVENTS_PORT=${EVENTS_PORT}
     volumes:
       - ./dev/resources/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
 
@@ -41,7 +40,6 @@ services:
       - AUTHRATELIMIT_DURATION=1
       - MANAGE_SITES=true
       - SECRET_SITES=secret-sites
-      - SECRET_EVENTS=secret-events
       - SECRET_SENDMAILS=secret-sendmails
       # host network: sd's default SMTP localhost:1025 would reach another env's maildev; nothing listens
       # on this one (registry has no mail flow of its own)
@@ -62,24 +60,6 @@ services:
       interval: 2s
       timeout: 2s
       retries: 60
-
-  # optional (npx --no df-dev up events): without it the API runs with privateEventsUrl unset
-  # (dev/dev.json "optional")
-  events:
-    profiles:
-      - events
-    image: ghcr.io/data-fair/events:main
-    network_mode: host
-    depends_on:
-      - mongo
-    environment:
-      - PORT=${EVENTS_PORT}
-      - PRIVATE_DIRECTORY_URL=http://localhost:${SD_PORT}
-      - MONGO_URL=mongodb://localhost:${MONGO_PORT}/data-fair-events
-      - OBSERVER_ACTIVE=false
-      - SECRET_IDENTITIES=secret-identities
-      - SECRET_EVENTS=secret-events
-      - SECRET_SENDMAILS=secret-sendmails
 
   #####
   # storage

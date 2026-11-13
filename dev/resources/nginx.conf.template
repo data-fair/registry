@@ -46,7 +46,7 @@ server {
   listen ${NGINX_PORT};
   server_name ${DEV_HOST};
 
-  rewrite ^(/simple-directory|/events|/registry)$ $1/ redirect;
+  rewrite ^(/simple-directory|/registry)$ $1/ redirect;
 
   location = / {
     return 302 /registry/;
@@ -66,9 +66,5 @@ server {
 
   location /simple-directory/ {
     proxy_pass http://localhost:${SD_PORT};
-  }
-
-  location /events/ {
-    proxy_pass http://localhost:${EVENTS_PORT};
   }
 }
