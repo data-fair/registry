@@ -74,7 +74,6 @@ fr:
   deprecatedNotice: "Cet artefact est d\xE9pr\xE9ci\xE9. Il reste disponible mais n'est plus recommand\xE9."
 en:
   artefacts: Artefacts
-  tarball: Tarball
   noAccessGrant: Contact your administrator for download access.
   loginRequired: Log in to access downloads.
   mirroredFrom: "This artefact is mirrored from remote registry: {origin}"
