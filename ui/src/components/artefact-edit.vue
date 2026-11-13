@@ -103,8 +103,8 @@
 
 <i18n lang="yaml">
 en:
-  editableMetadata: Editable Metadata
-  pickFile: Pick a thumbnail
+  editableMetadata: Editable metadata
+  pickFile: Choose a thumbnail
   replaceFile: Replace the thumbnail
   remove: Remove the thumbnail
   removalPending: The thumbnail will be removed on save.
@@ -113,13 +113,13 @@ en:
   save: Save
   saved: Changes saved
 fr:
-  editableMetadata: Métadonnées éditables
+  editableMetadata: Métadonnées modifiables
   pickFile: Choisir une vignette
   replaceFile: Remplacer la vignette
   remove: Retirer la vignette
   removalPending: La vignette sera retirée à l'enregistrement.
   cancel: Annuler
-  mirroredNotice: Cet artefact est mirroré depuis un registre distant. Ses métadonnées sont en lecture seule ; seul l'accès local (public / accès privés) est modifiable ici.
+  mirroredNotice: Cet artefact est mis en miroir depuis un registre distant. Ses métadonnées sont en lecture seule ; seul l'accès local (public / accès privés) est modifiable ici.
   save: Enregistrer
   saved: Modifications enregistrées
 </i18n>

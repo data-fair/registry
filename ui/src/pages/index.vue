@@ -318,7 +318,7 @@
 <i18n lang="yaml">
 en:
   browse: Browse
-  apiKeys: API Keys
+  apiKeys: API keys
   search: Search
   category: Category
   group: Group
@@ -335,7 +335,7 @@ en:
   visibility: Visibility
   mirror: Mirror
   deprecated: Deprecated
-  showDeprecated: Show deprecated
+  showDeprecated: Show deprecated versions
   dataUpdatedAt: Data updated
   artefacts: Artefacts
   artefactsCount: "{n} artefact | {n} artefacts"
@@ -344,42 +344,42 @@ en:
   keyName: Key name
   create: Create
   keyCreated: "Key created successfully. Copy it now:"
-  keyWarning: This key will not be shown again after you close this.
+  keyWarning: This key will not be shown again once this message is closed.
   existingKeys: Existing keys
   createdAt: Created
   expiresAt: Expires
   delete: Delete
 fr:
   browse: Parcourir
-  apiKeys: "Cl\xE9s API"
+  apiKeys: "Clés API"
   search: Rechercher
-  category: "Cat\xE9gorie"
+  category: "Catégorie"
   group: Groupe
   name: Nom
   version: Version
   size: Taille
-  vulns: "Vuln\xE9rabilit\xE9s"
-  scanError: "\xC9chec de l'analyse"
+  vulns: "Vulnérabilités"
+  scanError: "Échec de l'analyse"
   criticalCount: "{n} critique | {n} critiques"
   highCount: "{n} élevée | {n} élevées"
   mediumCount: "{n} moyenne | {n} moyennes"
   lowCount: "{n} faible | {n} faibles"
   unknownCount: "{n} inconnue | {n} inconnues"
-  visibility: "Visibilit\xE9"
+  visibility: "Visibilité"
   mirror: Miroir
-  deprecated: "D\xE9pr\xE9ci\xE9"
-  showDeprecated: "Afficher les versions d\xE9pr\xE9ci\xE9es"
-  dataUpdatedAt: "Donn\xE9es mises \xE0 jour"
+  deprecated: "Déprécié"
+  showDeprecated: "Afficher les versions dépréciées"
+  dataUpdatedAt: "Données mises à jour"
   artefacts: Artefacts
   artefactsCount: "{n} artefact | {n} artefacts"
-  edit: Éditer
-  createKey: "Cr\xE9er une cl\xE9 de lecture"
-  keyName: "Nom de la cl\xE9"
-  create: "Cr\xE9er"
-  keyCreated: "Cl\xE9 cr\xE9\xE9e avec succ\xE8s. Copiez-la maintenant :"
-  keyWarning: "Cette cl\xE9 ne sera plus affich\xE9e apr\xE8s fermeture."
-  existingKeys: "Cl\xE9s existantes"
-  createdAt: "Cr\xE9\xE9 le"
+  edit: Modifier
+  createKey: "Créer une clé de lecture"
+  keyName: "Nom de la clé"
+  create: "Créer"
+  keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
+  keyWarning: Cette clé ne sera plus affichée une fois ce message fermé.
+  existingKeys: "Clés existantes"
+  createdAt: Créée le
   expiresAt: Expiration
   delete: Supprimer
 </i18n>

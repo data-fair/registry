@@ -155,10 +155,10 @@
 
 <i18n lang="yaml">
 en:
-  dangerZone: Danger Zone
-  deleteArtefact: Delete Artefact
-  confirmDeleteTitle: Confirm Deletion
-  confirmDeleteText: "Are you sure you want to delete artefact \"{name}\" and its data?"
+  dangerZone: Danger zone
+  deleteArtefact: Delete artefact
+  confirmDeleteTitle: Confirm deletion
+  confirmDeleteText: "Are you sure you want to delete the artefact \"{name}\" and its data?"
   cancel: Cancel
   delete: Delete
   deleted: Artefact deleted
@@ -186,7 +186,7 @@ en:
   lowCount: "{n} low | {n} low"
   unknownCount: "{n} unknown | {n} unknown"
   package: Package
-  installed: Installed
+  installed: Installed version
   fixedIn: Fixed in
   severity: Severity
   advisory: Advisory
@@ -194,7 +194,7 @@ fr:
   dangerZone: Zone de danger
   deleteArtefact: Supprimer l'artefact
   confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: "Voulez-vous vraiment supprimer l'artefact \"{name}\" et ses données ?"
+  confirmDeleteText: Voulez-vous vraiment supprimer l'artefact « {name} » et ses données ?
   cancel: Annuler
   delete: Supprimer
   deleted: Artefact supprimé
@@ -222,8 +222,8 @@ fr:
   lowCount: "{n} faible | {n} faibles"
   unknownCount: "{n} inconnue | {n} inconnues"
   package: Paquet
-  installed: Installée
-  fixedIn: Corrigé dans
+  installed: Version installée
+  fixedIn: Corrigée en
   severity: Gravité
   advisory: Avis
 </i18n>

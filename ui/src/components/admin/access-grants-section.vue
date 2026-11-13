@@ -115,11 +115,11 @@
 
 <i18n lang="yaml">
 en:
-  grantAccess: Grant Access
-  searchAccount: Search an account
+  grantAccess: Grant access
+  searchAccount: Search for an account
   noAccounts: No account found
   grant: Grant
-  existingGrants: Existing Grants
+  existingGrants: Existing grants
   account: Account
   grantedBy: Granted by
   grantedAt: Granted

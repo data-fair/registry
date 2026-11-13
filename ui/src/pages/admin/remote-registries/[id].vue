@@ -116,7 +116,7 @@
             </template>
           </div>
           <div class="text-medium-emphasis text-body-2">
-            {{ t('startedAt') }}: {{ dayjs(registry.syncProgress.startedAt).format('LT') }}
+            {{ t('startedAt', { time: dayjs(registry.syncProgress.startedAt).format('LT') }) }}
           </div>
         </template>
 
@@ -138,12 +138,12 @@
             {{ t('stoppedAt', { done: registry.syncProgress.done, total: registry.syncProgress.total }) }}
           </div>
           <div class="text-medium-emphasis text-body-2">
-            {{ t('startedAt') }}: {{ dayjs(registry.syncProgress.startedAt).format('L LT') }}
+            {{ t('startedOn', { date: dayjs(registry.syncProgress.startedAt).format('L LT') }) }}
           </div>
         </template>
 
         <div v-if="!syncRunning && registry.lastSyncAt">
-          {{ t('lastSyncAt') }}: {{ dayjs(registry.lastSyncAt).format('L LT') }}
+          {{ t('lastSyncAt', { date: dayjs(registry.lastSyncAt).format('L LT') }) }}
         </div>
         <div
           v-if="!syncRunning && registry.lastSyncError"
@@ -457,22 +457,23 @@ en:
   config: Configuration
   name: Name
   url: URL
-  apiKey: API Key
-  changeApiKey: New API Key
+  apiKey: API key
+  changeApiKey: New API key
   save: Save
   saved: Changes saved
   syncStatus: Synchronization
-  lastSyncAt: Last sync
+  lastSyncAt: "Last sync: {date}"
   neverSynced: Never synced
-  syncNow: Sync Now
+  syncNow: Sync now
   syncStarted: Sync started
   syncStarting: Starting…
   running: Running
   interrupted: Interrupted
-  startedAt: Started at
+  startedAt: Started at {time}
+  startedOn: Started on {date}
   stoppedAt: Stopped at {done}/{total} artefacts
   syncAlreadyRunning: A sync is already running
-  remoteArtefacts: Remote Artefacts
+  remoteArtefacts: Remote artefacts
   search: Search
   artefactName: Name
   format: Format
@@ -495,12 +496,12 @@ en:
   conflictHint: A locally uploaded artefact already has this id; delete it to mirror the remote one.
   syncDone: "Sync done ({n} artefact) | Sync done ({n} artefacts)"
   syncFailed: "Sync failed: {error}"
-  dangerZone: Danger Zone
+  dangerZone: Danger zone
   deleteRemote: Delete this remote registry
   confirmUnselectTitle: Stop mirroring?
   confirmUnselectText: "The local copy of \"{id}\" is kept but becomes a plain local artefact, no longer synced. While it exists, this id cannot be mirrored again."
-  confirmDeleteTitle: Confirm Deletion
-  confirmDeleteText: This will unlock local mirrored artefacts but will not delete them.
+  confirmDeleteTitle: Confirm deletion
+  confirmDeleteText: The artefacts mirrored locally from this registry will be unlocked but not deleted.
   cancel: Cancel
   delete: Delete
 fr:
@@ -514,14 +515,15 @@ fr:
   save: Enregistrer
   saved: Modifications enregistrées
   syncStatus: Synchronisation
-  lastSyncAt: Dernière synchro
+  lastSyncAt: "Dernière synchronisation : {date}"
   neverSynced: Jamais synchronisé
   syncNow: Synchroniser maintenant
   syncStarted: Synchronisation lancée
   syncStarting: Démarrage…
   running: En cours
   interrupted: Interrompue
-  startedAt: Démarrée à
+  startedAt: Démarrée à {time}
+  startedOn: Démarrée le {date}
   stoppedAt: Arrêtée à {done}/{total} artefacts
   syncAlreadyRunning: Une synchronisation est déjà en cours
   remoteArtefacts: Artefacts distants
@@ -539,20 +541,20 @@ fr:
   statusSuccess: Succès
   statusError: Erreur
   syncing: Synchronisation…
-  pendingSync: En attente de synchro
+  pendingSync: En attente de synchronisation
   updateAvailable: Mise à jour disponible
   synced: Synchronisé
   conflict: Artefact local existant
   selectionFailed: Échec de la sélection
-  conflictHint: Un artefact téléversé localement porte déjà cet identifiant ; supprimez-le pour pouvoir mirrorer celui du registre distant.
+  conflictHint: Un artefact téléversé localement porte déjà cet identifiant ; supprimez-le pour pouvoir mettre en miroir celui du registre distant.
   syncDone: "Synchronisation terminée ({n} artefact) | Synchronisation terminée ({n} artefacts)"
   syncFailed: "Échec de la synchronisation : {error}"
   dangerZone: Zone de danger
   deleteRemote: Supprimer ce registre distant
   confirmUnselectTitle: Arrêter le miroir ?
-  confirmUnselectText: "La copie locale de \"{id}\" est conservée mais devient un artefact local ordinaire, plus synchronisé. Tant qu'elle existe, cet identifiant ne pourra pas être mirroré à nouveau."
+  confirmUnselectText: La copie locale de « {id} » est conservée mais devient un artefact local ordinaire, qui n'est plus synchronisé. Tant qu'elle existe, cet identifiant ne pourra pas être mis en miroir à nouveau.
   confirmDeleteTitle: Confirmer la suppression
-  confirmDeleteText: Cela déverrouillera les artefacts miroir locaux mais ne les supprimera pas.
+  confirmDeleteText: Les artefacts mis en miroir localement depuis ce registre seront déverrouillés mais pas supprimés.
   cancel: Annuler
   delete: Supprimer
 </i18n>

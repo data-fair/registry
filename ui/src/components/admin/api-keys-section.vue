@@ -151,8 +151,8 @@ en:
   allowedNamePrefix: Allowed name prefix
   create: Create
   keyCreated: "Key created successfully. Copy it now:"
-  keyWarning: This key will not be shown again after you close this.
-  existingKeys: Existing Keys
+  keyWarning: This key will not be shown again once this message is closed.
+  existingKeys: Existing keys
   prefix: Prefix
   createdBy: Created by
   createdAt: Created
@@ -161,17 +161,17 @@ en:
   never: Never
   delete: Delete
 fr:
-  createKey: Créer une clé d'upload
+  createKey: Créer une clé de téléversement
   name: Nom
   allowedCategory: Catégorie autorisée
   allowedNamePrefix: Préfixe de nom autorisé
   create: Créer
   keyCreated: "Clé créée avec succès. Copiez-la maintenant :"
-  keyWarning: Cette clé ne sera plus affichée après fermeture.
+  keyWarning: Cette clé ne sera plus affichée une fois ce message fermé.
   existingKeys: Clés existantes
   prefix: Préfixe
-  createdBy: Créé par
-  createdAt: Créé le
+  createdBy: Créée par
+  createdAt: Créée le
   expiresAt: Expiration
   lastUsedAt: Dernière utilisation
   never: Jamais
