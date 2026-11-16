@@ -152,7 +152,6 @@ declare module 'vue' {
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
-    readonly injectHead: UnwrapRef<typeof import('@unhead/vue')['injectHead']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
@@ -201,8 +200,6 @@ declare module 'vue' {
     readonly useDisplayOwner: UnwrapRef<typeof import('@data-fair/lib-vue/owner.js')['useDisplayOwner']>
     readonly useEditFetch: UnwrapRef<typeof import('@data-fair/lib-vue/edit-fetch.js')['useEditFetch']>
     readonly useFetch: UnwrapRef<typeof import('@data-fair/lib-vue/fetch.js')['useFetch']>
-    readonly useHead: UnwrapRef<typeof import('@unhead/vue')['useHead']>
-    readonly useHeadSafe: UnwrapRef<typeof import('@unhead/vue')['useHeadSafe']>
     readonly useI18n: UnwrapRef<typeof import('vue-i18n')['useI18n']>
     readonly useId: UnwrapRef<typeof import('vue')['useId']>
     readonly useLeaveGuard: UnwrapRef<typeof import('@data-fair/lib-vue/leave-guard.js')['useLeaveGuard']>
@@ -214,10 +211,6 @@ declare module 'vue' {
     readonly useRegistrySync: UnwrapRef<typeof import('../src/composables/registry-sync')['useRegistrySync']>
     readonly useRoute: UnwrapRef<typeof import('vue-router')['useRoute']>
     readonly useRouter: UnwrapRef<typeof import('vue-router')['useRouter']>
-    readonly useSeoMeta: UnwrapRef<typeof import('@unhead/vue')['useSeoMeta']>
-    readonly useServerHead: UnwrapRef<typeof import('@unhead/vue')['useServerHead']>
-    readonly useServerHeadSafe: UnwrapRef<typeof import('@unhead/vue')['useServerHeadSafe']>
-    readonly useServerSeoMeta: UnwrapRef<typeof import('@unhead/vue')['useServerSeoMeta']>
     readonly useSession: UnwrapRef<typeof import('@data-fair/lib-vue/session.js')['useSession']>
     readonly useSessionAuthenticated: UnwrapRef<typeof import('@data-fair/lib-vue/session.js')['useSessionAuthenticated']>
     readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>

@@ -5,7 +5,6 @@ import VueRouter from 'unplugin-vue-router/vite'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
-import { unheadVueComposablesImports } from '@unhead/vue'
 import Vuetify from 'vite-plugin-vuetify'
 import microTemplate from '@data-fair/lib-utils/micro-template.js'
 import { autoImports, settingsPath } from '@data-fair/lib-vuetify/vite.js'
@@ -50,7 +49,6 @@ export default defineConfig(({ command, isPreview }) => ({
       vueTemplate: true,
       imports: [
         ...(autoImports as any),
-        unheadVueComposablesImports,
         {
           '~/context': ['$uiConfig', '$sitePath', '$cspNonce', '$apiPath', '$fetch']
         }
