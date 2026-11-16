@@ -19,14 +19,18 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Lint and type-check
-      run: npm run lint && npm run build-types && npm run check-types
+    - name: Lint and build types
+      run: npm run lint && npm run build-types
 
     - name: Init env
       run: ./node_modules/.bin/df-dev init-env
 
+    # also writes the .d.ts files of ui/dts (auto-imports, components, typed router) vue-tsc needs
     - name: Build UI
       run: NODE_CONFIG_DIR=$PWD/api/config/ npm -w ui run build
+
+    - name: Type-check
+      run: npm run check-types
 
     # every profile: CI tests every integration
     - name: Start dev dependencies
