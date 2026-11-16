@@ -17,7 +17,7 @@
     "build-types": "mkdir -p ui/src/components/vjsf && df-build-types . --vjsf-dir ui/src/components/vjsf",
     "prepare": "husky || true",
     "check-types": "tsc && npm -w ui run check-types",
-    "quality": "npm run lint && npm run build-types && npm run check-types && npm run test"
+    "quality": "npm run lint && npm run build-types && NODE_CONFIG_DIR=$PWD/api/config/ npm -w ui run build && npm run check-types && npm run test"
   },
   "repository": {
     "type": "git",

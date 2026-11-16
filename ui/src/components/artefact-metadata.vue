@@ -52,32 +52,32 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  metadata: "M\xE9tadonn\xE9es"
-  packageName: Nom du paquet
-  latestVersion: "Derni\xE8re version"
-  licence: Licence
-  category: "Cat\xE9gorie"
-  fileName: Fichier
-  size: Taille
-  dataUpdatedAt: "Donn\xE9es mises \xE0 jour le"
-  uploadedBy: "T\xE9l\xE9vers\xE9 par"
-  internal: service interne
-  hasNativeModules: Modules natifs
-  download: "T\xE9l\xE9charger"
 en:
   metadata: Metadata
   packageName: Package name
   latestVersion: Latest version
-  licence: Licence
+  licence: License
   category: Category
   fileName: File
   size: Size
-  dataUpdatedAt: Data updated
+  dataUpdatedAt: Data updated on
   uploadedBy: Uploaded by
   internal: internal service
   hasNativeModules: Native modules
   download: Download
+fr:
+  metadata: "Métadonnées"
+  packageName: Nom du paquet
+  latestVersion: "Dernière version"
+  licence: Licence
+  category: "Catégorie"
+  fileName: Fichier
+  size: Taille
+  dataUpdatedAt: "Données mises à jour le"
+  uploadedBy: "Téléversé par"
+  internal: service interne
+  hasNativeModules: Modules natifs
+  download: "Télécharger"
 </i18n>
 
 <script setup lang="ts">

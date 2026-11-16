@@ -26,5 +26,5 @@ export default [
       'no-undef': 'off'
     }
   },
-  { ignores: ['dist/*', 'dts/*', 'src/components/vjsf/*', 'node_modules/*', 'components.d.ts'] },
+  { ignores: ['dist/*', 'dts/*', 'src/components/vjsf/*', 'node_modules/*'] },
 ]

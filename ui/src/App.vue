@@ -12,9 +12,7 @@ import uiNotif from '@data-fair/lib-vuetify/ui-notif.vue'
 
 const session = useSession()
 
-useHead({
-  htmlAttrs: { lang: session.lang.value ?? 'fr' }
-})
+watchEffect(() => { document.documentElement.lang = session.lang.value ?? 'fr' })
 </script>
 
 <style>

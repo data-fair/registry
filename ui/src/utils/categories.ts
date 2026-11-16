@@ -1,14 +1,14 @@
 export const categoryValues = ['processing', 'catalog', 'application', 'skill', 'tileset', 'maplibre-style', 'other'] as const
 export type Category = typeof categoryValues[number]
 
-export const categoryLabels: Record<Category, { fr: string, en: string }> = {
-  processing: { fr: 'Traitement', en: 'Processing' },
-  catalog: { fr: 'Catalogue', en: 'Catalog' },
-  application: { fr: 'Application', en: 'Application' },
-  skill: { fr: 'Compétence d\'agent', en: 'Agent skill' },
-  tileset: { fr: 'Tuiles', en: 'Tileset' },
-  'maplibre-style': { fr: 'Style Maplibre', en: 'Maplibre style' },
-  other: { fr: 'Autre', en: 'Other' }
+export const categoryLabels: Record<Category, { en: string, fr: string }> = {
+  processing: { en: 'Processing', fr: 'Traitement' },
+  catalog: { en: 'Catalog', fr: 'Catalogue' },
+  application: { en: 'Application', fr: 'Application' },
+  skill: { en: 'Agent skill', fr: 'Compétence d\'agent' },
+  tileset: { en: 'Tileset', fr: 'Tuiles' },
+  'maplibre-style': { en: 'Maplibre style', fr: 'Style Maplibre' },
+  other: { en: 'Other', fr: 'Autre' }
 }
 
 export const categoryColors: Record<Category, string> = {

@@ -13,10 +13,10 @@ export const vocabulary = defineScopes({
   registry: {
     tiers: ['read'],
     descriptions: {
-      umbrella: { fr: 'Tous les droits sur le registre d\'artefacts', en: 'All artefact registry scopes' },
+      umbrella: { en: 'All artefact registry scopes', fr: 'Tous les droits sur le registre d\'artefacts' },
       read: {
-        fr: 'Parcourir le catalogue d\'artefacts du registre : métadonnées et téléchargement des artefacts visibles par le compte',
-        en: 'Browse the artefact catalog of the registry: metadata and downloads of the artefacts visible to the account'
+        en: 'Browse the artefact catalog of the registry: metadata and downloads of the artefacts visible to the account',
+        fr: 'Parcourir le catalogue d\'artefacts du registre : métadonnées et téléchargement des artefacts visibles par le compte'
       }
     }
   }

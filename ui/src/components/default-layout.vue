@@ -36,9 +36,9 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  admin: Administration
 en:
+  admin: Administration
+fr:
   admin: Administration
 </i18n>
 

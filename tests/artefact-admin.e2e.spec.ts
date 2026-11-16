@@ -113,7 +113,7 @@ test.describe('Artefact admin metadata editing for a mirrored artefact', () => {
     await expect(page.locator('#artefact-edit')).toBeVisible()
 
     // Mirror notice is shown and the remote-owned metadata appears read-only.
-    await expect(page.getByText('mirroré depuis un registre distant')).toBeVisible()
+    await expect(page.getByText('mis en miroir depuis un registre distant')).toBeVisible()
     const groupEn = page.getByLabel('Groupe - Anglais')
     await expect(groupEn).toHaveValue('Statistics')
     await expect(groupEn).toBeDisabled()

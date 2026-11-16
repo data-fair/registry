@@ -66,18 +66,18 @@
 </template>
 
 <i18n lang="yaml">
-fr:
-  artefacts: Artefacts
-  noAccessGrant: "Contactez votre administrateur pour obtenir un acc\xE8s aux t\xE9l\xE9chargements."
-  loginRequired: "Connectez-vous pour acc\xE9der aux t\xE9l\xE9chargements."
-  mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
-  deprecatedNotice: "Cet artefact est d\xE9pr\xE9ci\xE9. Il reste disponible mais n'est plus recommand\xE9."
 en:
   artefacts: Artefacts
-  noAccessGrant: Contact your administrator for download access.
+  noAccessGrant: Contact your administrator to get download access.
   loginRequired: Log in to access downloads.
-  mirroredFrom: "This artefact is mirrored from remote registry: {origin}"
+  mirroredFrom: "This artefact is mirrored from the remote registry: {origin}"
   deprecatedNotice: "This artefact is deprecated. It remains available but is no longer recommended."
+fr:
+  artefacts: Artefacts
+  noAccessGrant: "Contactez votre administrateur pour obtenir un accès aux téléchargements."
+  loginRequired: "Connectez-vous pour accéder aux téléchargements."
+  mirroredFrom: "Cet artefact est un miroir du registre distant : {origin}"
+  deprecatedNotice: "Cet artefact est déprécié. Il reste disponible mais n'est plus recommandé."
 </i18n>
 
 <script setup lang="ts">
@@ -85,6 +85,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useBreadcrumbs } from '~/composables/breadcrumbs'
+import { localized } from '~/utils/localized'
 import type { Artefact } from '#api/types'
 
 const { t, locale } = useI18n()
@@ -98,7 +99,7 @@ const artefact = ref<Artefact | null>(null)
 
 useBreadcrumbs().setForPage(() => [
   { title: t('artefacts'), to: '/' },
-  { title: (artefact.value?.title as any)?.[locale.value] || artefact.value?.name || artefactId.value, disabled: true }
+  { title: localized(artefact.value?.title, locale.value) || artefact.value?.name || artefactId.value, disabled: true }
 ])
 const fetchLoading = ref(true)
 const hasGrant = ref(false)
