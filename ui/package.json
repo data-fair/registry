@@ -13,7 +13,7 @@
   "dependencies": {
     "@data-fair/frame": "^0.18.0",
     "@data-fair/lib-vue": "^1.33.0",
-    "@data-fair/lib-vuetify": "^2.5.3",
+    "@data-fair/lib-vuetify": "^2.5.4",
     "@koumoul/vjsf": "^4.1.0",
     "@mdi/js": "^7.4.47",
     "@registry/shared": "*",
@@ -27,7 +27,7 @@
     "vuetify": "^4.0.1"
   },
   "devDependencies": {
-    "@data-fair/lib-utils": "^1.14.1",
+    "@data-fair/lib-utils": "^1.15.0",
     "@intlify/unplugin-vue-i18n": "^5.2.0",
     "@types/config": "^3.3.5",
     "@vitejs/plugin-vue": "^6.0.5",
