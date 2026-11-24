@@ -61,10 +61,10 @@ test.describe('API Keys', () => {
     const res = await ax.post('/api/v1/api-keys', {
       type: 'upload',
       name: 'scoped',
-      allowedNamePrefix: '@data-fair/'
+      allowedNamePrefix: '@test_registry_df/'
     })
     expect(res.status).toBe(201)
-    expect(res.data.allowedNamePrefix).toBe('@data-fair/')
+    expect(res.data.allowedNamePrefix).toBe('@test_registry_df/')
   })
 
   test('rejects allowedNamePrefix on read keys', async () => {
@@ -170,11 +170,11 @@ test.describe('API Keys', () => {
     })
     const upload = axiosWithApiKey(keyRes.data.key)
 
-    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+    const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     try {
-      await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+      await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(401)
@@ -187,11 +187,11 @@ test.describe('API Keys', () => {
     // Upload a public artefact so the read key can access it
     const uploadKeyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'uploader' })
     const upload = axiosWithApiKey(uploadKeyRes.data.key)
-    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+    const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
-    await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true, privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }] })
+    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
+    await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { public: true, privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }] })
 
     // Create a read key and use it
     await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
@@ -216,14 +216,14 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: '@data-fair/processing-'
+        allowedNamePrefix: '@test_registry_df/processing-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
-      const tarball = await createTestTarball({ name: '@data-fair/processing-gpkg', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_df/processing-gpkg', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
       const res = await upload.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@data-fair/processing-gpkg@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_df/processing-gpkg@1'),
         form,
         { headers: form.getHeaders() }
       )
@@ -235,7 +235,7 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: '@data-fair/processing-'
+        allowedNamePrefix: '@test_registry_df/processing-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
       const tarball = await createTestTarball({ name: '@data-fair/catalog-x', version: '1.0.0' })
@@ -258,13 +258,13 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: 'terrain-'
+        allowedNamePrefix: 'test_registry_terrain-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
       const form = new FormData()
       form.append('file', Buffer.from('hello'), { filename: 'data.bin', contentType: 'application/octet-stream' })
       const res = await upload.post(
-        '/api/v1/artefacts/file/' + encodeURIComponent('terrain-france'),
+        '/api/v1/artefacts/file/' + encodeURIComponent('test_registry_terrain-france'),
         form,
         { headers: form.getHeaders() }
       )
@@ -276,14 +276,14 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: 'terrain-'
+        allowedNamePrefix: 'test_registry_terrain-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
       const form = new FormData()
       form.append('file', Buffer.from('hello'), { filename: 'data.bin', contentType: 'application/octet-stream' })
       try {
         await upload.post(
-          '/api/v1/artefacts/file/' + encodeURIComponent('roads-france'),
+          '/api/v1/artefacts/file/' + encodeURIComponent('test_registry_roads-france'),
           form,
           { headers: form.getHeaders() }
         )

@@ -3,7 +3,7 @@ import FormData from 'form-data'
 import { superAdmin, axiosWithApiKey, clean } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
-const layoutPkgId = '@test/layout-pkg@1'
+const layoutPkgId = '@test_registry_/layout-pkg@1'
 
 test.beforeAll(async () => {
   await clean()
@@ -11,7 +11,7 @@ test.beforeAll(async () => {
   const keyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'e2e-layout' })
   const upload = axiosWithApiKey(keyRes.data.key)
 
-  const tarball = await createTestTarball({ name: '@test/layout-pkg', version: '1.0.0' })
+  const tarball = await createTestTarball({ name: '@test_registry_/layout-pkg', version: '1.0.0' })
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
   await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent(layoutPkgId), form, { headers: form.getHeaders() })
@@ -35,7 +35,7 @@ test.describe('App layout (anonymous)', () => {
     const crumbs = page.locator('.v-breadcrumbs .v-breadcrumbs-item')
     await expect(crumbs).toHaveCount(2)
     await expect(crumbs.first()).toHaveText('Artefacts')
-    await expect(crumbs.nth(1)).toContainText('@test/layout-pkg')
+    await expect(crumbs.nth(1)).toContainText('@test_registry_/layout-pkg')
     await expect(page.locator('#artefact-admin')).toHaveCount(0)
 
     await crumbs.first().click()
@@ -81,14 +81,14 @@ test.describe('Admin layout', () => {
     await page.goto('/registry/admin')
     const search = page.locator('#access-grants input').first()
     await search.click()
-    await search.fill('Test Organization')
+    await search.fill('Registry Test Organization')
 
     // Search hits the simple-directory accounts endpoint; pick the matching org.
-    await page.getByRole('option', { name: /Test Organization 1/ }).click()
+    await page.getByRole('option', { name: /Registry Test Organization 1/ }).click()
     await page.locator('#access-grants .v-btn--variant-flat').click()
 
     const grantsTable = page.locator('#access-grants table')
-    await expect(grantsTable).toContainText('Test Organization 1')
+    await expect(grantsTable).toContainText('Registry Test Organization 1')
     await expect(grantsTable).toContainText('test_registry_org1')
   })
 })

@@ -21,6 +21,9 @@ services:
   #####
 
   simple-directory:
+    # master (>= 8.24): the scoped NHI token exchange and the prefixed test API (POST /api/test-env/seed,
+    # DELETE /api/test-env?prefix=) the tests and npm run dev-world seed their accounts with —
+    # `docker compose pull simple-directory` if older
     image: ghcr.io/data-fair/simple-directory:master
     network_mode: host
     depends_on:
@@ -32,8 +35,15 @@ services:
       - MONGO_URL=mongodb://localhost:${MONGO_PORT}/simple-directory
       - OBSERVER_ACTIVE=false
       - CIPHER_PASSWORD=dev-cipher-password-0123456789abcdef
-      - STORAGE_TYPE=file
-      - ADMINS=["test_registry_superadmin@test.com"]
+      # accounts in mongo: the test suite seeds and cleans its own sub-space (test_registry_,
+      # tests/support/sd-fixtures.ts) through the test API, npm run dev-world seeds the dev world
+      # test_demo_ the same way (dev/resources/demo-world.json)
+      - STORAGE_TYPE=mongo
+      - ENABLE_TEST_API=1
+      # the test API needs NODE_ENV=development, the configuration stays the image's production one
+      - NODE_ENV=development
+      - NODE_CONFIG_ENV=production
+      - ADMINS=["test_registry_superadmin@test.com","test_demo_dev@example.org"]
       - CONTACT=contact@test.com
       # tests log in through the API many times per minute
       - AUTHRATELIMIT_ATTEMPTS=200
@@ -49,12 +59,9 @@ services:
       # binding admin sessions to their IP is unfinished and breaks legitimate uses
       # (eg api tests calling the api directly, without X-Forwarded-For), disabled until reviewed
       - ADMIN_SESSION_IP_BINDING=false
-      # the test non-human identity of dev/resources/users.json (scope tests, tests/scopes.api.spec.ts)
+      # the test non-human identity of the scope tests (tests/support/sd-fixtures.ts, tests/scopes.api.spec.ts)
       - MANAGE_NHIS=true
       - NHIS_ALLOW_INSECURE_ISSUERS=true
-    volumes:
-      - ./dev/resources/users.json:/app/data/users.json
-      - ./dev/resources/organizations.json:/app/data/organizations.json
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "${SD_PORT}"]
       interval: 2s

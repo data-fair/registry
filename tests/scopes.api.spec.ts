@@ -12,9 +12,9 @@ import { createTestTarball } from './support/test-tarball.ts'
 import { nhiSession } from './support/nhi.ts'
 
 const enc = encodeURIComponent
-const pub = '@test/pub@1'
-const privTest1 = '@test/priv-test1@1'
-const privOther = '@test/priv-other@1'
+const pub = '@test_registry_/pub@1'
+const privTest1 = '@test_registry_/priv-test1@1'
+const privOther = '@test_registry_/priv-other@1'
 
 const expectStatus = async (promise: Promise<unknown>, status: number) => {
   try {

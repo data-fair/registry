@@ -10,15 +10,15 @@ test.describe('scanning cache', () => {
   test('cold miss extracts + writes meta; same path is a hit (openTarball not re-called)', async () => {
     const cacheDir = await mkdtemp(join(tmpdir(), 'scan-cache-'))
     try {
-      const buf = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const buf = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
       let opens = 0
       const openTarball = async () => { opens++; return Readable.from(buf) }
-      const ref = { artefactId: '@test/pkg@1', path: 'npm/@test/pkg@1/aaa.tgz', dataUpdatedAt: 'D1' }
+      const ref = { artefactId: '@test_registry_/pkg@1', path: 'npm/@test_registry_/pkg@1/aaa.tgz', dataUpdatedAt: 'D1' }
 
       const dir1 = await ensureExtracted(ref, cacheDir, openTarball, 1000)
       expect(opens).toBe(1)
       const top = JSON.parse(await readFile(join(dir1, 'package', 'package.json'), 'utf-8'))
-      expect(top.name).toBe('@test/pkg')
+      expect(top.name).toBe('@test_registry_/pkg')
       const meta = JSON.parse(await readFile(join(dir1, '.meta.json'), 'utf-8'))
       expect(meta.path).toBe(ref.path)
 
@@ -34,10 +34,10 @@ test.describe('scanning cache', () => {
     const cacheDir = await mkdtemp(join(tmpdir(), 'scan-cache-'))
     try {
       let opens = 0
-      const open1 = async () => { opens++; return Readable.from(await createTestTarball({ name: '@test/pkg', version: '1.0.0' })) }
-      const open2 = async () => { opens++; return Readable.from(await createTestTarball({ name: '@test/pkg', version: '2.0.0' })) }
-      await ensureExtracted({ artefactId: '@test/pkg@1', path: 'p/aaa.tgz' }, cacheDir, open1, 1000)
-      const dir = await ensureExtracted({ artefactId: '@test/pkg@1', path: 'p/bbb.tgz' }, cacheDir, open2, 1000)
+      const open1 = async () => { opens++; return Readable.from(await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })) }
+      const open2 = async () => { opens++; return Readable.from(await createTestTarball({ name: '@test_registry_/pkg', version: '2.0.0' })) }
+      await ensureExtracted({ artefactId: '@test_registry_/pkg@1', path: 'p/aaa.tgz' }, cacheDir, open1, 1000)
+      const dir = await ensureExtracted({ artefactId: '@test_registry_/pkg@1', path: 'p/bbb.tgz' }, cacheDir, open2, 1000)
       expect(opens).toBe(2)
       const top = JSON.parse(await readFile(join(dir, 'package', 'package.json'), 'utf-8'))
       expect(top.version).toBe('2.0.0')
@@ -49,13 +49,13 @@ test.describe('scanning cache', () => {
   test('pruneExtracted removes stale slots, keeps valid, ignores .tmp. dirs', async () => {
     const cacheDir = await mkdtemp(join(tmpdir(), 'scan-cache-'))
     try {
-      const keep = encodeURIComponent('@test/keep@1')
-      const stale = encodeURIComponent('@test/stale@1')
+      const keep = encodeURIComponent('@test_registry_/keep@1')
+      const stale = encodeURIComponent('@test_registry_/stale@1')
       await mkdir(join(cacheDir, keep), { recursive: true })
       await mkdir(join(cacheDir, stale), { recursive: true })
       await mkdir(join(cacheDir, `${keep}.tmp.123`), { recursive: true })
 
-      await pruneExtracted(cacheDir, new Set(['@test/keep@1']))
+      await pruneExtracted(cacheDir, new Set(['@test_registry_/keep@1']))
 
       const left = await readdir(cacheDir)
       expect(left).toContain(keep)

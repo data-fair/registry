@@ -2,17 +2,34 @@
 // file artefacts, thumbnails, and access grants. Idempotent — re-running skips
 // anything already present. Requires the dev API to be running.
 //
+// Everything is done as the dev world's account test_demo_dev@example.org (a simple-directory
+// admin, npm run dev-world) and its organization test_demo_org: the tests never clean that
+// sub-space, and the artefact names here carry no test prefix.
+//
 // Run: npm run dev:fixtures
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import FormData from 'form-data'
+import { axiosAuth } from '@data-fair/lib-node/axios-auth.js'
 import {
-  superAdmin, axiosWithApiKey, baseURL, axios as axiosFactory,
-  upstreamBaseURL, upstreamSuperAdmin, upstreamAxiosAuth, upstreamAxiosWithApiKey
+  axiosWithApiKey, baseURL, directoryUrl, axios as axiosFactory,
+  upstreamBaseURL, upstreamAxiosWithApiKey
 } from '../tests/support/axios.ts'
 import { createTestTarball } from '../tests/support/test-tarball.ts'
+
+// the dev world (dev/resources/demo-world.json)
+const DEV_EMAIL = 'test_demo_dev@example.org'
+const DEV_ORG = 'test_demo_org'
+// session calls go to DEV_HOST, where the session cookies are set (tests/support/axios.ts)
+const devSession = (port: string | undefined, opts: { adminMode?: boolean, org?: string } = {}) => axiosAuth({
+  email: DEV_EMAIL,
+  password: 'passwd',
+  ...opts,
+  axiosOpts: { baseURL: `http://${process.env.DEV_HOST}:${port}` },
+  directoryUrl
+})
 
 const OUTPUT_PATH = join(import.meta.dirname, 'fixtures-output.json')
 
@@ -46,7 +63,7 @@ const anonymousPing = async (url: string) => {
 
 async function main () {
   console.log(`→ Connecting to ${baseURL}`)
-  const admin = await superAdmin
+  const admin = await devSession(process.env.DEV_API_PORT, { adminMode: true })
   const output = await loadOutput()
 
   // --- API keys -----------------------------------------------------------
@@ -161,7 +178,7 @@ async function main () {
     {
       id: '@koumoul/application-demo@1',
       body: {
-        privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }],
+        privateAccess: [{ type: 'organization', id: DEV_ORG, name: 'Fixtures Demo' }],
         title: { fr: 'Application de démo', en: 'Demo application' }
       }
     },
@@ -177,7 +194,7 @@ async function main () {
     },
     {
       id: 'basemap-style',
-      body: { privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }] }
+      body: { privateAccess: [{ type: 'organization', id: DEV_ORG, name: 'Fixtures Demo' }] }
     }
   ]
 
@@ -202,7 +219,7 @@ async function main () {
 
   // --- Access grants ------------------------------------------------------
   const grantTargets: { type: string, id: string }[] = [
-    { type: 'organization', id: 'test_registry_org1' }
+    { type: 'organization', id: DEV_ORG }
   ]
   for (const account of grantTargets) {
     try {
@@ -231,7 +248,7 @@ async function main () {
     )
   }
 
-  const upstreamAdmin = await upstreamSuperAdmin()
+  const upstreamAdmin = await devSession(process.env.DEV_UPSTREAM_API_PORT, { adminMode: true })
 
   const upstreamKeys = await upstreamAdmin.get('/api/v1/api-keys?type=upload')
   const upstreamKeyNames = new Set<string>(upstreamKeys.data.results.map((k: any) => k.name))
@@ -289,11 +306,11 @@ async function main () {
 
   // A read key requires an access grant for its owner account, minted by an admin of it.
   try {
-    await upstreamAdmin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
-    console.log('  + upstream access-grant organization:test_registry_org1')
+    await upstreamAdmin.post('/api/v1/access-grants', { account: { type: 'organization', id: DEV_ORG } })
+    console.log(`  + upstream access-grant organization:${DEV_ORG}`)
   } catch (err) {
     if (!isHttp409(err)) throw err
-    console.log('  ✓ upstream access-grant organization:test_registry_org1 (skipped)')
+    console.log(`  ✓ upstream access-grant organization:${DEV_ORG} (skipped)`)
   }
 
   // Consult the upstream itself, not just our output file — the api-test suite
@@ -301,9 +318,9 @@ async function main () {
   // reference a key the upstream no longer has. Mirrors the upload-key logic above.
   //
   // The read-key LIST endpoint filters by the caller's own account, so a read key
-  // owned by org test_registry_org1 is only visible through a test_registry_org1-scoped session — never to a
-  // plain superadmin session. List and mint through the same org admin.
-  const orgAdmin = await upstreamAxiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+  // owned by org test_demo_org is only visible through a session on that org — never to a
+  // plain admin session. List and mint through the same org admin.
+  const orgAdmin = await devSession(process.env.DEV_UPSTREAM_API_PORT, { org: DEV_ORG })
   const upstreamReadKeys = await orgAdmin.get('/api/v1/api-keys?type=read')
   const hasFederationKey = upstreamReadKeys.data.results.some((k: any) => k.name === 'dev-federation')
   if (hasFederationKey && output.keys['dev-upstream-read']) {
@@ -312,10 +329,10 @@ async function main () {
     const res = await orgAdmin.post('/api/v1/api-keys', {
       type: 'read',
       name: 'dev-federation',
-      owner: { type: 'organization', id: 'test_registry_org1' }
+      owner: { type: 'organization', id: DEV_ORG }
     })
     output.keys['dev-upstream-read'] = res.data.key
-    console.log('  + upstream read-key dev-federation (owner organization:test_registry_org1)')
+    console.log(`  + upstream read-key dev-federation (owner organization:${DEV_ORG})`)
     await saveOutput(output)
   }
 

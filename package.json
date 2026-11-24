@@ -17,6 +17,7 @@
     "dev:api": "cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn exec ../node_modules/.bin/nodemon -e js,ts,json index.ts",
     "dev:api-upstream": "cd api && FORCE_COLOR=1 NODE_ENV=development EVENTS_LOG_LEVEL=warn PORT=${DEV_UPSTREAM_API_PORT} MONGO_URL=${DEV_UPSTREAM_MONGO_URL:-mongodb://localhost:${MONGO_PORT}/data-fair-registry-upstream} DATA_DIR=./data-upstream exec ../node_modules/.bin/nodemon -e js,ts,json index.ts",
     "dev:ui": "cd ui && FORCE_COLOR=1 NODE_CONFIG_DIR=../api/config/ exec ../node_modules/.bin/vite --port ${DEV_UI_PORT}",
+    "dev-world": "node dev/world.ts",
     "dev:fixtures": "dotenv -- node dev/fixtures.ts",
     "build-lib-node": "tsc -p tsconfig.build.json",
     "build-types": "mkdir -p ui/src/components/vjsf && df-build-types . --vjsf-dir ui/src/components/vjsf",

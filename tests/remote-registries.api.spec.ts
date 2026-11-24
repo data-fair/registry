@@ -18,12 +18,12 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
       const res = await ax.post('/api/v1/remote-registries', {
         url: 'https://upstream.example.com',
-        name: 'Upstream',
+        name: 'test_registry_Upstream',
         apiKey: 'reg_abc_secretkey123'
       })
       expect(res.status).toBe(201)
       expect(res.data._id).toBe('https://upstream.example.com')
-      expect(res.data.name).toBe('Upstream')
+      expect(res.data.name).toBe('test_registry_Upstream')
       expect(res.data.apiKeyShortId).toBe('reg_abc')
       expect(res.data.apiKey).toBeUndefined()
       expect(res.data.selectedArtefacts).toEqual([])
@@ -33,13 +33,13 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
       await ax.post('/api/v1/remote-registries', {
         url: 'https://upstream.example.com',
-        name: 'Upstream',
+        name: 'test_registry_Upstream',
         apiKey: 'reg_abc_secretkey123'
       })
       try {
         await ax.post('/api/v1/remote-registries', {
           url: 'https://upstream.example.com',
-          name: 'Duplicate',
+          name: 'test_registry_Duplicate',
           apiKey: 'reg_def_otherkey'
         })
         expect(true).toBe(false)
@@ -52,12 +52,12 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
       await ax.post('/api/v1/remote-registries', {
         url: 'https://upstream1.example.com',
-        name: 'Upstream 1',
+        name: 'test_registry_Upstream 1',
         apiKey: 'reg_a_key1'
       })
       await ax.post('/api/v1/remote-registries', {
         url: 'https://upstream2.example.com',
-        name: 'Upstream 2',
+        name: 'test_registry_Upstream 2',
         apiKey: 'reg_b_key2'
       })
 
@@ -73,12 +73,12 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
       await ax.post('/api/v1/remote-registries', {
         url: 'https://upstream.example.com',
-        name: 'Upstream',
+        name: 'test_registry_Upstream',
         apiKey: 'reg_abc_secretkey123'
       })
 
       const res = await ax.get('/api/v1/remote-registries/' + encodeURIComponent('https://upstream.example.com'))
-      expect(res.data.name).toBe('Upstream')
+      expect(res.data.name).toBe('test_registry_Upstream')
       expect(res.data.apiKey).toBeUndefined()
       expect(res.data.apiKeyShortId).toBe('reg_abc')
     })
@@ -87,15 +87,15 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
       await ax.post('/api/v1/remote-registries', {
         url: 'https://upstream.example.com',
-        name: 'Old Name',
+        name: 'test_registry_Old Name',
         apiKey: 'reg_old_key123'
       })
 
       const res = await ax.patch(
         '/api/v1/remote-registries/' + encodeURIComponent('https://upstream.example.com'),
-        { name: 'New Name', apiKey: 'reg_new_key456' }
+        { name: 'test_registry_New Name', apiKey: 'reg_new_key456' }
       )
-      expect(res.data.name).toBe('New Name')
+      expect(res.data.name).toBe('test_registry_New Name')
       expect(res.data.apiKeyShortId).toBe('reg_new')
       expect(res.data.apiKey).toBeUndefined()
     })
@@ -104,7 +104,7 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
       await ax.post('/api/v1/remote-registries', {
         url: 'https://upstream.example.com',
-        name: 'Upstream',
+        name: 'test_registry_Upstream',
         apiKey: 'reg_abc_key'
       })
 
@@ -120,26 +120,26 @@ test.describe('Remote registries', () => {
       const remoteUrl = 'https://upstream.example.com'
 
       // Upload an artefact, then simulate it being mirrored by setting origin
-      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
 
       // Create remote registry
-      await ax.post('/api/v1/remote-registries', { url: remoteUrl, name: 'Upstream', apiKey: 'reg_abc_key' })
+      await ax.post('/api/v1/remote-registries', { url: remoteUrl, name: 'test_registry_Upstream', apiKey: 'reg_abc_key' })
 
       // Set origin on the artefact (simulates a sync having occurred)
-      await setArtefactOrigin('@test/pkg@1', remoteUrl)
+      await setArtefactOrigin('@test_registry_/pkg@1', remoteUrl)
 
       // Verify origin is set
-      const before = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'))
+      const before = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'))
       expect(before.data.origin).toBe(remoteUrl)
 
       // Delete the remote registry
       await ax.delete('/api/v1/remote-registries/' + encodeURIComponent(remoteUrl))
 
       // Origin should be removed
-      const after = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'))
+      const after = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'))
       expect(after.data.origin).toBeUndefined()
     })
 
@@ -152,7 +152,7 @@ test.describe('Remote registries', () => {
         expect([401, 403]).toContain(err.status)
       }
       try {
-        await ax.post('/api/v1/remote-registries', { url: 'https://x.com', name: 'X', apiKey: 'k' })
+        await ax.post('/api/v1/remote-registries', { url: 'https://x.com', name: 'test_registry_X', apiKey: 'k' })
         expect(true).toBe(false)
       } catch (err: any) {
         expect([401, 403]).toContain(err.status)
@@ -166,18 +166,18 @@ test.describe('Remote registries', () => {
 
     test.beforeEach(async () => {
       const ax = await superAdmin
-      await ax.post('/api/v1/remote-registries', { url: remoteUrl, name: 'Upstream', apiKey: 'reg_abc_key' })
+      await ax.post('/api/v1/remote-registries', { url: remoteUrl, name: 'test_registry_Upstream', apiKey: 'reg_abc_key' })
     })
 
     test('select artefact', async () => {
       const ax = await superAdmin
       const res = await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
-        artefactId: '@test/pkg'
+        artefactId: '@test_registry_/pkg'
       })
       expect(res.status).toBe(201)
 
       const registry = await ax.get(`/api/v1/remote-registries/${encodedRemoteUrl}`)
-      expect(registry.data.selectedArtefacts).toContain('@test/pkg')
+      expect(registry.data.selectedArtefacts).toContain('@test_registry_/pkg')
       // selecting starts a sync of that artefact right away
       expect(registry.data.syncState).toBe('running')
       await waitSyncIdle(remoteUrl)
@@ -186,11 +186,11 @@ test.describe('Remote registries', () => {
     test('select duplicate returns 409', async () => {
       const ax = await superAdmin
       await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
-        artefactId: '@test/pkg'
+        artefactId: '@test_registry_/pkg'
       })
       try {
         await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
-          artefactId: '@test/pkg'
+          artefactId: '@test_registry_/pkg'
         })
         expect(true).toBe(false)
       } catch (err: any) {
@@ -203,15 +203,15 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
 
       // Upload a local artefact
-      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
 
       // Try to select the same artefact ID from remote
       try {
         await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
-          artefactId: '@test/pkg@1'
+          artefactId: '@test_registry_/pkg@1'
         })
         expect(true).toBe(false)
       } catch (err: any) {
@@ -222,39 +222,39 @@ test.describe('Remote registries', () => {
     test('unselect artefact', async () => {
       const ax = await superAdmin
       await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
-        artefactId: '@test/pkg'
+        artefactId: '@test_registry_/pkg'
       })
       await waitSyncIdle(remoteUrl)
 
       const res = await ax.delete(
-        `/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts/${encodeURIComponent('@test/pkg')}`
+        `/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts/${encodeURIComponent('@test_registry_/pkg')}`
       )
       expect(res.status).toBe(204)
 
       const registry = await ax.get(`/api/v1/remote-registries/${encodedRemoteUrl}`)
-      expect(registry.data.selectedArtefacts).not.toContain('@test/pkg')
+      expect(registry.data.selectedArtefacts).not.toContain('@test_registry_/pkg')
     })
 
     test('unselect removes origin from local artefact', async () => {
       const ax = await superAdmin
 
       // Upload an artefact and set origin to simulate a synced state
-      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
-      await setArtefactOrigin('@test/pkg@1', remoteUrl)
+      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
+      await setArtefactOrigin('@test_registry_/pkg@1', remoteUrl)
 
       // Select then unselect
       await ax.post(`/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts`, {
-        artefactId: '@test/pkg@1'
+        artefactId: '@test_registry_/pkg@1'
       })
       await waitSyncIdle(remoteUrl)
       await ax.delete(
-        `/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts/${encodeURIComponent('@test/pkg@1')}`
+        `/api/v1/remote-registries/${encodedRemoteUrl}/selected-artefacts/${encodeURIComponent('@test_registry_/pkg@1')}`
       )
 
-      const artefact = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'))
+      const artefact = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'))
       expect(artefact.data.origin).toBeUndefined()
     })
   })
@@ -262,19 +262,19 @@ test.describe('Remote registries', () => {
   test.describe('Integration protections', () => {
     test.beforeEach(async () => {
       // Upload an artefact and set origin to simulate a mirrored artefact
-      const tarball = await createTestTarball({ name: '@test/mirrored', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/mirrored', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/mirrored@1'), form, { headers: form.getHeaders() })
-      await setArtefactOrigin('@test/mirrored@1', 'https://upstream.example.com')
+      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/mirrored@1'), form, { headers: form.getHeaders() })
+      await setArtefactOrigin('@test_registry_/mirrored@1', 'https://upstream.example.com')
     })
 
     test('upload to mirrored npm artefact returns 409', async () => {
-      const tarball = await createTestTarball({ name: '@test/mirrored', version: '1.1.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/mirrored', version: '1.1.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
       try {
-        await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/mirrored@1'), form, { headers: form.getHeaders() })
+        await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/mirrored@1'), form, { headers: form.getHeaders() })
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(409)
@@ -284,7 +284,7 @@ test.describe('Remote registries', () => {
     test('delete mirrored artefact returns 403', async () => {
       const ax = await superAdmin
       try {
-        await ax.delete('/api/v1/artefacts/' + encodeURIComponent('@test/mirrored@1'))
+        await ax.delete('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/mirrored@1'))
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(403)
@@ -295,7 +295,7 @@ test.describe('Remote registries', () => {
       const ax = await superAdmin
 
       // Allowed: public and privateAccess
-      const okRes = await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/mirrored@1'), {
+      const okRes = await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/mirrored@1'), {
         public: true,
         privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }]
       })
@@ -303,7 +303,7 @@ test.describe('Remote registries', () => {
 
       // Forbidden: title on mirrored artefact
       try {
-        await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/mirrored@1'), {
+        await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/mirrored@1'), {
           title: { fr: 'Interdit', en: 'Forbidden' }
         })
         expect(true).toBe(false)
@@ -317,15 +317,15 @@ test.describe('Remote registries', () => {
       const fileForm = new FormData()
       fileForm.append('file', Buffer.from('content'), { filename: 'terrain.mbtiles', contentType: 'application/octet-stream' })
       fileForm.append('category', 'tileset')
-      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/file/mirrored-file', fileForm, { headers: fileForm.getHeaders() })
-      await setArtefactOrigin('mirrored-file', 'https://upstream.example.com')
+      await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/file/test_registry_mirrored-file', fileForm, { headers: fileForm.getHeaders() })
+      await setArtefactOrigin('test_registry_mirrored-file', 'https://upstream.example.com')
 
       // Try uploading again
       const form2 = new FormData()
       form2.append('file', Buffer.from('new-content'), { filename: 'terrain.mbtiles', contentType: 'application/octet-stream' })
       form2.append('category', 'tileset')
       try {
-        await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/file/mirrored-file', form2, { headers: form2.getHeaders() })
+        await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/file/test_registry_mirrored-file', form2, { headers: form2.getHeaders() })
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(409)
@@ -338,7 +338,7 @@ test.describe('Remote registries', () => {
 
     test.beforeEach(async () => {
       const ax = await superAdmin
-      await ax.post('/api/v1/remote-registries', { url, name: 'Upstream', apiKey: 'reg_abc_secretkey123' })
+      await ax.post('/api/v1/remote-registries', { url, name: 'test_registry_Upstream', apiKey: 'reg_abc_secretkey123' })
     })
 
     test('a registry with no attempt recorded is idle', async () => {
@@ -374,7 +374,7 @@ test.describe('Remote registries', () => {
     test('one registry running does not mark its siblings as running', async () => {
       const ax = await superAdmin
       const other = 'https://other.example.com'
-      await ax.post('/api/v1/remote-registries', { url: other, name: 'Other', apiKey: 'reg_def_otherkey' })
+      await ax.post('/api/v1/remote-registries', { url: other, name: 'test_registry_Other', apiKey: 'reg_def_otherkey' })
       await holdSyncLock(url)
       try {
         const res = await ax.get('/api/v1/remote-registries')
@@ -392,7 +392,7 @@ test.describe('Remote registries', () => {
 
     test.beforeEach(async () => {
       const ax = await superAdmin
-      await ax.post('/api/v1/remote-registries', { url, name: 'Upstream', apiKey: 'reg_abc_secretkey123' })
+      await ax.post('/api/v1/remote-registries', { url, name: 'test_registry_Upstream', apiKey: 'reg_abc_secretkey123' })
     })
 
     test('a free lock accepts the sync with 202', async () => {
@@ -473,7 +473,7 @@ test.describe('Remote registries', () => {
 
     test('a sync over one selected artefact records per-artefact progress and surfaces the fetch error', async () => {
       const ax = await superAdmin
-      const artefactId = '@test/pkg@1'
+      const artefactId = '@test_registry_/pkg@1'
 
       // Selecting starts a background sync of the artefact, which fails against
       // the non-resolving host. Let it settle so the manual sync below owns the lock.

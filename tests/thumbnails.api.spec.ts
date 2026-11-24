@@ -10,7 +10,7 @@ const makePng = (width = 600, height = 400) => sharp({
 
 let uploadApiKey: string
 
-const createArtefact = async (name = '@test/pkg') => {
+const createArtefact = async (name = '@test_registry_/pkg') => {
   const ax = axiosWithApiKey(uploadApiKey)
   const tarball = await createTestTarball({ name, version: '1.0.0' })
   const form = new FormData()
@@ -132,7 +132,7 @@ test.describe('Thumbnails', () => {
   })
 
   test('SVG upload is preserved byte-for-byte and served as image/svg+xml', async () => {
-    const artefactId = await createArtefact('@test/svg-pkg')
+    const artefactId = await createArtefact('@test_registry_/svg-pkg')
     const admin = await superAdmin
 
     const svgSource = Buffer.from(

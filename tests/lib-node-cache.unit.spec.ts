@@ -66,7 +66,7 @@ const startFakeRegistry = async (state: FakeState, hold?: (req: http.IncomingMes
 
 test.describe('lib-node version-keyed extraction', () => {
   let cacheDir: string
-  const artefactId = '@test/pkg@1'
+  const artefactId = '@test_registry_/pkg@1'
   const secretKey = 'secret-registry-internal'
 
   test.beforeEach(async () => {
@@ -80,7 +80,7 @@ test.describe('lib-node version-keyed extraction', () => {
 
   test('extraction path changes when artefact content changes', async () => {
     const state: FakeState = {
-      tarball: await createTestTarball({ name: '@test/pkg', version: '1.0.0' }),
+      tarball: await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }),
       version: '1.0.0',
       lastModified: new Date('2026-01-01T00:00:00Z'),
       hasNativeModules: false
@@ -92,7 +92,7 @@ test.describe('lib-node version-keyed extraction', () => {
       expect(r1.downloaded).toBe(true)
 
       // Simulate a re-upload: new content + newer Last-Modified.
-      state.tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.1' })
+      state.tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.1' })
       state.version = '1.0.1'
       state.lastModified = new Date('2026-01-02T00:00:00Z')
 
@@ -109,7 +109,7 @@ test.describe('lib-node version-keyed extraction', () => {
 
   test('same-version re-publish (dataUpdatedAt moves) also changes the path', async () => {
     const state: FakeState = {
-      tarball: await createTestTarball({ name: '@test/pkg', version: '1.0.0' }),
+      tarball: await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }),
       version: '1.0.0',
       lastModified: new Date('2026-01-01T00:00:00Z'),
       hasNativeModules: false
@@ -132,7 +132,7 @@ test.describe('lib-node version-keyed extraction', () => {
 
   test('returns the same extraction path on an unchanged (304) call', async () => {
     const state: FakeState = {
-      tarball: await createTestTarball({ name: '@test/pkg', version: '1.0.0' }),
+      tarball: await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }),
       version: '1.0.0',
       lastModified: new Date('2026-01-01T00:00:00Z'),
       hasNativeModules: false
@@ -147,7 +147,7 @@ test.describe('lib-node version-keyed extraction', () => {
       expect(r2.path).toBe(r1.path)
       // Content is still readable from the cached path.
       const pkg = JSON.parse(await readFile(join(r2.path, 'package.json'), 'utf-8'))
-      expect(pkg.name).toBe('@test/pkg')
+      expect(pkg.name).toBe('@test_registry_/pkg')
     } finally {
       await registry.close()
     }
@@ -155,7 +155,7 @@ test.describe('lib-node version-keyed extraction', () => {
 
   test('writes a stable per-buildTuple pointer file', async () => {
     const state: FakeState = {
-      tarball: await createTestTarball({ name: '@test/pkg', version: '1.0.0' }),
+      tarball: await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }),
       version: '1.0.0',
       lastModified: new Date('2026-01-01T00:00:00Z'),
       hasNativeModules: false
@@ -178,7 +178,7 @@ test.describe('lib-node version-keyed extraction', () => {
 
   test('prunes the previous version directory after a re-download', async () => {
     const state: FakeState = {
-      tarball: await createTestTarball({ name: '@test/pkg', version: '1.0.0' }),
+      tarball: await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }),
       version: '1.0.0',
       lastModified: new Date('2026-01-01T00:00:00Z'),
       hasNativeModules: false
@@ -188,7 +188,7 @@ test.describe('lib-node version-keyed extraction', () => {
       const opts = { registryUrl: registry.url, secretKey, artefactId, cacheDir }
       const r1 = await ensureArtefact(opts)
 
-      state.tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.1' })
+      state.tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.1' })
       state.version = '1.0.1'
       state.lastModified = new Date('2026-01-02T00:00:00Z')
       const r2 = await ensureArtefact(opts)
@@ -208,7 +208,7 @@ test.describe('lib-node version-keyed extraction', () => {
 
   test('pruning keeps a version dir still referenced by another buildTuple', async () => {
     const state: FakeState = {
-      tarball: await createTestTarball({ name: '@test/pkg', version: '1.0.0' }),
+      tarball: await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }),
       version: '1.0.0',
       lastModified: new Date('2026-01-01T00:00:00Z'),
       hasNativeModules: false
@@ -221,7 +221,7 @@ test.describe('lib-node version-keyed extraction', () => {
 
       // Content changes, then a build:true consumer downloads the new version.
       // Its prune pass must not delete the js slot's still-current version dir.
-      state.tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.1' })
+      state.tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.1' })
       state.version = '1.0.1'
       state.lastModified = new Date('2026-01-02T00:00:00Z')
       await ensureArtefact({ ...base, build: true })
@@ -248,12 +248,12 @@ const tmpLeftovers = async (dir: string) =>
 
 test.describe('lib-node concurrent and failing extractions', () => {
   let cacheDir: string
-  const artefactId = '@test/pkg@1'
+  const artefactId = '@test_registry_/pkg@1'
   const secretKey = 'secret-registry-internal'
   const lastModified = new Date('2026-01-01T00:00:00Z')
 
   const stateWith = async (extraEntries: { name: string, content: string }[]): Promise<FakeState> => ({
-    tarball: await createTestTarball({ name: '@test/pkg', version: '1.0.0', extraEntries }),
+    tarball: await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0', extraEntries }),
     version: '1.0.0',
     lastModified,
     hasNativeModules: false
@@ -302,7 +302,7 @@ test.describe('lib-node concurrent and failing extractions', () => {
       // the late call must neither replace the dir in use nor install a partial copy over it
       await expect(access(join(r1.path, '.in-use'))).resolves.toBeUndefined()
       expect(await countFiles(r1.path)).toBe(201)
-      expect(JSON.parse(await readFile(join(r1.path, 'package.json'), 'utf-8')).name).toBe('@test/pkg')
+      expect(JSON.parse(await readFile(join(r1.path, 'package.json'), 'utf-8')).name).toBe('@test_registry_/pkg')
       expect(await tmpLeftovers(join(cacheDir, artefactId))).toEqual([])
     } finally {
       await registry.close()

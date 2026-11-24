@@ -10,6 +10,7 @@ import apiKeysRouter from './api-keys/router.ts'
 import accessGrantsRouter from './access-grants/router.ts'
 import { publicThumbnailsRouter } from './thumbnails/router.ts'
 import remoteRegistriesRouter from './remote-registries/router.ts'
+import { syncLockId } from './remote-registries/operations.ts'
 import mongo from '#mongo'
 import { filesStorage } from './files-storage/index.ts'
 import config from '#config'
@@ -48,20 +49,54 @@ app.use('/api/v1/thumbnails', publicThumbnailsRouter)
 app.use('/api/v1/remote-registries', remoteRegistriesRouter)
 app.use('/api/ping', (req, res) => res.send('ok'))
 
+// test_<suite>_, the prefix of a test sub-space
+const testPrefixRegexp = /^test_[a-z0-9]+(?:_[a-z0-9]+)*_$/
+
 if (process.env.NODE_ENV === 'development') {
+  // Prefixed test sub-spaces: a test suite owns the accounts whose ids start with its own prefix (test_<suite>_)
+  // and what they own here, plus the global objects it names with that prefix. Several suites share one
+  // registry: the clean of one prefix never touches the others, nor the unprefixed dev data.
+  // DELETE /api/test-env?prefix=test_<suite>_ removes:
+  // - the artefacts whose id starts with the prefix, optionally after an @ (`@test_<suite>_x/pkg@1`,
+  //   `test_<suite>_file`), with their tarballs, thumbnails, scans and scan locks;
+  // - the api keys created by or owned by the prefix's accounts, and their access grants;
+  // - the remote registries whose name starts with the prefix, with their sync locks.
   app.delete('/api/test-env', async (req, res) => {
     assertReqInternal(req)
-    await mongo.artefacts.deleteMany({})
-    await mongo.artefactScans.deleteMany({})
-    await mongo.apiKeys.deleteMany({})
-    // Scoped delete: only grants for test accounts (test users/orgs are
-    // `test*`-prefixed) are wiped, so manually-created dev grants survive.
-    await mongo.accessGrants.deleteMany({ 'account.id': { $regex: /^test/ } })
-    await mongo.thumbnails.deleteMany({})
-    await mongo.remoteRegistries.deleteMany({})
-    await mongo.db.collection('locks').deleteMany({})
-    await filesStorage.clean()
-    res.send()
+    const prefix = req.query.prefix
+    if (typeof prefix !== 'string' || !testPrefixRegexp.test(prefix)) {
+      res.status(400).send('invalid test prefix')
+      return
+    }
+    // the prefix only holds [a-z0-9_], safe in a regexp
+    const accountFilter = new RegExp('^' + prefix)
+    const artefacts = await mongo.artefacts.find({ _id: new RegExp('^@?' + prefix) }, { projection: { _id: 1, path: 1 } }).toArray()
+    const artefactIds = artefacts.map(a => a._id)
+    for (const artefact of artefacts) {
+      if (artefact.path) await filesStorage.delete(artefact.path)
+    }
+    await mongo.artefacts.deleteMany({ _id: { $in: artefactIds } })
+    await mongo.artefactScans.deleteMany({ _id: { $in: artefactIds } })
+    await mongo.thumbnails.deleteMany({ artefactId: { $in: artefactIds } })
+    await mongo.apiKeys.deleteMany({ $or: [{ 'createdBy.id': accountFilter }, { 'owner.id': accountFilter }] })
+    await mongo.accessGrants.deleteMany({ 'account.id': accountFilter })
+    const remoteRegistries = await mongo.remoteRegistries.find({ name: accountFilter }, { projection: { _id: 1 } }).toArray()
+    await mongo.remoteRegistries.deleteMany({ _id: { $in: remoteRegistries.map(r => r._id) } })
+    const lockIds = [...artefactIds.map(id => `scan-${id}`), ...remoteRegistries.map(r => syncLockId(r._id))]
+    await mongo.db.collection('locks').deleteMany({ _id: { $in: lockIds as any[] } })
+    res.status(204).send()
+  })
+
+  // raw documents, for the specs of the clean itself (tests/test-env.api.spec.ts)
+  app.post('/api/test-env/docs/:collection', async (req, res) => {
+    assertReqInternal(req)
+    await mongo.db.collection(req.params.collection).insertOne(req.body)
+    res.status(201).send()
+  })
+
+  app.get('/api/test-env/docs/:collection/:id', async (req, res) => {
+    assertReqInternal(req)
+    res.json(await mongo.db.collection(req.params.collection).findOne({ _id: req.params.id as any }))
   })
 
   app.put('/api/test-env/artefacts/:id/origin', async (req, res) => {

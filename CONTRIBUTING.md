@@ -60,7 +60,7 @@ Tests use [Playwright](https://playwright.dev/) as a test runner with 3 project 
 - **api** (`*.api.spec.ts`) -- API integration tests against a running dev environment
 - **e2e** (`*.e2e.spec.ts`) -- Browser-based end-to-end tests
 
-A state setup runs automatically before api and e2e tests. Test users are defined in `dev/resources/users.json`.
+A state setup runs automatically before api and e2e tests. Test accounts (`test_registry_*`) are seeded in simple-directory from `tests/support/sd-fixtures.ts`; the dev world `test_demo_` (`npm run dev-world`, login `test_demo_dev@example.org` / `passwd`) is never cleaned by the tests.
 
 ## Commits
 

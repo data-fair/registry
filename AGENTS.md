@@ -69,13 +69,27 @@ Run a specific test file, or a single test. Note `npm run test` is a compound `a
     npm run test-api -- tests/artefacts.api.spec.ts -g "upload happy path"
     npm run test-unit -- tests/artefacts-operations.unit.spec.ts
 
-Test users are defined in @dev/resources/users.json and organizations in @dev/resources/organizations.json.
+Test sub-space: the tests own the simple-directory accounts whose ids start with `test_registry_`
+(@tests/support/sd-fixtures.ts, password `passwd`, email `<id>@test.com`), seeded through simple-directory's
+test API by `tests/global-setup.ts` and, under a lock against a second concurrent run, by `tests/state-setup.ts`.
+`DELETE /api/test-env?prefix=test_<suite>_` cleans one sub-space only (400 without a valid prefix):
+
+- the artefacts whose id starts with the prefix, optionally after an `@` (`@test_registry_/pkg@1`,
+  `test_registry_terrain`), with their tarballs, thumbnails, scans and scan locks: an artefact a test creates
+  carries the prefix in its id, or no clean removes it;
+- the api keys created by or owned by the prefix's accounts, and their access grants;
+- the remote registries whose name starts with the prefix, with their sync locks.
+
+Several suites can share one registry: the clean of one prefix never touches another prefix nor unprefixed
+artefacts. `tests/test-env.api.spec.ts` checks it. The dev world `test_demo_` (`npm run dev-world`,
+@dev/resources/demo-world.json, login `test_demo_dev@example.org` / `passwd`, a simple-directory admin) is never
+cleaned by the tests; `npm run dev:fixtures` seeds its artefacts as that account.
 
 ### Exercising federation sync
 
 Sync mirrors artefacts *from* an upstream registry, so it needs two registries. `api-upstream` is a second registry process (same code, `PORT`/`MONGO_URL`/`DATA_DIR` overridden). Pointing a registry at itself cannot work: selecting an artefact that already exists locally without an `origin` returns 409.
 
-`npm run dev:fixtures` seeds the upstream, mints a read key owned by org `test_registry_org1`, registers the mirror and selects two artefacts. Selecting an artefact queues a background sync of that artefact alone (`pendingSync` on the registry doc, drained under the sync lock), so the mirrors land without clicking **Sync now** — that button runs a full sync. Sync progress is published on the registry's ws channel; the admin table gets each row's local state from `GET …/remote-artefacts` and loads upstream thumbnails through `GET …/remote-thumbnails/:id/data` (the browser cannot reach the upstream directly).
+`npm run dev:fixtures` seeds the upstream, mints a read key owned by org `test_demo_org`, registers the mirror and selects two artefacts. Selecting an artefact queues a background sync of that artefact alone (`pendingSync` on the registry doc, drained under the sync lock), so the mirrors land without clicking **Sync now** — that button runs a full sync. Sync progress is published on the registry's ws channel; the admin table gets each row's local state from `GET …/remote-artefacts` and loads upstream thumbnails through `GET …/remote-thumbnails/:id/data` (the browser cannot reach the upstream directly).
 
 Unselecting keeps the local copy but unlocks it (drops `origin`); it then blocks re-mirroring of that id (409) until it is deleted. Deleting a registry unlocks all its mirrors the same way.
 
@@ -109,7 +123,7 @@ turns its `x-agent` annotations into agent tools (`search_artefacts`, `get_artef
 - `tests/api-docs.api.spec.ts` pins the agent surface in `tests/fixtures/agent-surface.json`: regenerate
   with `UPDATE_GOLDEN=1 npm run test-api -- tests/api-docs.api.spec.ts` when a change is intended.
 - `tests/scopes.api.spec.ts` mints scoped sessions with the test non-human identity `test_registry_org1_scope_nhi`
-  (`dev/resources/users.json`, key in `tests/resources/nhi/`, `tests/support/nhi.ts`); simple-directory
+  (`tests/support/sd-fixtures.ts`, keys in `tests/resources/nhi/`, `tests/support/nhi.ts`); simple-directory
   runs with `MANAGE_NHIS` for it. Bearer tokens are tested through nginx: their audience is the site.
 
 ## Logging

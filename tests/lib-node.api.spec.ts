@@ -37,27 +37,27 @@ test.describe('lib-node-registry', () => {
   })
 
   test('downloads and extracts on first call (noarch)', async () => {
-    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
+    await uploadNpm('@test_registry_/pkg@1', { name: '@test_registry_/pkg', version: '1.0.0' })
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
-      artefactId: '@test/pkg@1',
+      artefactId: '@test_registry_/pkg@1',
       cacheDir
     })
     expect(result.downloaded).toBe(true)
     expect(result.version).toBe('1.0.0')
     const pkg = JSON.parse(await readFile(join(result.path, 'package.json'), 'utf-8'))
-    expect(pkg.name).toBe('@test/pkg')
+    expect(pkg.name).toBe('@test_registry_/pkg')
   })
 
   test('returns cached result on second call', async () => {
-    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
+    await uploadNpm('@test_registry_/pkg@1', { name: '@test_registry_/pkg', version: '1.0.0' })
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', cacheDir }
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { public: true })
+    const opts = { registryUrl, secretKey, artefactId: '@test_registry_/pkg@1', cacheDir }
 
     const r1 = await ensureArtefact(opts)
     expect(r1.downloaded).toBe(true)
@@ -67,9 +67,9 @@ test.describe('lib-node-registry', () => {
   })
 
   test('cache-hit call makes a single conditional request to the registry', async () => {
-    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
+    await uploadNpm('@test_registry_/pkg@1', { name: '@test_registry_/pkg', version: '1.0.0' })
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { public: true })
 
     // Counting proxy in front of the real registry. We measure only the SDK's
     // calls — the test's own admin requests go directly to the dev API.
@@ -94,7 +94,7 @@ test.describe('lib-node-registry', () => {
       const opts = {
         registryUrl: `http://127.0.0.1:${proxyPort}`,
         secretKey,
-        artefactId: '@test/pkg@1',
+        artefactId: '@test_registry_/pkg@1',
         cacheDir
       }
       await ensureArtefact(opts) // warm cache
@@ -102,7 +102,7 @@ test.describe('lib-node-registry', () => {
       const r = await ensureArtefact(opts)
       expect(r.downloaded).toBe(false)
       expect(requestPaths).toEqual([
-        `GET /api/v1/artefacts/${encodeURIComponent('@test/pkg@1')}/download`
+        `GET /api/v1/artefacts/${encodeURIComponent('@test_registry_/pkg@1')}/download`
       ])
     } finally {
       await new Promise<void>(resolve => proxy.close(() => resolve()))
@@ -111,14 +111,14 @@ test.describe('lib-node-registry', () => {
 
   test('cache slot lives under nodeMajor-libc when build:true', async () => {
     // Slot naming depends solely on opts.build; no native-module signal needed.
-    await uploadNpm('@test/cache-key@1', { name: '@test/cache-key', version: '1.0.0' })
+    await uploadNpm('@test_registry_/cache-key@1', { name: '@test_registry_/cache-key', version: '1.0.0' })
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/cache-key@1'), { public: true })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/cache-key@1'), { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
-      artefactId: '@test/cache-key@1',
+      artefactId: '@test_registry_/cache-key@1',
       cacheDir,
       build: true
     })
@@ -129,10 +129,10 @@ test.describe('lib-node-registry', () => {
   })
 
   test('re-downloads when dataUpdatedAt changes', async () => {
-    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.0' })
+    await uploadNpm('@test_registry_/pkg@1', { name: '@test_registry_/pkg', version: '1.0.0' })
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
-    const opts = { registryUrl, secretKey, artefactId: '@test/pkg@1', cacheDir }
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { public: true })
+    const opts = { registryUrl, secretKey, artefactId: '@test_registry_/pkg@1', cacheDir }
 
     const r1 = await ensureArtefact(opts)
     expect(r1.version).toBe('1.0.0')
@@ -140,7 +140,7 @@ test.describe('lib-node-registry', () => {
     // Wait >1s — Last-Modified is HTTP-date (second precision), so a same-second
     // republish would alias to the cached entry.
     await new Promise(resolve => setTimeout(resolve, 1100))
-    await uploadNpm('@test/pkg@1', { name: '@test/pkg', version: '1.0.1' })
+    await uploadNpm('@test_registry_/pkg@1', { name: '@test_registry_/pkg', version: '1.0.1' })
 
     const r2 = await ensureArtefact(opts)
     expect(r2.downloaded).toBe(true)
@@ -158,7 +158,7 @@ test.describe('lib-node-registry', () => {
       scripts: { postinstall: 'node -e "require(\'fs\').writeFileSync(__dirname + \'/SENTINEL\', \'ok\')"' }
     })
     const tarball = await createTestTarball({
-      name: '@test/with-postinstall',
+      name: '@test_registry_/with-postinstall',
       version: '1.0.0',
       extraEntries: [
         // A .node binary trips the native-module detector without making npm
@@ -171,15 +171,15 @@ test.describe('lib-node-registry', () => {
     const ax = axiosWithApiKey(uploadApiKey)
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/with-postinstall@1'), form, { headers: form.getHeaders() })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/with-postinstall@1'), form, { headers: form.getHeaders() })
 
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/with-postinstall@1'), { public: true })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/with-postinstall@1'), { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
-      artefactId: '@test/with-postinstall@1',
+      artefactId: '@test_registry_/with-postinstall@1',
       cacheDir,
       build: true
     })
@@ -198,7 +198,7 @@ test.describe('lib-node-registry', () => {
       scripts: { postinstall: 'node -e "require(\'fs\').writeFileSync(__dirname + \'/NODEDIR\', process.env.npm_config_nodedir || \'\')"' }
     })
     const tarball = await createTestTarball({
-      name: '@test/nodedir-probe',
+      name: '@test_registry_/nodedir-probe',
       version: '1.0.0',
       extraEntries: [
         { name: 'package/node_modules/nodedir-probe/index.node', content: 'fake' },
@@ -208,15 +208,15 @@ test.describe('lib-node-registry', () => {
     const ax = axiosWithApiKey(uploadApiKey)
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/nodedir-probe@1'), form, { headers: form.getHeaders() })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/nodedir-probe@1'), form, { headers: form.getHeaders() })
 
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/nodedir-probe@1'), { public: true })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/nodedir-probe@1'), { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
-      artefactId: '@test/nodedir-probe@1',
+      artefactId: '@test_registry_/nodedir-probe@1',
       cacheDir,
       build: true
     })
@@ -234,7 +234,7 @@ test.describe('lib-node-registry', () => {
       scripts: { postinstall: 'node -e "require(\'fs\').writeFileSync(__dirname + \'/SENTINEL\', \'ok\')"' }
     })
     const tarball = await createTestTarball({
-      name: '@test/no-build',
+      name: '@test_registry_/no-build',
       version: '1.0.0',
       extraEntries: [
         { name: 'package/node_modules/sentinel/index.node', content: 'fake' },
@@ -244,15 +244,15 @@ test.describe('lib-node-registry', () => {
     const ax = axiosWithApiKey(uploadApiKey)
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/no-build@1'), form, { headers: form.getHeaders() })
+    await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/no-build@1'), form, { headers: form.getHeaders() })
 
     const admin = await superAdmin
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/no-build@1'), { public: true })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/no-build@1'), { public: true })
 
     const result = await ensureArtefact({
       registryUrl,
       secretKey,
-      artefactId: '@test/no-build@1',
+      artefactId: '@test_registry_/no-build@1',
       cacheDir
       // build omitted -> false
     })
