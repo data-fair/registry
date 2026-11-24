@@ -144,7 +144,7 @@ test.describe('Remote registries', () => {
     })
 
     test('non-admin cannot access remote registries', async () => {
-      const ax = await axiosAuth('dev-standalone1')
+      const ax = await axiosAuth('test_registry_standalone2')
       try {
         await ax.get('/api/v1/remote-registries')
         expect(true).toBe(false)
@@ -297,7 +297,7 @@ test.describe('Remote registries', () => {
       // Allowed: public and privateAccess
       const okRes = await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/mirrored@1'), {
         public: true,
-        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
+        privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }]
       })
       expect(okRes.data.public).toBe(true)
 

@@ -18,7 +18,7 @@ const NPM_ID = '@up/pkg@1'
 const FILE_ID = 'up-terrain'
 const FILE_BYTES = 'upstream-tileset-bytes'
 
-// Seeds the upstream and returns a read key owned by org test1. A read key needs
+// Seeds the upstream and returns a read key owned by org test_registry_org1. A read key needs
 // (a) an admin of the owner account and (b) an existing access grant for it.
 const seedUpstream = async () => {
   const admin = await upstreamSuperAdmin()
@@ -38,12 +38,12 @@ const seedUpstream = async () => {
   await upload.post('/api/v1/artefacts/file/' + FILE_ID, fileForm, { headers: fileForm.getHeaders() })
   await admin.patch('/api/v1/artefacts/' + FILE_ID, { public: true })
 
-  await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-  const orgAdmin = await upstreamAxiosAuth('test1-admin1', { org: 'test1' })
+  await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+  const orgAdmin = await upstreamAxiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
   const readRes = await orgAdmin.post('/api/v1/api-keys', {
     type: 'read',
     name: 'federation',
-    owner: { type: 'organization', id: 'test1' }
+    owner: { type: 'organization', id: 'test_registry_org1' }
   })
   return { readKey: readRes.data.key as string, uploadKey: keyRes.data.key as string }
 }

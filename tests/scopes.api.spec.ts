@@ -1,5 +1,5 @@
 /**
- * Scope-restricted sessions: the test non-human identity (admin of org test1) exchanges an
+ * Scope-restricted sessions: the test non-human identity (admin of org test_registry_org1) exchanges an
  * assertion for a session limited to some scopes, cf tests/support/nhi.ts.
  * Only the catalog-browsing routes accept a registry scope (api/src/scopes.ts).
  */
@@ -40,8 +40,8 @@ test.describe('scope-restricted sessions', () => {
       await uploader.post('/api/v1/artefacts/npm/' + enc(id), form, { headers: form.getHeaders() })
     }
     await admin.patch('/api/v1/artefacts/' + enc(pub), { public: true })
-    await admin.patch('/api/v1/artefacts/' + enc(privTest1), { privateAccess: [{ type: 'organization', id: 'test1', name: 'Test Organization 1' }] })
-    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    await admin.patch('/api/v1/artefacts/' + enc(privTest1), { privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'Test Organization 1' }] })
+    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
     await anonymousAx.put(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/artefacts/${enc(pub)}/scan`, {
       summary: { critical: 1, high: 0, medium: 0, low: 0, unknown: 0, total: 1 }
     })

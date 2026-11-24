@@ -89,7 +89,7 @@ test.describe('Admin layout', () => {
 
     const grantsTable = page.locator('#access-grants table')
     await expect(grantsTable).toContainText('Test Organization 1')
-    await expect(grantsTable).toContainText('test1')
+    await expect(grantsTable).toContainText('test_registry_org1')
   })
 })
 
@@ -98,7 +98,7 @@ test.describe('Admin layout', () => {
 async function loginAdmin (page: Page) {
   const directoryUrl = `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/simple-directory`
   const res = await page.request.post(directoryUrl + '/api/auth/password', {
-    data: { email: 'superadmin@test.com', password: 'passwd', adminMode: true },
+    data: { email: 'test_registry_superadmin@test.com', password: 'passwd', adminMode: true },
     params: { redirect: directoryUrl },
     maxRedirects: 0
   })

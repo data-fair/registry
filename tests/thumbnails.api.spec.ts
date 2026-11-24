@@ -96,7 +96,7 @@ test.describe('Thumbnails', () => {
 
   test('non-admin cannot upload a thumbnail', async () => {
     const artefactId = await createArtefact()
-    const ax = await axiosAuth('dev-standalone1')
+    const ax = await axiosAuth('test_registry_standalone2')
     try {
       await uploadThumb(ax, artefactId, await makePng())
       expect(true).toBe(false)

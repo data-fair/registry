@@ -33,7 +33,7 @@ services:
       - OBSERVER_ACTIVE=false
       - CIPHER_PASSWORD=dev-cipher-password-0123456789abcdef
       - STORAGE_TYPE=file
-      - ADMINS=["superadmin@test.com","alban.mouton@koumoul.com"]
+      - ADMINS=["test_registry_superadmin@test.com"]
       - CONTACT=contact@test.com
       # tests log in through the API many times per minute
       - AUTHRATELIMIT_ATTEMPTS=200

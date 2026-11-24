@@ -22,7 +22,7 @@ export const axiosAuth = (user: string, opts?: { adminMode?: boolean, org?: stri
   })
 }
 
-export const superAdmin = axiosAuth('superadmin', { adminMode: true })
+export const superAdmin = axiosAuth('test_registry_superadmin', { adminMode: true })
 
 export const axiosWithApiKey = (key: string) => axiosBuilder({ ...axiosOpts, headers: { 'x-api-key': key } })
 
@@ -87,7 +87,7 @@ export const upstreamBaseURL = () => `http://localhost:${upstreamPort()}`
 // session calls go to DEV_HOST, where the session cookies are set (see baseURL)
 const upstreamSessionURL = () => `http://${process.env.DEV_HOST}:${upstreamPort()}`
 
-export const upstreamSuperAdmin = () => axiosAuth('superadmin', { adminMode: true, baseURL: upstreamSessionURL() })
+export const upstreamSuperAdmin = () => axiosAuth('test_registry_superadmin', { adminMode: true, baseURL: upstreamSessionURL() })
 
 export const upstreamAxiosAuth = (user: string, opts?: { org?: string }) =>
   axiosAuth(user, { ...opts, baseURL: upstreamSessionURL() })

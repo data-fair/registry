@@ -9,26 +9,16 @@
     }
   },
   {
-    "id": "albanm",
-    "firstName": "Alban",
-    "lastName": "Mouton",
-    "email": "alban.mouton@koumoul.com",
+    "id": "test_registry_superadmin",
+    "email": "test_registry_superadmin@test.com",
     "isAdmin": true,
     "password": {
       "clear": "passwd"
     }
   },
   {
-    "id": "superadmin",
-    "email": "superadmin@test.com",
-    "isAdmin": true,
-    "password": {
-      "clear": "passwd"
-    }
-  },
-  {
-    "id": "dev-standalone1",
-    "email": "dev-standalone1@test.com",
+    "id": "test_registry_standalone2",
+    "email": "test_registry_standalone2@test.com",
     "password": {
       "clear": "passwd"
     }
@@ -48,36 +38,36 @@
     }
   },
   {
-    "id": "test-standalone1",
-    "email": "test-standalone1@test.com",
+    "id": "test_registry_standalone1",
+    "email": "test_registry_standalone1@test.com",
     "password": {
       "clear": "passwd"
     }
   },
   {
-    "id": "test1-admin1",
-    "email": "test1-admin1@test.com",
+    "id": "test_registry_org1_admin",
+    "email": "test_registry_org1_admin@test.com",
     "password": {
       "clear": "passwd"
     }
   },
   {
-    "id": "test1-contrib1",
-    "email": "test1-contrib1@test.com",
+    "id": "test_registry_org1_contrib",
+    "email": "test_registry_org1_contrib@test.com",
     "password": {
       "clear": "passwd"
     }
   },
   {
-    "id": "test1-user1",
-    "email": "test1-user1@test.com",
+    "id": "test_registry_org1_user",
+    "email": "test_registry_org1_user@test.com",
     "password": {
       "clear": "passwd"
     }
   },
   {
-    "id": "test1_scope_nhi",
-    "email": "test1_scope_nhi@test.com",
+    "id": "test_registry_org1_scope_nhi",
+    "email": "test_registry_org1_scope_nhi@test.com",
     "nhi": {
       "provider": {
         "issuer": "https://registry-tests.example.com",

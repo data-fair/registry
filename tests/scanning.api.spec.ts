@@ -49,7 +49,7 @@ test.describe('Scanning', () => {
     const adminRes = await admin.get('/api/v1/artefacts/' + fenc)
     expect(adminRes.data.scan?.summary?.high).toBe(1)
 
-    const userAx = await axiosAuth('test1-user1')
+    const userAx = await axiosAuth('test_registry_org1_user')
     const userRes = await userAx.get('/api/v1/artefacts/' + fenc)
     expect(userRes.data.scan).toBeUndefined()
   })

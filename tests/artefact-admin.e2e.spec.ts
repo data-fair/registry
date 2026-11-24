@@ -142,7 +142,7 @@ test.describe('Artefact admin metadata editing for a mirrored artefact', () => {
 async function loginAdmin (page: Page) {
   const directoryUrl = `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/simple-directory`
   const res = await page.request.post(directoryUrl + '/api/auth/password', {
-    data: { email: 'superadmin@test.com', password: 'passwd', adminMode: true },
+    data: { email: 'test_registry_superadmin@test.com', password: 'passwd', adminMode: true },
     params: { redirect: directoryUrl },
     maxRedirects: 0
   })

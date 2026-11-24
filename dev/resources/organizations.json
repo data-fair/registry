@@ -8,10 +8,6 @@
         "role": "admin"
       },
       {
-        "id": "albanm",
-        "role": "admin"
-      },
-      {
         "id": "dev1-contrib1",
         "role": "contrib"
       },
@@ -22,23 +18,23 @@
     ]
   },
   {
-    "id": "test1",
+    "id": "test_registry_org1",
     "name": "Test Organization 1",
     "members": [
       {
-        "id": "test1-admin1",
+        "id": "test_registry_org1_admin",
         "role": "admin"
       },
       {
-        "id": "test1-contrib1",
+        "id": "test_registry_org1_contrib",
         "role": "contrib"
       },
       {
-        "id": "test1-user1",
+        "id": "test_registry_org1_user",
         "role": "user1"
       },
       {
-        "id": "test1_scope_nhi",
+        "id": "test_registry_org1_scope_nhi",
         "role": "admin"
       }
     ]

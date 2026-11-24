@@ -22,41 +22,41 @@ test.describe('Read API key access', () => {
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/public-pkg@1'), form1, { headers: form1.getHeaders() })
     await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1'), {
       public: true,
-      privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
+      privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }]
     })
 
-    // Private artefact visible to test1
+    // Private artefact visible to test_registry_org1
     const tarball2 = await createTestTarball({ name: '@test/private-pkg', version: '2.0.0' })
     const form2 = new FormData()
     form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/private-pkg@2'), form2, { headers: form2.getHeaders() })
     await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/private-pkg@2'), {
-      privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
+      privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }]
     })
 
-    // Private artefact NOT visible to test1
+    // Private artefact NOT visible to test_registry_org1
     const tarball3 = await createTestTarball({ name: '@test/other-pkg', version: '3.0.0' })
     const form3 = new FormData()
     form3.append('file', tarball3, { filename: 'package.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/other-pkg@3'), form3, { headers: form3.getHeaders() })
 
-    // File artefact visible to test1
+    // File artefact visible to test_registry_org1
     const fileForm = new FormData()
     fileForm.append('file', Buffer.from('file-content'), { filename: 'terrain.mbtiles', contentType: 'application/octet-stream' })
     fileForm.append('category', 'tileset')
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/file/terrain', fileForm, { headers: fileForm.getHeaders() })
     await admin.patch('/api/v1/artefacts/terrain', {
       public: true,
-      privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
+      privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }]
     })
 
-    // Grant access to test1, then create read key
-    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    const ax = await axiosAuth('test1-admin1', { org: 'test1' })
+    // Grant access to test_registry_org1, then create read key
+    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
     const readKeyRes = await ax.post('/api/v1/api-keys', {
       type: 'read',
       name: 'federation-key',
-      owner: { type: 'organization', id: 'test1' }
+      owner: { type: 'organization', id: 'test_registry_org1' }
     })
     readApiKey = readKeyRes.data.key
   })
@@ -142,20 +142,20 @@ test.describe('Read API key access', () => {
     // but downloading is blocked.
     test('read key without grant can list public artefacts', async () => {
       const admin = await superAdmin
-      await admin.post('/api/v1/access-grants', { account: { type: 'user', id: 'test-standalone1' } })
+      await admin.post('/api/v1/access-grants', { account: { type: 'user', id: 'test_registry_standalone1' } })
       const keyRes = await admin.post('/api/v1/api-keys', {
         type: 'read',
         name: 'no-grant-key',
-        owner: { type: 'user', id: 'test-standalone1' }
+        owner: { type: 'user', id: 'test_registry_standalone1' }
       })
       const grants = await admin.get('/api/v1/access-grants')
-      const grant = grants.data.results.find((g: any) => g.account.id === 'test-standalone1')
+      const grant = grants.data.results.find((g: any) => g.account.id === 'test_registry_standalone1')
       await admin.delete(`/api/v1/access-grants/${grant._id}`)
 
       const ax = axiosWithApiKey(keyRes.data.key)
       const res = await ax.get('/api/v1/artefacts')
       const names = res.data.results.map((a: any) => a.packageName ?? a.name)
-      // test-standalone1 has no privateAccess on any artefact, so only public ones show up.
+      // test_registry_standalone1 has no privateAccess on any artefact, so only public ones show up.
       expect(names).toContain('@test/public-pkg')
       expect(names).toContain('terrain')
       expect(names).not.toContain('@test/private-pkg')
@@ -164,14 +164,14 @@ test.describe('Read API key access', () => {
 
     test('read key without grant cannot download tarballs', async () => {
       const admin = await superAdmin
-      await admin.post('/api/v1/access-grants', { account: { type: 'user', id: 'test-standalone1' } })
+      await admin.post('/api/v1/access-grants', { account: { type: 'user', id: 'test_registry_standalone1' } })
       const keyRes = await admin.post('/api/v1/api-keys', {
         type: 'read',
         name: 'no-grant-key-2',
-        owner: { type: 'user', id: 'test-standalone1' }
+        owner: { type: 'user', id: 'test_registry_standalone1' }
       })
       const grants = await admin.get('/api/v1/access-grants')
-      const grant = grants.data.results.find((g: any) => g.account.id === 'test-standalone1')
+      const grant = grants.data.results.find((g: any) => g.account.id === 'test_registry_standalone1')
       await admin.delete(`/api/v1/access-grants/${grant._id}`)
 
       const ax = axiosWithApiKey(keyRes.data.key)
@@ -185,14 +185,14 @@ test.describe('Read API key access', () => {
 
     test('read key without grant cannot download file artefacts', async () => {
       const admin = await superAdmin
-      await admin.post('/api/v1/access-grants', { account: { type: 'user', id: 'test-standalone1' } })
+      await admin.post('/api/v1/access-grants', { account: { type: 'user', id: 'test_registry_standalone1' } })
       const keyRes = await admin.post('/api/v1/api-keys', {
         type: 'read',
         name: 'no-grant-key-3',
-        owner: { type: 'user', id: 'test-standalone1' }
+        owner: { type: 'user', id: 'test_registry_standalone1' }
       })
       const grants = await admin.get('/api/v1/access-grants')
-      const grant = grants.data.results.find((g: any) => g.account.id === 'test-standalone1')
+      const grant = grants.data.results.find((g: any) => g.account.id === 'test_registry_standalone1')
       await admin.delete(`/api/v1/access-grants/${grant._id}`)
 
       const ax = axiosWithApiKey(keyRes.data.key)

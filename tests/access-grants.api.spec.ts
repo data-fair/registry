@@ -9,18 +9,18 @@ test.describe('Access Grants', () => {
   test('superadmin can grant access', async () => {
     const ax = await superAdmin
     const res = await ax.post('/api/v1/access-grants', {
-      account: { type: 'organization', id: 'test1' }
+      account: { type: 'organization', id: 'test_registry_org1' }
     })
     expect(res.status).toBe(201)
-    expect(res.data.account.id).toBe('test1')
+    expect(res.data.account.id).toBe('test_registry_org1')
     expect(res.data.grantedBy).toBeTruthy()
     expect(res.data.grantedAt).toBeTruthy()
   })
 
   test('superadmin can list grants', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    await ax.post('/api/v1/access-grants', { account: { type: 'user', id: 'test-standalone1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'user', id: 'test_registry_standalone1' } })
 
     const res = await ax.get('/api/v1/access-grants')
     // clean() only wipes test*-prefixed grants — manually-created dev grants persist
@@ -31,7 +31,7 @@ test.describe('Access Grants', () => {
   test('superadmin can revoke a grant', async () => {
     const ax = await superAdmin
     const created = await ax.post('/api/v1/access-grants', {
-      account: { type: 'organization', id: 'test1' }
+      account: { type: 'organization', id: 'test_registry_org1' }
     })
     const deleteRes = await ax.delete(`/api/v1/access-grants/${created.data._id}`)
     expect(deleteRes.status).toBe(204)
@@ -44,9 +44,9 @@ test.describe('Access Grants', () => {
 
   test('duplicate grant returns 409', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
     try {
-      await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+      await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(409)
@@ -54,7 +54,7 @@ test.describe('Access Grants', () => {
   })
 
   test('non-admin cannot grant access', async () => {
-    const ax = await axiosAuth('dev-standalone1')
+    const ax = await axiosAuth('test_registry_standalone2')
     try {
       await ax.post('/api/v1/access-grants', { account: { type: 'user', id: 'someone' } })
       expect(true).toBe(false)

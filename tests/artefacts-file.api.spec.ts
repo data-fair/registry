@@ -140,7 +140,7 @@ test.describe('File artefacts', () => {
       await ax.post('/api/v1/artefacts/file/terrain', form, { headers: form.getHeaders() })
       await admin.patch('/api/v1/artefacts/terrain', {
         public: true,
-        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
+        privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }]
       })
     })
 
@@ -154,15 +154,15 @@ test.describe('File artefacts', () => {
 
     test('download with session + grant', async () => {
       const admin = await superAdmin
-      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
 
-      const ax = await axiosAuth('test1-admin1', { org: 'test1' })
+      const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
       const res = await ax.get('/api/v1/artefacts/terrain/download', { responseType: 'arraybuffer' })
       expect(res.status).toBe(200)
     })
 
     test('download without access returns 403', async () => {
-      const ax = await axiosAuth('dev-standalone1')
+      const ax = await axiosAuth('test_registry_standalone2')
       try {
         await ax.get('/api/v1/artefacts/terrain/download')
         expect(true).toBe(false)
@@ -178,9 +178,9 @@ test.describe('File artefacts', () => {
     test('download of private artefact when caller is not in privateAccess returns 403', async () => {
       const admin = await superAdmin
       await admin.patch('/api/v1/artefacts/terrain', { public: false, privateAccess: [] })
-      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+      await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
 
-      const ax = await axiosAuth('test1-admin1', { org: 'test1' })
+      const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
       try {
         await ax.get('/api/v1/artefacts/terrain/download')
         expect(true).toBe(false)

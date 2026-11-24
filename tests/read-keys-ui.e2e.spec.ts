@@ -4,10 +4,10 @@ import { superAdmin, clean } from './support/axios.ts'
 test.describe('Read API key creation (UI)', () => {
   test.beforeEach(async ({ page }) => {
     await clean()
-    // Grant test1 org access so the API Keys tab becomes available.
+    // Grant test_registry_org1 org access so the API Keys tab becomes available.
     const admin = await superAdmin
-    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    await loginOrg(page, 'test1-admin1', 'test1')
+    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    await loginOrg(page, 'test_registry_org1_admin', 'test_registry_org1')
   })
 
   // Regression: the create form used to send the whole session account as

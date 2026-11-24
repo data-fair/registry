@@ -75,7 +75,7 @@ Test users are defined in @dev/resources/users.json and organizations in @dev/re
 
 Sync mirrors artefacts *from* an upstream registry, so it needs two registries. `api-upstream` is a second registry process (same code, `PORT`/`MONGO_URL`/`DATA_DIR` overridden). Pointing a registry at itself cannot work: selecting an artefact that already exists locally without an `origin` returns 409.
 
-`npm run dev:fixtures` seeds the upstream, mints a read key owned by org `test1`, registers the mirror and selects two artefacts. Selecting an artefact queues a background sync of that artefact alone (`pendingSync` on the registry doc, drained under the sync lock), so the mirrors land without clicking **Sync now** — that button runs a full sync. Sync progress is published on the registry's ws channel; the admin table gets each row's local state from `GET …/remote-artefacts` and loads upstream thumbnails through `GET …/remote-thumbnails/:id/data` (the browser cannot reach the upstream directly).
+`npm run dev:fixtures` seeds the upstream, mints a read key owned by org `test_registry_org1`, registers the mirror and selects two artefacts. Selecting an artefact queues a background sync of that artefact alone (`pendingSync` on the registry doc, drained under the sync lock), so the mirrors land without clicking **Sync now** — that button runs a full sync. Sync progress is published on the registry's ws channel; the admin table gets each row's local state from `GET …/remote-artefacts` and loads upstream thumbnails through `GET …/remote-thumbnails/:id/data` (the browser cannot reach the upstream directly).
 
 Unselecting keeps the local copy but unlocks it (drops `origin`); it then blocks re-mirroring of that id (409) until it is deleted. Deleting a registry unlocks all its mirrors the same way.
 
@@ -108,7 +108,7 @@ turns its `x-agent` annotations into agent tools (`search_artefacts`, `get_artef
   `x-api-key` stays under `registryApiKey` (never `apiKey`), `x-agent` uses only openapi-mcp's keys.
 - `tests/api-docs.api.spec.ts` pins the agent surface in `tests/fixtures/agent-surface.json`: regenerate
   with `UPDATE_GOLDEN=1 npm run test-api -- tests/api-docs.api.spec.ts` when a change is intended.
-- `tests/scopes.api.spec.ts` mints scoped sessions with the test non-human identity `test1_scope_nhi`
+- `tests/scopes.api.spec.ts` mints scoped sessions with the test non-human identity `test_registry_org1_scope_nhi`
   (`dev/resources/users.json`, key in `tests/resources/nhi/`, `tests/support/nhi.ts`); simple-directory
   runs with `MANAGE_NHIS` for it. Bearer tokens are tested through nginx: their audience is the site.
 

@@ -161,7 +161,7 @@ async function main () {
     {
       id: '@koumoul/application-demo@1',
       body: {
-        privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }],
+        privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }],
         title: { fr: 'Application de démo', en: 'Demo application' }
       }
     },
@@ -177,7 +177,7 @@ async function main () {
     },
     {
       id: 'basemap-style',
-      body: { privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] }
+      body: { privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }] }
     }
   ]
 
@@ -202,7 +202,7 @@ async function main () {
 
   // --- Access grants ------------------------------------------------------
   const grantTargets: { type: string, id: string }[] = [
-    { type: 'organization', id: 'test1' }
+    { type: 'organization', id: 'test_registry_org1' }
   ]
   for (const account of grantTargets) {
     try {
@@ -289,11 +289,11 @@ async function main () {
 
   // A read key requires an access grant for its owner account, minted by an admin of it.
   try {
-    await upstreamAdmin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    console.log('  + upstream access-grant organization:test1')
+    await upstreamAdmin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    console.log('  + upstream access-grant organization:test_registry_org1')
   } catch (err) {
     if (!isHttp409(err)) throw err
-    console.log('  ✓ upstream access-grant organization:test1 (skipped)')
+    console.log('  ✓ upstream access-grant organization:test_registry_org1 (skipped)')
   }
 
   // Consult the upstream itself, not just our output file — the api-test suite
@@ -301,9 +301,9 @@ async function main () {
   // reference a key the upstream no longer has. Mirrors the upload-key logic above.
   //
   // The read-key LIST endpoint filters by the caller's own account, so a read key
-  // owned by org test1 is only visible through a test1-scoped session — never to a
+  // owned by org test_registry_org1 is only visible through a test_registry_org1-scoped session — never to a
   // plain superadmin session. List and mint through the same org admin.
-  const orgAdmin = await upstreamAxiosAuth('test1-admin1', { org: 'test1' })
+  const orgAdmin = await upstreamAxiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
   const upstreamReadKeys = await orgAdmin.get('/api/v1/api-keys?type=read')
   const hasFederationKey = upstreamReadKeys.data.results.some((k: any) => k.name === 'dev-federation')
   if (hasFederationKey && output.keys['dev-upstream-read']) {
@@ -312,10 +312,10 @@ async function main () {
     const res = await orgAdmin.post('/api/v1/api-keys', {
       type: 'read',
       name: 'dev-federation',
-      owner: { type: 'organization', id: 'test1' }
+      owner: { type: 'organization', id: 'test_registry_org1' }
     })
     output.keys['dev-upstream-read'] = res.data.key
-    console.log('  + upstream read-key dev-federation (owner organization:test1)')
+    console.log('  + upstream read-key dev-federation (owner organization:test_registry_org1)')
     await saveOutput(output)
   }
 
