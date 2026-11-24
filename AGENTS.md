@@ -43,6 +43,8 @@ The UI and simple-directory are served on `http://$DEV_HOST:$NGINX_PORT`; the AP
 - If a service is down, do not try to fix the infrastructure: read its logs (`dev/logs/`, or
   `docker compose logs <service>` for a container) and report the problem to the user with the relevant lines.
 
+Design specs and implementation plans are not kept in this repository; durable architecture docs live in `docs/architecture/`.
+
 ### Vulnerability scanner (osv-scanner)
 
 Dev config enables npm vulnerability scanning (`api/config/development.js`), but `dev/default.env` turns it off (`SCANNING_ENABLED=false`): set it to `true` in `.env` to work on it. It shells out to the **osv-scanner v2** binary. Install it once so it's on your PATH (Linux x86_64):
@@ -112,7 +114,7 @@ Advisory, admin-only vulnerability scanning of `npm` artefacts (bundled `node_mo
 `GET /api/v1/api-docs.json` (`api/contract/api-docs.ts`, fr/en from `Accept-Language`) is the OpenAPI
 document data-fair fetches over a private URL and merges into its platform document; `@data-fair/openapi-mcp`
 turns its `x-agent` annotations into agent tools (`search_artefacts`, `get_artefact`). Design:
-`docs/superpowers/specs/2026-11-03-api-doc-scopes-design.md`.
+`docs/architecture/README.md`, "API doc and scopes".
 
 - The session is scope-aware. `api/src/scopes.ts` declares the `registry` scope family (read tier only) and
   the `scopedOperations` table: only those routes (`requireOperationScope`) accept scope-restricted

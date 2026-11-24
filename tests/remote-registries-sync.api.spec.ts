@@ -2,8 +2,8 @@
 // process). Nothing else in the suite executes syncNpmArtefact / syncFileArtefact:
 // the other sync specs either mirror zero artefacts or assert a DNS failure.
 //
-// Requires DEV_UPSTREAM_API_PORT and a running upstream — see
-// docs/superpowers/specs/2026-07-10-federation-dev-testing-design.md
+// Requires DEV_UPSTREAM_API_PORT and a running upstream (npm run dev:api-upstream) — see
+// AGENTS.md "Exercising federation sync" and docs/architecture/README.md "Remote registries"
 
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'

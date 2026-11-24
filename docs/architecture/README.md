@@ -147,3 +147,19 @@ Tarball and file storage is pluggable:
 
 Both backends implement the same interface: `writeStream`, `readStream`, `delete`, `exists`, `clean`.
 
+
+## API doc and scopes
+
+`GET /api/v1/api-docs.json` (`api/contract/api-docs.ts`) is registry's OpenAPI document. data-fair fetches it
+over a private URL and merges it into its platform document, and `@data-fair/openapi-mcp` turns its `x-agent`
+annotations into agent tools (`search_artefacts`, `get_artefact`), so an agent with a scoped token can browse
+the artefact catalog read-only for its account.
+
+- `api/src/scopes.ts` declares the `registry` scope family (a single `read` tier; `all:*` covers it) and the
+  `scopedOperations` table. Only the browsing routes accept scope-restricted sessions: list, detail and
+  download of artefacts (the download keeps its access-grant check). Every other route refuses them, and a
+  scoped session is never admin.
+- The document must stay mergeable by data-fair: the `sdCookie` and `oauth2` schemes keep their exact
+  definitions, registry's own `x-api-key` header is documented under `registryApiKey` (never `apiKey`), every
+  oauth2 scope an operation requires is declared by the scheme, `x-agent` uses only the keys the merge
+  accepts, and `servers` is the relative `/registry/api/v1`.

@@ -4,7 +4,7 @@ A simple registry for the [data-fair](https://github.com/data-fair) stack. It st
 
 Services in the data-fair ecosystem use the registry to discover, download and cache plugins (processings, catalogs, applications) and file artefacts (tilesets) at runtime.
 
-See [docs/architecture.md](docs/architecture.md) for a detailed overview of how the registry fits into the stack.
+See [docs/architecture/](docs/architecture/README.md) for a detailed overview of how the registry fits into the stack.
 
 See [docs/ci-integration.md](docs/ci-integration.md) for recommendations on how to push to the registry from CI workflows.
 

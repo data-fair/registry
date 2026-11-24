@@ -3,7 +3,7 @@
 // of the platform. Every route a scoped session may reach is listed in scopedOperations and guarded by
 // requireOperationScope; any other route refuses scope-restricted sessions (lib-express).
 // The OpenAPI document (api/contract/api-docs.ts) is built from the same table.
-// Design: docs/superpowers/specs/2026-11-03-api-doc-scopes-design.md
+// Design: docs/architecture/README.md, "API doc and scopes"
 import type { RequestHandler } from 'express'
 import type { ScopeTier } from '@data-fair/lib-common-types/scopes.js'
 import { defineScopes } from '@data-fair/lib-common-types/scopes.js'
