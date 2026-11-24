@@ -35,7 +35,7 @@ const OUTPUT_PATH = join(import.meta.dirname, 'fixtures-output.json')
 
 // 2x2 PNG (red). Base64 is short and sharp decodes it fine.
 const TINY_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAF0lEQVQIW2P8z8Dwn4EIwDiqEL+KYSQKAH0eBPuxMUosAAAAAElFTkSuQmCC',
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwnwGM/zMwAAAf7gP9qS/A4gAAAABJRU5ErkJggg==',
   'base64'
 )
 
