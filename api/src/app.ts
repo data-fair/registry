@@ -61,8 +61,9 @@ if (process.env.NODE_ENV === 'development') {
   //   `test_<suite>_file`), with their tarballs, thumbnails, scans and scan locks;
   // - the api keys created by or owned by the prefix's accounts, and their access grants;
   // - the remote registries whose name starts with the prefix, with their sync locks.
+  // Not restricted to internal calls, unlike the other test-env routes: a dev environment running several
+  // services cleans a prefix on each one's public path. It only ever deletes what the prefix names.
   app.delete('/api/test-env', async (req, res) => {
-    assertReqInternal(req)
     const prefix = req.query.prefix
     if (typeof prefix !== 'string' || !testPrefixRegexp.test(prefix)) {
       res.status(400).send('invalid test prefix')

@@ -74,7 +74,8 @@ Run a specific test file, or a single test. Note `npm run test` is a compound `a
 Test sub-space: the tests own the simple-directory accounts whose ids start with `test_registry_`
 (@tests/support/sd-fixtures.ts, password `passwd`, email `<id>@test.com`), seeded through simple-directory's
 test API by `tests/global-setup.ts` and, under a lock against a second concurrent run, by `tests/state-setup.ts`.
-`DELETE /api/test-env?prefix=test_<suite>_` cleans one sub-space only (400 without a valid prefix):
+`DELETE /api/test-env?prefix=test_<suite>_` cleans one sub-space only (400 without a valid prefix), also through
+nginx (`/registry/api/test-env`, where a dev environment of several services cleans each one):
 
 - the artefacts whose id starts with the prefix, optionally after an `@` (`@test_registry_/pkg@1`,
   `test_registry_terrain`), with their tarballs, thumbnails, scans and scan locks: an artefact a test creates

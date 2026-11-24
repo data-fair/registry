@@ -71,6 +71,13 @@ test.describe('test-env', () => {
     }
   })
 
+  test('the prefixed clean answers through the reverse proxy too', async () => {
+    // the stack's world loader cleans a prefix on every service's public path
+    const res = await anonymousAx.delete(`http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/registry/api/test-env`, { params: { prefix: a } })
+    expect(res.status).toBe(204)
+    await expect(anonymousAx.delete(`http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/registry/api/test-env`)).rejects.toMatchObject({ status: 400 })
+  })
+
   test('prefixed clean keeps other prefixes\' artefacts', async () => {
     const admin = await superAdmin
     await anonymousAx.delete(testEnv, { params: { prefix: a } })
