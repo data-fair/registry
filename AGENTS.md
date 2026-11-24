@@ -17,46 +17,35 @@ Types are managed from JSON schemas (e.g., @api/config/type/index.ts). Run `npm 
 
 ## Dev environment
 
-The dev environment is the shared one of the data-fair services (`@data-fair/lib-dev`, the
-`data-fair-service` skill of data-fair/lib): one zellij session per checkout, readable by humans,
-operated by agents only through `df-dev`. `dev/dev.json` declares what is specific to this repo (drawn
-ports, panes and their readiness URLs, optional containers), `.zellij.kdl` the panes: `status`
-(containers), `ui`, `api` (the registry), `api-upstream` (a second registry used as a federation mirror
-source, port `DEV_UPSTREAM_API_PORT`), and a free shell.
+Docker runs the containers (nginx, simple-directory, mongo); the api, the upstream api and the ui run as node
+processes. registry sends no events, so the dev env has no events service.
 
-The user starts the session (`npm run dev-zellij`). An agent never starts or kills it.
+- `npm run dev` — the containers (`npm run dev-deps`), then the api, the upstream api and the ui in the terminal
+  (Ctrl+C stops them), at `http://localhost:5850/registry/`. Their logs are in `dev/logs/` (`DEV_LOG_DIR`,
+  `DEV_LOG_PREFIX`); `npm run dev` accepts docker compose arguments.
+- `npm run dev-deps` — the containers only, plus `npm run dev-setup`.
+- `npm run dev-setup` — idempotent builds (types, ui), no container.
+- `npm run dev:api`, `dev:api-upstream`, `dev:ui` — one process each, with the variables of `.env` exported.
+  `api-upstream` is a second registry used as a federation mirror source (port `DEV_UPSTREAM_API_PORT`).
+- `npm run stop-dev-deps` — stops the containers.
 
-| Need | Command |
-|---|---|
-| What runs, what is broken | `npx --no df-dev status` (containers, panes running / exited / **not ready**, memory) |
-| A process's output | `npx --no df-dev logs <pane> -n 100` (`api`, `api-upstream`, `ui`) |
-| Restart one process | `npx --no df-dev restart <pane>`: Ctrl+C, rerun, waits for the pane's readiness URL |
+Default ports (5850-5857) are in `dev/default.env`, copied to `.env` the first time: `.env` overrides it and is
+never overwritten. Production names (`MONGO_URL`, `PRIVATE_DIRECTORY_URL`, `SECRET_INTERNAL_SERVICES`,
+`SCANNING_ENABLED`...) override `api/config/development.js`. The upstream api takes its database from
+`DEV_UPSTREAM_MONGO_URL` when set (default `data-fair-registry-upstream` on `MONGO_PORT`).
 
-- Read the logs before restarting: nodemon and vite already reload on file changes.
-- "not ready" from `restart` → report to the user with the logs, never retry in a loop.
-- Never `docker compose restart`, `kill`, `zellij action`, nor `npm ci` / `npm install` while the env runs
-  (watchers restart on half-installed modules).
-- Always `npx --no`: a bare `npx df-dev` downloads an unrelated public package when the dependency is
-  missing (dependency confusion). Scripts and CI call `./node_modules/.bin/df-dev`.
+The UI and simple-directory are served on `http://$DEV_HOST:$NGINX_PORT`; the APIs answer directly on
+`localhost:<port>` too.
 
-Containers: nginx, simple-directory and mongo. registry sends no events, so the dev env has no events
-service.
-
-The UI and simple-directory are served on `http://$DEV_HOST:$NGINX_PORT` (`<branch>.localhost`, so the
-session cookies of two worktrees never mix); the APIs answer directly on `localhost:<port>` too.
-
-Worktrees, from the main checkout: `npx --no df-worktree <branch>` / `npx --no df-worktree-delete <branch>`
-(branch names: letters, digits, `.`, `_`, `-`, no `/`, and `registry_<branch>` at most 60 characters).
-
-Ports are drawn per checkout into `.env` (`npx --no df-dev init-env`). Do not modify them.
-
-If a service is down, do not try to fix the infrastructure: run `npx --no df-dev status`, read the pane's
-logs (`npx --no df-dev logs <pane>`, or `docker compose logs <service>` for a container), and report the
-problem to the user with the relevant lines.
+- Read the logs before restarting: nodemon (api) and vite (ui) already reload on file changes.
+- Do not start, stop or restart the dev processes or containers of the user: ask.
+- Never `npm ci` / `npm install` while the env runs.
+- If a service is down, do not try to fix the infrastructure: read its logs (`dev/logs/`, or
+  `docker compose logs <service>` for a container) and report the problem to the user with the relevant lines.
 
 ### Vulnerability scanner (osv-scanner)
 
-Dev config enables npm vulnerability scanning (`api/config/development.js`), which shells out to the **osv-scanner v2** binary. Install it once so it's on your PATH (Linux x86_64):
+Dev config enables npm vulnerability scanning (`api/config/development.js`), but `dev/default.env` turns it off (`SCANNING_ENABLED=false`): set it to `true` in `.env` to work on it. It shells out to the **osv-scanner v2** binary. Install it once so it's on your PATH (Linux x86_64):
 
     OSV_VERSION=v2.7.0
     sudo curl -sSfL -o /usr/local/bin/osv-scanner \

@@ -12,10 +12,10 @@ import { commonjsDeps } from '@koumoul/vjsf/utils/build.js'
 import dotenv from 'dotenv'
 dotenv.config({ path: import.meta.resolve('../.env').replace('file://', '') })
 
-// the ports drawn in .env for this checkout (dev/dev.json "ports")
+// the ports of .env (dev/default.env)
 const envPort = (name: string) => {
   const port = Number(process.env[name])
-  if (!Number.isInteger(port) || port <= 0) throw new Error(`missing ${name} env variable, run "npx --no df-dev setup" to create the .env file`)
+  if (!Number.isInteger(port) || port <= 0) throw new Error(`missing ${name} env variable, run "npm run dev-deps" to create the .env file from dev/default.env`)
   return port
 }
 

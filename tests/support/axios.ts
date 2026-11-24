@@ -77,7 +77,7 @@ export const waitSyncIdle = async (registryId: string) => {
 const upstreamPort = (): string => {
   const port = process.env.DEV_UPSTREAM_API_PORT
   if (!port) {
-    throw new Error('DEV_UPSTREAM_API_PORT is not set — run "npx --no df-dev init-env --force" to draw the ports again (dev/dev.json "ports")')
+    throw new Error('DEV_UPSTREAM_API_PORT is not set — add it to .env (see dev/default.env)')
   }
   return port
 }
