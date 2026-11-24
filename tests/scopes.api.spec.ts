@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
 import { decodeJwt } from 'jose'
 import type { AxiosInstance } from 'axios'
-import { superAdmin, axiosWithApiKey, clean, anonymousAx } from './support/axios.ts'
+import { superAdmin, axiosWithApiKey, clean, anonymousAx, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 import { nhiSession } from './support/nhi.ts'
 
@@ -26,7 +26,7 @@ const expectStatus = async (promise: Promise<unknown>, status: number) => {
 }
 
 const ids = async (ax: AxiosInstance, query = '') =>
-  (await ax.get('/api/v1/artefacts' + query)).data.results.map((a: any) => a._id)
+  ours((await ax.get('/api/v1/artefacts' + query, listOpts)).data.results).map((a: any) => a._id)
 
 test.describe('scope-restricted sessions', () => {
   test.beforeEach(async () => {
@@ -54,8 +54,8 @@ test.describe('scope-restricted sessions', () => {
 
   test('registry:read lists the account catalog', async () => {
     const { cookieAx } = await nhiSession('registry:read')
-    const res = await cookieAx.get('/api/v1/artefacts')
-    expect(res.data.results.map((a: any) => a._id).sort()).toEqual([privTest1, pub].sort())
+    const res = await cookieAx.get('/api/v1/artefacts', listOpts)
+    expect(ours(res.data.results).map((a: any) => a._id).sort()).toEqual([privTest1, pub].sort())
     for (const artefact of res.data.results) expect(artefact).not.toHaveProperty('scan')
   })
 
@@ -98,9 +98,9 @@ test.describe('scope-restricted sessions', () => {
 
   test('a scoped session is never admin', async () => {
     const { cookieAx } = await nhiSession('registry:read')
-    const res = await cookieAx.get('/api/v1/artefacts?sort=-vulnerabilities')
+    const res = await cookieAx.get('/api/v1/artefacts?sort=-vulnerabilities', listOpts)
     for (const artefact of res.data.results) expect(artefact).not.toHaveProperty('scan')
-    expect(res.data.results.map((a: any) => a._id)).toEqual(await ids(cookieAx))
+    expect(ours(res.data.results).map((a: any) => a._id)).toEqual(await ids(cookieAx))
   })
 
   test('unscoped session keeps working', async () => {

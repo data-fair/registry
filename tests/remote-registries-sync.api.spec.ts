@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
 import sharp from 'sharp'
 import {
-  superAdmin, clean, waitSyncIdle,
+  superAdmin, clean, waitSyncIdle, ours,
   upstreamBaseURL, upstreamSuperAdmin, upstreamAxiosAuth, upstreamAxiosWithApiKey, cleanUpstream
 } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
@@ -363,9 +363,12 @@ test.describe('Federation sync against a real upstream registry', () => {
     await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'test_registry_Upstream', apiKey: readKey })
 
     const tilesets = await listRemote({ category: 'tileset' })
-    expect(tilesets.results.map(a => a._id)).toEqual([FILE_ID])
+    // the upstream may hold other artefacts (the dev data's): only this sub-space's are compared
+    expect(ours(tilesets.results).map(a => a._id)).toEqual([FILE_ID])
+    for (const a of tilesets.results) expect(a.category).toBe('tileset')
 
     const npm = await listRemote({ format: 'npm' })
-    expect(npm.results.map(a => a._id)).toEqual([NPM_ID])
+    expect(ours(npm.results).map(a => a._id)).toEqual([NPM_ID])
+    for (const a of npm.results) expect(a.format).toBe('npm')
   })
 })

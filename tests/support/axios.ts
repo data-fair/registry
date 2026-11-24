@@ -37,6 +37,13 @@ export const axiosInternal = (secret: string) => axiosBuilder({ ...axiosOpts, he
 
 // what the test sub-space owns here (accounts test_registry_*) and the global objects it names with the
 // prefix: artefacts `@test_registry_…` or `test_registry_…`, remote registries named `test_registry_…`
+// The artefacts of this sub-space in a listing. The registry is shared with the dev data and with other test
+// suites (their artefacts named after their own prefix), so a spec counts and orders only its own artefacts,
+// out of a page large enough to hold them all (listOpts).
+export const ourArtefact = /^@?test_registry_/
+export const ours = <T extends { _id: string }>(results: T[]): T[] => results.filter(r => ourArtefact.test(r._id))
+export const listOpts = { params: { size: 100 } }
+
 export const clean = async () => {
   await anonymousAx.delete(`http://localhost:${process.env.DEV_API_PORT}/api/test-env`, { params: { prefix } })
 }

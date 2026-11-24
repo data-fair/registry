@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosWithApiKey, anonymousAx, clean } from './support/axios.ts'
+import { superAdmin, axiosWithApiKey, anonymousAx, clean, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -340,8 +340,8 @@ test.describe('Artefacts', () => {
       const deleteRes = await ax.delete('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'))
       expect(deleteRes.status).toBe(204)
 
-      const listRes = await ax.get('/api/v1/artefacts')
-      expect(listRes.data.count).toBe(0)
+      const listRes = await ax.get('/api/v1/artefacts', listOpts)
+      expect(ours(listRes.data.results)).toHaveLength(0)
     })
   })
 
@@ -432,17 +432,15 @@ test.describe('Artefacts', () => {
     test('deprecated artefacts are excluded from the default list', async () => {
       const ax = await superAdmin
       await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { deprecated: true })
-      const list = await ax.get('/api/v1/artefacts')
-      expect(list.data.count).toBe(0)
-      expect(list.data.results).toEqual([])
+      const list = await ax.get('/api/v1/artefacts', listOpts)
+      expect(ours(list.data.results)).toEqual([])
     })
 
     test('deprecated artefacts appear with includeDeprecated=true', async () => {
       const ax = await superAdmin
       await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { deprecated: true })
-      const list = await ax.get('/api/v1/artefacts?includeDeprecated=true')
-      expect(list.data.count).toBe(1)
-      expect(list.data.results[0]._id).toBe('@test_registry_/pkg@1')
+      const list = await ax.get('/api/v1/artefacts?includeDeprecated=true', listOpts)
+      expect(ours(list.data.results).map((a: any) => a._id)).toEqual(['@test_registry_/pkg@1'])
     })
   })
 
@@ -468,20 +466,20 @@ test.describe('Artefacts', () => {
 
     test('sort=group.en orders by the English group (ungrouped first, as Mongo sorts missing fields)', async () => {
       const admin = await superAdmin
-      const res = await admin.get('/api/v1/artefacts?sort=group.en')
-      expect(res.data.results.map((a: any) => a._id)).toEqual(['@test_registry_/c@1', '@test_registry_/a@1', '@test_registry_/b@1'])
+      const res = await admin.get('/api/v1/artefacts?sort=group.en', listOpts)
+      expect(ours(res.data.results).map((a: any) => a._id)).toEqual(['@test_registry_/c@1', '@test_registry_/a@1', '@test_registry_/b@1'])
     })
 
     test('a leading dash reverses the order', async () => {
       const admin = await superAdmin
-      const res = await admin.get('/api/v1/artefacts?sort=-name')
-      expect(res.data.results.map((a: any) => a._id)).toEqual(['@test_registry_/c@1', '@test_registry_/b@1', '@test_registry_/a@1'])
+      const res = await admin.get('/api/v1/artefacts?sort=-name', listOpts)
+      expect(ours(res.data.results).map((a: any) => a._id)).toEqual(['@test_registry_/c@1', '@test_registry_/b@1', '@test_registry_/a@1'])
     })
 
     test('sort=version orders by version', async () => {
       const admin = await superAdmin
-      const res = await admin.get('/api/v1/artefacts?sort=-version')
-      expect(res.data.results.map((a: any) => a.version)).toEqual(['3.0.0', '2.0.0', '1.0.0'])
+      const res = await admin.get('/api/v1/artefacts?sort=-version', listOpts)
+      expect(ours(res.data.results).map((a: any) => a.version)).toEqual(['3.0.0', '2.0.0', '1.0.0'])
     })
 
     test('an unknown sort key returns 400', async () => {

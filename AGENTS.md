@@ -84,7 +84,8 @@ nginx (`/registry/api/test-env`, where a dev environment of several services cle
 - the remote registries whose name starts with the prefix, with their sync locks.
 
 Several suites can share one registry: the clean of one prefix never touches another prefix nor unprefixed
-artefacts. `tests/test-env.api.spec.ts` checks it. The dev world `test_demo_` (`npm run dev-world`,
+artefacts. `tests/test-env.api.spec.ts` checks it. So a spec never asserts on a whole listing: it keeps its own
+artefacts (`ours()` and `listOpts` of `tests/support/axios.ts`), grants and remote registries (by prefix). The dev world `test_demo_` (`npm run dev-world`,
 @dev/resources/demo-world.json, login `test_demo_dev@example.org` / `passwd`, a simple-directory admin) is never
 cleaned by the tests; `npm run dev:fixtures` seeds its artefacts as that account.
 

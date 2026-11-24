@@ -336,30 +336,34 @@ async function main () {
     await saveOutput(output)
   }
 
+  // The remote registry's id is its URL, and the tests register the same upstream as
+  // http://localhost:<port>: the dev mirror uses 127.0.0.1 so that both can exist.
+  const mirrorUrl = upstreamUrl.replace('//localhost:', '//127.0.0.1:')
+
   // Downstream: register the mirror and select both artefacts. Deliberately does NOT
   // sync — leave the "Sync now" button for a human to click.
   try {
     await admin.post('/api/v1/remote-registries', {
-      url: upstreamUrl,
+      url: mirrorUrl,
       name: 'Dev upstream',
       apiKey: output.keys['dev-upstream-read']
     })
-    console.log(`  + remote-registry ${upstreamUrl}`)
+    console.log(`  + remote-registry ${mirrorUrl}`)
   } catch (err) {
     if (!isHttp409(err)) throw err
-    console.log(`  ✓ remote-registry ${upstreamUrl} (skipped)`)
+    console.log(`  ✓ remote-registry ${mirrorUrl} (skipped)`)
   }
 
   // Always refresh the stored key: on a re-run the read key above may have been
   // re-minted, and the existing registry doc would otherwise keep ciphering the
   // old, now-invalid key — the cause of a 401 when browsing the mirror.
-  await admin.patch(`/api/v1/remote-registries/${encodeURIComponent(upstreamUrl)}`, {
+  await admin.patch(`/api/v1/remote-registries/${encodeURIComponent(mirrorUrl)}`, {
     apiKey: output.keys['dev-upstream-read']
   })
 
   for (const artefactId of [UPSTREAM_NPM_ID, UPSTREAM_FILE_ID]) {
     try {
-      await admin.post(`/api/v1/remote-registries/${encodeURIComponent(upstreamUrl)}/selected-artefacts`, { artefactId })
+      await admin.post(`/api/v1/remote-registries/${encodeURIComponent(mirrorUrl)}/selected-artefacts`, { artefactId })
       console.log(`  + selected ${artefactId}`)
     } catch (err) {
       if (!isHttp409(err)) throw err

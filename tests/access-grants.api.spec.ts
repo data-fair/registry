@@ -24,7 +24,7 @@ test.describe('Access Grants', () => {
 
     const res = await ax.get('/api/v1/access-grants')
     // clean() only wipes test*-prefixed grants — manually-created dev grants persist
-    const testGrants = res.data.results.filter((g: any) => g.account.id.startsWith('test'))
+    const testGrants = res.data.results.filter((g: any) => g.account.id.startsWith('test_registry_'))
     expect(testGrants).toHaveLength(2)
   })
 
@@ -38,7 +38,7 @@ test.describe('Access Grants', () => {
 
     const listRes = await ax.get('/api/v1/access-grants')
     // clean() only wipes test*-prefixed grants — manually-created dev grants persist
-    const testGrants = listRes.data.results.filter((g: any) => g.account.id.startsWith('test'))
+    const testGrants = listRes.data.results.filter((g: any) => g.account.id.startsWith('test_registry_'))
     expect(testGrants).toHaveLength(0)
   })
 

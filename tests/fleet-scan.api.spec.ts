@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test'
-import { superAdmin, anonymousAx, clean } from './support/axios.ts'
+import { superAdmin, anonymousAx, clean, ours } from './support/axios.ts'
 
 // Seed an artefact doc directly (no upload → no auto-scan race). See the
 // PUT /api/test-env/artefacts/:id/doc route (already implemented).
 const seed = async (id: string, doc: Record<string, any>) => {
   await anonymousAx.put(`/api/test-env/artefacts/${encodeURIComponent(id)}/doc`, doc)
 }
+
+// the registry is shared (dev data, other suites' artefacts): the summary is compared to the one before seeding
+const summary = async () => (await (await superAdmin).get('/api/v1/artefacts/scan-summary')).data
 
 const sevSummary = (critical: number, high: number, total = critical + high) =>
   ({ critical, high, medium: 0, low: 0, unknown: 0, total })
@@ -14,6 +17,7 @@ test.describe('Fleet scan — summary endpoint', () => {
   test.beforeEach(async () => { await clean() })
 
   test('aggregates totals, health and worst offenders for an admin', async () => {
+    const before = await summary()
     await seed('@test_registry_t/a@1', { scan: { status: 'success', finishedAt: '2026-06-01T00:00:00.000Z', summary: sevSummary(2, 1) } })
     await seed('@test_registry_t/b@1', { scan: { status: 'success', finishedAt: '2026-06-05T00:00:00.000Z', summary: sevSummary(0, 3) } })
     await seed('@test_registry_t/err@1', { scan: { status: 'error', finishedAt: '2026-06-05T00:00:00.000Z', error: 'boom' } })
@@ -25,30 +29,31 @@ test.describe('Fleet scan — summary endpoint', () => {
     const res = await admin.get('/api/v1/artefacts/scan-summary')
 
     expect(typeof res.data.enabled).toBe('boolean')
-    expect(res.data.totals.critical).toBe(2)
-    expect(res.data.totals.high).toBe(4)
-    expect(res.data.totals.artefactsWithCritical).toBe(1)
-    expect(res.data.health.npmTotal).toBe(4)
-    expect(res.data.health.scanned).toBe(2)
-    expect(res.data.health.error).toBe(1)
-    expect(res.data.health.never).toBe(1)
-    expect(res.data.health.oldestScanAt).toBe('2026-06-01T00:00:00.000Z')
-    expect(res.data.worstOffenders[0]._id).toBe('@test_registry_t/a@1')
+    expect(res.data.totals.critical - before.totals.critical).toBe(2)
+    expect(res.data.totals.high - before.totals.high).toBe(4)
+    expect(res.data.totals.artefactsWithCritical - before.totals.artefactsWithCritical).toBe(1)
+    expect(res.data.health.npmTotal - before.health.npmTotal).toBe(4)
+    expect(res.data.health.scanned - before.health.scanned).toBe(2)
+    expect(res.data.health.error - before.health.error).toBe(1)
+    expect(res.data.health.never - before.health.never).toBe(1)
+    if (!before.health.oldestScanAt) expect(res.data.health.oldestScanAt).toBe('2026-06-01T00:00:00.000Z')
+    expect(ours(res.data.worstOffenders)[0]._id).toBe('@test_registry_t/a@1')
     expect(res.data.worstOffenders.map((o: any) => o._id)).not.toContain('@test_registry_t/file')
   })
 
   test('counts the pending bucket and returns null oldestScanAt when nothing succeeded', async () => {
+    const before = await summary()
     await seed('@test_registry_t/p1@1', { scan: { status: 'pending', queuedAt: '2026-06-01T00:00:00.000Z' } })
     await seed('@test_registry_t/p2@1', { scan: { status: 'running', startedAt: '2026-06-01T00:00:00.000Z' } })
     await seed('@test_registry_t/e1@1', { scan: { status: 'error', finishedAt: '2026-06-02T00:00:00.000Z', error: 'x' } })
 
     const admin = await superAdmin
     const res = await admin.get('/api/v1/artefacts/scan-summary')
-    expect(res.data.health.npmTotal).toBe(3)
-    expect(res.data.health.pending).toBe(2)
-    expect(res.data.health.scanned).toBe(0)
-    expect(res.data.health.oldestScanAt).toBeNull()
-    expect(res.data.worstOffenders).toEqual([])
+    expect(res.data.health.npmTotal - before.health.npmTotal).toBe(3)
+    expect(res.data.health.pending - before.health.pending).toBe(2)
+    expect(res.data.health.scanned - before.health.scanned).toBe(0)
+    if (!before.health.scanned) expect(res.data.health.oldestScanAt).toBeNull()
+    expect(ours(res.data.worstOffenders)).toEqual([])
   })
 
   test('scan-summary rejects a non-admin caller', async () => {

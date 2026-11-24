@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosAuth, axiosWithApiKey, clean } from './support/axios.ts'
+import { superAdmin, axiosAuth, axiosWithApiKey, clean, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -64,8 +64,8 @@ test.describe('Read API key access', () => {
   test.describe('List', () => {
     test('read key sees public + privateAccess artefacts', async () => {
       const ax = axiosWithApiKey(readApiKey)
-      const res = await ax.get('/api/v1/artefacts')
-      expect(res.data.count).toBe(3) // public-pkg, private-pkg, test_registry_terrain
+      const res = await ax.get('/api/v1/artefacts', listOpts)
+      expect(ours(res.data.results)).toHaveLength(3) // public-pkg, private-pkg, test_registry_terrain
       const names = res.data.results.map((a: any) => a.packageName ?? a.name)
       expect(names).toContain('@test_registry_/public-pkg')
       expect(names).toContain('@test_registry_/private-pkg')

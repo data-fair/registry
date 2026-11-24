@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, clean } from './support/axios.ts'
+import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, clean, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -33,15 +33,15 @@ test.describe('Account-facing access patterns', () => {
   })
 
   test('anonymous sees only public artefacts', async () => {
-    const res = await anonymousAx.get('/api/v1/artefacts')
-    expect(res.data.count).toBe(1)
-    expect(res.data.results[0].packageName).toBe('@test_registry_/public-pkg')
+    const res = await anonymousAx.get('/api/v1/artefacts', listOpts)
+    expect(ours(res.data.results).map((a: any) => a.packageName)).toEqual(['@test_registry_/public-pkg'])
+    for (const a of res.data.results) expect(a.public).toBe(true)
   })
 
   test('authenticated user without grant sees public + privateAccess artefacts', async () => {
     const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
-    const res = await ax.get('/api/v1/artefacts')
-    expect(res.data.count).toBe(2)
+    const res = await ax.get('/api/v1/artefacts', listOpts)
+    expect(ours(res.data.results)).toHaveLength(2)
   })
 
   test('authenticated user without grant cannot download', async () => {

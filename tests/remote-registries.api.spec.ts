@@ -61,8 +61,9 @@ test.describe('Remote registries', () => {
         apiKey: 'reg_b_key2'
       })
 
+      // other remote registries (the dev data's) may be listed too: only the ones named with the prefix are ours
       const res = await ax.get('/api/v1/remote-registries')
-      expect(res.data.count).toBe(2)
+      expect(res.data.results.filter((r: any) => r.name.startsWith('test_registry_'))).toHaveLength(2)
       for (const r of res.data.results) {
         expect(r.apiKey).toBeUndefined()
         expect(r.apiKeyShortId).toBeTruthy()
@@ -112,7 +113,7 @@ test.describe('Remote registries', () => {
       expect(delRes.status).toBe(204)
 
       const list = await ax.get('/api/v1/remote-registries')
-      expect(list.data.count).toBe(0)
+      expect(list.data.results.filter((r: any) => r.name.startsWith('test_registry_'))).toHaveLength(0)
     })
 
     test('delete registry unlocks mirrored artefacts', async () => {

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, axiosInternal, clean } from './support/axios.ts'
+import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, axiosInternal, clean, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 test.describe('File artefacts', () => {
@@ -62,8 +62,8 @@ test.describe('File artefacts', () => {
       expect(res.status).toBe(201)
       // Should still be a single artefact
       const admin = await superAdmin
-      const list = await admin.get('/api/v1/artefacts')
-      expect(list.data.count).toBe(1)
+      const list = await admin.get('/api/v1/artefacts', listOpts)
+      expect(ours(list.data.results)).toHaveLength(1)
     })
 
     test('upload with metadata fields', async () => {
@@ -101,20 +101,20 @@ test.describe('File artefacts', () => {
     })
 
     test('both formats appear in list', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts')
-      expect(res.data.count).toBe(2)
+      const res = await anonymousAx.get('/api/v1/artefacts', listOpts)
+      expect(ours(res.data.results)).toHaveLength(2)
     })
 
     test('format filter works', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts?format=file')
-      expect(res.data.count).toBe(1)
-      expect(res.data.results[0].format).toBe('file')
+      const res = await anonymousAx.get('/api/v1/artefacts?format=file', listOpts)
+      expect(ours(res.data.results)).toHaveLength(1)
+      for (const a of res.data.results) expect(a.format).toBe('file')
     })
 
     test('category filter works for tileset', async () => {
-      const res = await anonymousAx.get('/api/v1/artefacts?category=tileset')
-      expect(res.data.count).toBe(1)
-      expect(res.data.results[0].name).toBe('test_registry_terrain')
+      const res = await anonymousAx.get('/api/v1/artefacts?category=tileset', listOpts)
+      expect(ours(res.data.results).map((a: any) => a.name)).toEqual(['test_registry_terrain'])
+      for (const a of res.data.results) expect(a.category).toBe('tileset')
     })
 
     test('detail returns file artefact without versions array', async () => {
@@ -224,8 +224,8 @@ test.describe('File artefacts', () => {
       const deleteRes = await ax.delete('/api/v1/artefacts/test_registry_terrain')
       expect(deleteRes.status).toBe(204)
 
-      const listRes = await ax.get('/api/v1/artefacts')
-      expect(listRes.data.count).toBe(0)
+      const listRes = await ax.get('/api/v1/artefacts', listOpts)
+      expect(ours(listRes.data.results)).toHaveLength(0)
     })
   })
 
