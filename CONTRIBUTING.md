@@ -33,7 +33,6 @@ process each, with the variables of `.env` exported.
 
 ```bash
 npm run dev           # Start the dev environment
-npm run dev:fixtures  # Seed the dev environment (upstream registry, mirror, artefacts)
 
 npm run test          # Run all tests (unit, api, e2e)
 npm run test-api -- tests/artefacts.api.spec.ts  # Run a specific test file
@@ -60,7 +59,7 @@ Tests use [Playwright](https://playwright.dev/) as a test runner with 3 project 
 - **api** (`*.api.spec.ts`) -- API integration tests against a running dev environment
 - **e2e** (`*.e2e.spec.ts`) -- Browser-based end-to-end tests
 
-A state setup runs automatically before api and e2e tests. Test accounts (`test_registry_*`) are seeded in simple-directory from `tests/support/sd-fixtures.ts`; the dev world `test_demo_` (`npm run dev-world`, login `test_demo_dev@example.org` / `passwd`) is never cleaned by the tests.
+A state setup runs automatically before api and e2e tests. Test accounts (`test_registry_*`) are seeded in simple-directory from `tests/support/sd-fixtures.ts`; dev data under another prefix is never cleaned by the tests.
 
 ## Commits
 
