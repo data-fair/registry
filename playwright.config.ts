@@ -3,6 +3,8 @@ import 'dotenv/config'
 
 export default defineConfig({
   testDir: './tests',
+  // the test accounts in simple-directory, before the spec files (which log in at import time) are loaded
+  globalSetup: './tests/global-setup.ts',
   workers: 1,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
@@ -18,6 +20,11 @@ export default defineConfig({
     {
       name: 'state-setup',
       testMatch: /state-setup\.ts/,
+      teardown: 'state-teardown',
+    },
+    {
+      name: 'state-teardown',
+      testMatch: /state-teardown\.ts/,
     },
     {
       name: 'unit',

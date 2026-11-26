@@ -22,8 +22,12 @@ jobs:
     - name: Lint and build types
       run: npm run lint && npm run build-types
 
-    - name: Init env
-      run: ./node_modules/.bin/df-dev init-env
+    - name: Init .env
+      run: cp dev/default.env .env
+
+    # every later step gets the variables of .env, as npm run dev exports them to its processes
+    - name: Export .env to the next steps
+      run: grep -vE '^\s*(#|$)' .env >> "$GITHUB_ENV" # GITHUB_ENV accepts only NAME=value lines, no comments
 
     # also writes the .d.ts files of ui/dts (auto-imports, components, typed router) vue-tsc needs
     - name: Build UI
@@ -32,33 +36,21 @@ jobs:
     - name: Type-check
       run: npm run check-types
 
-    # every profile: CI tests every integration
+    # the build above leaves dev-setup nothing to build
     - name: Start dev dependencies
-      run: docker compose --profile '*' up -d --wait
+      run: npm run dev-deps
 
-    # the pane commands of .zellij.kdl, each writing dev/logs/<pane>.log (uploaded on failure)
-    - name: Start dev API
+    # the processes of npm run dev, logs in dev/logs for the upload below. Sync mirrors artefacts *from* an
+    # upstream registry, so exercising it needs a second one (dev:api-upstream): same code, its own port,
+    # database and data dir
+    - name: Start dev API and upstream API
       run: |
-        set -a && . ./.env && set +a
         mkdir -p dev/logs
-        export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config)
-        cd api && NODE_ENV=development node index.ts > ../dev/logs/api.log 2>&1 &
-
-    # Sync mirrors artefacts *from* an upstream registry, so exercising it needs a
-    # second one. Same code, different port / database / data dir.
-    - name: Start upstream registry API
-      run: |
-        set -a && . ./.env && set +a
-        export NODE_CONFIG=$(./node_modules/.bin/df-dev absent-config)
-        cd api && NODE_ENV=development \
-          PORT=$DEV_UPSTREAM_API_PORT \
-          MONGO_URL=mongodb://localhost:$MONGO_PORT/data-fair-registry-upstream \
-          DATA_DIR=./data-upstream \
-          node index.ts > ../dev/logs/api-upstream.log 2>&1 &
+        npm run dev:api > dev/logs/api.log 2>&1 &
+        npm run dev:api-upstream > dev/logs/api-upstream.log 2>&1 &
 
     - name: Wait for both APIs
       run: |
-        set -a && . ./.env && set +a
         for p in api:$DEV_API_PORT api-upstream:$DEV_UPSTREAM_API_PORT; do
           if ! timeout 60 bash -c "until curl -sf http://localhost:${p#*:}/api/ping >/dev/null; do sleep 1; done"; then
             tail -n 100 dev/logs/${p%%:*}.log

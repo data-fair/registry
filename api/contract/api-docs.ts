@@ -16,7 +16,7 @@
  * is declared under another name (registryApiKey), which the merge drops.
  *
  * The agent-facing surface this produces is pinned by tests/fixtures/agent-surface.json.
- * Design: docs/superpowers/specs/2026-11-03-api-doc-scopes-design.md
+ * Design: docs/architecture/README.md, "API doc and scopes"
  */
 import type { AgentOperation } from '@data-fair/openapi-mcp'
 import { oauth2SecurityScheme, oauth2Alternatives, type ScopeLocale } from '@data-fair/lib-common-types/scopes.js'

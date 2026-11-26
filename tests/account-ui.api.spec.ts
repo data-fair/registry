@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, clean } from './support/axios.ts'
+import { superAdmin, anonymousAx, axiosAuth, axiosWithApiKey, clean, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -13,41 +13,41 @@ test.describe('Account-facing access patterns', () => {
     uploadApiKey = keyRes.data.key
 
     // Upload a public artefact
-    const tarball1 = await createTestTarball({ name: '@test/public-pkg', version: '1.0.0' })
+    const tarball1 = await createTestTarball({ name: '@test_registry_/public-pkg', version: '1.0.0' })
     const form1 = new FormData()
     form1.append('file', tarball1, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/public-pkg@1'), form1, { headers: form1.getHeaders() })
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1'), { public: true })
+    await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/public-pkg@1'), form1, { headers: form1.getHeaders() })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/public-pkg@1'), { public: true })
 
-    // Upload a private artefact with test1 org access
-    const tarball2 = await createTestTarball({ name: '@test/private-pkg', version: '2.0.0' })
+    // Upload a private artefact with test_registry_org1 org access
+    const tarball2 = await createTestTarball({ name: '@test_registry_/private-pkg', version: '2.0.0' })
     const form2 = new FormData()
     form2.append('file', tarball2, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/private-pkg@2'), form2, { headers: form2.getHeaders() })
-    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/private-pkg@2'), {
-      privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }]
+    await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/private-pkg@2'), form2, { headers: form2.getHeaders() })
+    await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/private-pkg@2'), {
+      privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }]
     })
 
-    // Grant access to test1 org
-    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    // Grant access to test_registry_org1 org
+    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
   })
 
   test('anonymous sees only public artefacts', async () => {
-    const res = await anonymousAx.get('/api/v1/artefacts')
-    expect(res.data.count).toBe(1)
-    expect(res.data.results[0].packageName).toBe('@test/public-pkg')
+    const res = await anonymousAx.get('/api/v1/artefacts', listOpts)
+    expect(ours(res.data.results).map((a: any) => a.packageName)).toEqual(['@test_registry_/public-pkg'])
+    for (const a of res.data.results) expect(a.public).toBe(true)
   })
 
   test('authenticated user without grant sees public + privateAccess artefacts', async () => {
-    const ax = await axiosAuth('test1-admin1', { org: 'test1' })
-    const res = await ax.get('/api/v1/artefacts')
-    expect(res.data.count).toBe(2)
+    const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+    const res = await ax.get('/api/v1/artefacts', listOpts)
+    expect(ours(res.data.results)).toHaveLength(2)
   })
 
   test('authenticated user without grant cannot download', async () => {
-    const ax = await axiosAuth('dev-standalone1')
+    const ax = await axiosAuth('test_registry_standalone2')
     try {
-      await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/download')
+      await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/public-pkg@1') + '/download')
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(403)
@@ -55,27 +55,27 @@ test.describe('Account-facing access patterns', () => {
   })
 
   test('user with grant can download public artefact', async () => {
-    const ax = await axiosAuth('test1-admin1', { org: 'test1' })
-    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/public-pkg@1') + '/download', {
+    const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/public-pkg@1') + '/download', {
       responseType: 'arraybuffer'
     })
     expect(res.status).toBe(200)
   })
 
   test('user with grant can download private artefact in privateAccess', async () => {
-    const ax = await axiosAuth('test1-admin1', { org: 'test1' })
-    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test/private-pkg@2') + '/download', {
+    const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+    const res = await ax.get('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/private-pkg@2') + '/download', {
       responseType: 'arraybuffer'
     })
     expect(res.status).toBe(200)
   })
 
   test('user with grant can create and list read keys', async () => {
-    const ax = await axiosAuth('test1-admin1', { org: 'test1' })
+    const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
     const createRes = await ax.post('/api/v1/api-keys', {
       type: 'read',
       name: 'my-read-key',
-      owner: { type: 'organization', id: 'test1' }
+      owner: { type: 'organization', id: 'test_registry_org1' }
     })
     expect(createRes.status).toBe(201)
     expect(createRes.data.key).toBeTruthy()
@@ -87,11 +87,11 @@ test.describe('Account-facing access patterns', () => {
   })
 
   test('user with grant can delete own read key', async () => {
-    const ax = await axiosAuth('test1-admin1', { org: 'test1' })
+    const ax = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
     const createRes = await ax.post('/api/v1/api-keys', {
       type: 'read',
       name: 'to-delete',
-      owner: { type: 'organization', id: 'test1' }
+      owner: { type: 'organization', id: 'test_registry_org1' }
     })
 
     const deleteRes = await ax.delete(`/api/v1/api-keys/${createRes.data._id}`)

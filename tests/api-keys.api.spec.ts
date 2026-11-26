@@ -26,10 +26,10 @@ test.describe('API Keys', () => {
 
   test('list API keys without hashedKey', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
-    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key1', owner: { type: 'organization', id: 'test1' } })
-    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key2', owner: { type: 'organization', id: 'test1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    const orgAx = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key1', owner: { type: 'organization', id: 'test_registry_org1' } })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key2', owner: { type: 'organization', id: 'test_registry_org1' } })
 
     const res = await orgAx.get('/api/v1/api-keys')
     expect(res.data.results).toHaveLength(2)
@@ -47,7 +47,7 @@ test.describe('API Keys', () => {
   })
 
   test('non-admin cannot create upload keys', async () => {
-    const ax = await axiosAuth('dev-standalone1')
+    const ax = await axiosAuth('test_registry_standalone2')
     try {
       await ax.post('/api/v1/api-keys', { type: 'upload', name: 'nope' })
       expect(true).toBe(false) // should not reach
@@ -61,10 +61,10 @@ test.describe('API Keys', () => {
     const res = await ax.post('/api/v1/api-keys', {
       type: 'upload',
       name: 'scoped',
-      allowedNamePrefix: '@data-fair/'
+      allowedNamePrefix: '@test_registry_df/'
     })
     expect(res.status).toBe(201)
-    expect(res.data.allowedNamePrefix).toBe('@data-fair/')
+    expect(res.data.allowedNamePrefix).toBe('@test_registry_df/')
   })
 
   test('rejects allowedNamePrefix on read keys', async () => {
@@ -73,7 +73,7 @@ test.describe('API Keys', () => {
       await ax.post('/api/v1/api-keys', {
         type: 'read',
         name: 'bad',
-        owner: { type: 'organization', id: 'test1' },
+        owner: { type: 'organization', id: 'test_registry_org1' },
         allowedNamePrefix: 'anything'
       })
       expect(true).toBe(false)
@@ -124,7 +124,7 @@ test.describe('API Keys', () => {
       await ax.post('/api/v1/api-keys', {
         type: 'read',
         name: 'bad',
-        owner: { type: 'organization', id: 'test1' },
+        owner: { type: 'organization', id: 'test_registry_org1' },
         allowedCategory: 'tileset'
       })
       expect(true).toBe(false)
@@ -135,10 +135,10 @@ test.describe('API Keys', () => {
 
   test('list filter ?type=read', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
-    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'rd1', owner: { type: 'organization', id: 'test1' } })
-    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'rd2', owner: { type: 'organization', id: 'test1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    const orgAx = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'rd1', owner: { type: 'organization', id: 'test_registry_org1' } })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'rd2', owner: { type: 'organization', id: 'test_registry_org1' } })
 
     const all = await orgAx.get('/api/v1/api-keys')
     expect(all.data.results).toHaveLength(2)
@@ -152,9 +152,9 @@ test.describe('API Keys', () => {
 
   test('shortId visible in key list', async () => {
     const ax = await superAdmin
-    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
-    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key1', owner: { type: 'organization', id: 'test1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    const orgAx = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+    await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'key1', owner: { type: 'organization', id: 'test_registry_org1' } })
     const res = await orgAx.get('/api/v1/api-keys')
     expect(res.data.results[0].shortId).toBeTruthy()
     expect(res.data.results[0].shortId).toHaveLength(8)
@@ -170,11 +170,11 @@ test.describe('API Keys', () => {
     })
     const upload = axiosWithApiKey(keyRes.data.key)
 
-    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+    const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
     try {
-      await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+      await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(401)
@@ -187,16 +187,16 @@ test.describe('API Keys', () => {
     // Upload a public artefact so the read key can access it
     const uploadKeyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'uploader' })
     const upload = axiosWithApiKey(uploadKeyRes.data.key)
-    const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+    const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
     const form = new FormData()
     form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
-    await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true, privateAccess: [{ type: 'organization', id: 'test1', name: 'test1' }] })
+    await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
+    await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { public: true, privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'test_registry_org1' }] })
 
     // Create a read key and use it
-    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-    const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
-    const readKeyRes = await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'tracked-key', owner: { type: 'organization', id: 'test1' } })
+    await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+    const orgAx = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
+    const readKeyRes = await orgAx.post('/api/v1/api-keys', { type: 'read', name: 'tracked-key', owner: { type: 'organization', id: 'test_registry_org1' } })
     const reader = axiosWithApiKey(readKeyRes.data.key)
     await reader.get('/api/v1/artefacts')
 
@@ -216,14 +216,14 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: '@data-fair/processing-'
+        allowedNamePrefix: '@test_registry_df/processing-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
-      const tarball = await createTestTarball({ name: '@data-fair/processing-gpkg', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_df/processing-gpkg', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'p.tgz', contentType: 'application/gzip' })
       const res = await upload.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@data-fair/processing-gpkg@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_df/processing-gpkg@1'),
         form,
         { headers: form.getHeaders() }
       )
@@ -235,7 +235,7 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: '@data-fair/processing-'
+        allowedNamePrefix: '@test_registry_df/processing-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
       const tarball = await createTestTarball({ name: '@data-fair/catalog-x', version: '1.0.0' })
@@ -258,13 +258,13 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: 'terrain-'
+        allowedNamePrefix: 'test_registry_terrain-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
       const form = new FormData()
       form.append('file', Buffer.from('hello'), { filename: 'data.bin', contentType: 'application/octet-stream' })
       const res = await upload.post(
-        '/api/v1/artefacts/file/' + encodeURIComponent('terrain-france'),
+        '/api/v1/artefacts/file/' + encodeURIComponent('test_registry_terrain-france'),
         form,
         { headers: form.getHeaders() }
       )
@@ -276,14 +276,14 @@ test.describe('API Keys', () => {
       const keyRes = await ax.post('/api/v1/api-keys', {
         type: 'upload',
         name: 'prefix-scoped',
-        allowedNamePrefix: 'terrain-'
+        allowedNamePrefix: 'test_registry_terrain-'
       })
       const upload = axiosWithApiKey(keyRes.data.key)
       const form = new FormData()
       form.append('file', Buffer.from('hello'), { filename: 'data.bin', contentType: 'application/octet-stream' })
       try {
         await upload.post(
-          '/api/v1/artefacts/file/' + encodeURIComponent('roads-france'),
+          '/api/v1/artefacts/file/' + encodeURIComponent('test_registry_roads-france'),
           form,
           { headers: form.getHeaders() }
         )
@@ -297,27 +297,27 @@ test.describe('API Keys', () => {
   test.describe('read key owner permissions', () => {
     test.beforeEach(async () => {
       const ax = await superAdmin
-      await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+      await ax.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
     })
 
     test('org admin can create a read key for their organization and the owner name is stored', async () => {
-      const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+      const orgAx = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
       const res = await orgAx.post('/api/v1/api-keys', {
         type: 'read',
         name: 'federation-key',
-        owner: { type: 'organization', id: 'test1', name: 'Test Organization 1' }
+        owner: { type: 'organization', id: 'test_registry_org1', name: 'Test Organization 1' }
       })
       expect(res.status).toBe(201)
       expect(res.data.owner.name).toBe('Test Organization 1')
     })
 
     test('non-admin org member cannot create a read key', async () => {
-      const orgAx = await axiosAuth('test1-contrib1', { org: 'test1' })
+      const orgAx = await axiosAuth('test_registry_org1_contrib', { org: 'test_registry_org1' })
       try {
         await orgAx.post('/api/v1/api-keys', {
           type: 'read',
           name: 'nope',
-          owner: { type: 'organization', id: 'test1' }
+          owner: { type: 'organization', id: 'test_registry_org1' }
         })
         expect(true).toBe(false)
       } catch (err: any) {
@@ -326,12 +326,12 @@ test.describe('API Keys', () => {
     })
 
     test('a user cannot create a read key for an organization they do not administer', async () => {
-      const ax = await axiosAuth('dev-standalone1')
+      const ax = await axiosAuth('test_registry_standalone2')
       try {
         await ax.post('/api/v1/api-keys', {
           type: 'read',
           name: 'nope',
-          owner: { type: 'organization', id: 'test1' }
+          owner: { type: 'organization', id: 'test_registry_org1' }
         })
         expect(true).toBe(false)
       } catch (err: any) {
@@ -340,24 +340,24 @@ test.describe('API Keys', () => {
     })
 
     test('org admin can revoke their organization read key', async () => {
-      const orgAx = await axiosAuth('test1-admin1', { org: 'test1' })
+      const orgAx = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
       const created = await orgAx.post('/api/v1/api-keys', {
         type: 'read',
         name: 'federation-key',
-        owner: { type: 'organization', id: 'test1' }
+        owner: { type: 'organization', id: 'test_registry_org1' }
       })
       const del = await orgAx.delete(`/api/v1/api-keys/${created.data._id}`)
       expect(del.status).toBe(204)
     })
 
     test('non-admin org member cannot revoke an organization read key', async () => {
-      const orgAdmin = await axiosAuth('test1-admin1', { org: 'test1' })
+      const orgAdmin = await axiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
       const created = await orgAdmin.post('/api/v1/api-keys', {
         type: 'read',
         name: 'federation-key',
-        owner: { type: 'organization', id: 'test1' }
+        owner: { type: 'organization', id: 'test_registry_org1' }
       })
-      const contrib = await axiosAuth('test1-contrib1', { org: 'test1' })
+      const contrib = await axiosAuth('test_registry_org1_contrib', { org: 'test_registry_org1' })
       try {
         await contrib.delete(`/api/v1/api-keys/${created.data._id}`)
         expect(true).toBe(false)

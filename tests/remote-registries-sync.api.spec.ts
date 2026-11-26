@@ -2,30 +2,30 @@
 // process). Nothing else in the suite executes syncNpmArtefact / syncFileArtefact:
 // the other sync specs either mirror zero artefacts or assert a DNS failure.
 //
-// Requires DEV_UPSTREAM_API_PORT and a running upstream — see
-// docs/superpowers/specs/2026-07-10-federation-dev-testing-design.md
+// Requires DEV_UPSTREAM_API_PORT and a running upstream (npm run dev:api-upstream) — see
+// AGENTS.md "Exercising federation sync" and docs/architecture/README.md "Remote registries"
 
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
 import sharp from 'sharp'
 import {
-  superAdmin, clean, waitSyncIdle,
+  superAdmin, clean, waitSyncIdle, ours,
   upstreamBaseURL, upstreamSuperAdmin, upstreamAxiosAuth, upstreamAxiosWithApiKey, cleanUpstream
 } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
-const NPM_ID = '@up/pkg@1'
-const FILE_ID = 'up-terrain'
+const NPM_ID = '@test_registry_up/pkg@1'
+const FILE_ID = 'test_registry_up-terrain'
 const FILE_BYTES = 'upstream-tileset-bytes'
 
-// Seeds the upstream and returns a read key owned by org test1. A read key needs
+// Seeds the upstream and returns a read key owned by org test_registry_org1. A read key needs
 // (a) an admin of the owner account and (b) an existing access grant for it.
 const seedUpstream = async () => {
   const admin = await upstreamSuperAdmin()
   const keyRes = await admin.post('/api/v1/api-keys', { type: 'upload', name: 'up-ci' })
   const upload = upstreamAxiosWithApiKey(keyRes.data.key)
 
-  const tarball = await createTestTarball({ name: '@up/pkg', version: '1.0.0', licence: 'MIT' })
+  const tarball = await createTestTarball({ name: '@test_registry_up/pkg', version: '1.0.0', licence: 'MIT' })
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
   form.append('category', 'processing')
@@ -38,12 +38,12 @@ const seedUpstream = async () => {
   await upload.post('/api/v1/artefacts/file/' + FILE_ID, fileForm, { headers: fileForm.getHeaders() })
   await admin.patch('/api/v1/artefacts/' + FILE_ID, { public: true })
 
-  await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
-  const orgAdmin = await upstreamAxiosAuth('test1-admin1', { org: 'test1' })
+  await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
+  const orgAdmin = await upstreamAxiosAuth('test_registry_org1_admin', { org: 'test_registry_org1' })
   const readRes = await orgAdmin.post('/api/v1/api-keys', {
     type: 'read',
     name: 'federation',
-    owner: { type: 'organization', id: 'test1' }
+    owner: { type: 'organization', id: 'test_registry_org1' }
   })
   return { readKey: readRes.data.key as string, uploadKey: keyRes.data.key as string }
 }
@@ -60,14 +60,14 @@ const selectArtefact = async (artefactId: string) => {
 // tests below start from a settled registry.
 const registerMirror = async (readKey: string, artefactIds: string[]) => {
   const admin = await superAdmin
-  await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+  await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'test_registry_Upstream', apiKey: readKey })
   for (const artefactId of artefactIds) await selectArtefact(artefactId)
   await waitSyncIdle(upstreamBaseURL())
 }
 
 const republishUpstream = async (uploadKey: string, version: string) => {
   const upload = upstreamAxiosWithApiKey(uploadKey)
-  const tarball = await createTestTarball({ name: '@up/pkg', version, licence: 'MIT' })
+  const tarball = await createTestTarball({ name: '@test_registry_up/pkg', version, licence: 'MIT' })
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
   form.append('category', 'processing')
@@ -146,7 +146,7 @@ test.describe('Federation sync against a real upstream registry', () => {
     const local = await getLocal(NPM_ID)
     expect(local.origin).toBe(upstreamBaseURL())
     expect(local.format).toBe('npm')
-    expect(local.packageName).toBe('@up/pkg')
+    expect(local.packageName).toBe('@test_registry_up/pkg')
     expect(local.version).toBe('1.0.0')
     expect(typeof local.path).toBe('string')
     expect(local.size).toBeGreaterThan(0)
@@ -265,7 +265,7 @@ test.describe('Federation sync against a real upstream registry', () => {
 
   test('selecting an artefact mirrors it without a manual sync', async () => {
     const admin = await superAdmin
-    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'test_registry_Upstream', apiKey: readKey })
     await selectArtefact(NPM_ID)
     const registry = await waitSyncIdle(upstreamBaseURL())
 
@@ -277,7 +277,7 @@ test.describe('Federation sync against a real upstream registry', () => {
 
   test('selecting several artefacts in a row mirrors them all', async () => {
     const admin = await superAdmin
-    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'test_registry_Upstream', apiKey: readKey })
     // no await between the two: the second lands while the first sync holds the lock
     await Promise.all([selectArtefact(NPM_ID), selectArtefact(FILE_ID)])
     const registry = await waitSyncIdle(upstreamBaseURL())
@@ -324,7 +324,7 @@ test.describe('Federation sync against a real upstream registry', () => {
 
   test('remote-artefacts reports the local mirror state of each artefact', async () => {
     const admin = await superAdmin
-    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'test_registry_Upstream', apiKey: readKey })
 
     const before = (await listRemote()).results.find(a => a._id === NPM_ID)
     expect(before.local).toEqual({ synced: false, upToDate: false })
@@ -345,7 +345,7 @@ test.describe('Federation sync against a real upstream registry', () => {
   test('an upstream thumbnail is served through the local proxy for the admin table', async () => {
     const upstreamThumb = await uploadUpstreamThumbnail(NPM_ID)
     const admin = await superAdmin
-    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'test_registry_Upstream', apiKey: readKey })
 
     const res = await admin.get(
       `/api/v1/remote-registries/${encodeURIComponent(upstreamBaseURL())}/remote-thumbnails/${upstreamThumb.id}/data`,
@@ -360,12 +360,15 @@ test.describe('Federation sync against a real upstream registry', () => {
 
   test('remote-artefacts forwards category and format filters to the upstream', async () => {
     const admin = await superAdmin
-    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'Upstream', apiKey: readKey })
+    await admin.post('/api/v1/remote-registries', { url: upstreamBaseURL(), name: 'test_registry_Upstream', apiKey: readKey })
 
     const tilesets = await listRemote({ category: 'tileset' })
-    expect(tilesets.results.map(a => a._id)).toEqual([FILE_ID])
+    // the upstream may hold other artefacts (the dev data's): only this sub-space's are compared
+    expect(ours(tilesets.results).map(a => a._id)).toEqual([FILE_ID])
+    for (const a of tilesets.results) expect(a.category).toBe('tileset')
 
     const npm = await listRemote({ format: 'npm' })
-    expect(npm.results.map(a => a._id)).toEqual([NPM_ID])
+    expect(ours(npm.results).map(a => a._id)).toEqual([NPM_ID])
+    for (const a of npm.results) expect(a.format).toBe('npm')
   })
 })

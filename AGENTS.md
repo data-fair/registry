@@ -17,46 +17,37 @@ Types are managed from JSON schemas (e.g., @api/config/type/index.ts). Run `npm 
 
 ## Dev environment
 
-The dev environment is the shared one of the data-fair services (`@data-fair/lib-dev`, the
-`data-fair-service` skill of data-fair/lib): one zellij session per checkout, readable by humans,
-operated by agents only through `df-dev`. `dev/dev.json` declares what is specific to this repo (drawn
-ports, panes and their readiness URLs, optional containers), `.zellij.kdl` the panes: `status`
-(containers), `ui`, `api` (the registry), `api-upstream` (a second registry used as a federation mirror
-source, port `DEV_UPSTREAM_API_PORT`), and a free shell.
+Docker runs the containers (nginx, simple-directory, mongo); the api, the upstream api and the ui run as node
+processes. registry sends no events, so the dev env has no events service.
 
-The user starts the session (`npm run dev-zellij`). An agent never starts or kills it.
+- `npm run dev` — the containers (`npm run dev-deps`), then the api, the upstream api and the ui in the terminal
+  (Ctrl+C stops them), at `http://localhost:5850/registry/`. Their logs are in `dev/logs/` (`DEV_LOG_DIR`,
+  `DEV_LOG_PREFIX`); `npm run dev` accepts docker compose arguments.
+- `npm run dev-deps` — the containers only, plus `npm run dev-setup`.
+- `npm run dev-setup` — idempotent builds (types, ui), no container.
+- `npm run dev:api`, `dev:api-upstream`, `dev:ui` — one process each, with the variables of `.env` exported.
+  `api-upstream` is a second registry used as a federation mirror source (port `DEV_UPSTREAM_API_PORT`).
+- `npm run stop-dev-deps` — stops the containers.
 
-| Need | Command |
-|---|---|
-| What runs, what is broken | `npx --no df-dev status` (containers, panes running / exited / **not ready**, memory) |
-| A process's output | `npx --no df-dev logs <pane> -n 100` (`api`, `api-upstream`, `ui`) |
-| Restart one process | `npx --no df-dev restart <pane>`: Ctrl+C, rerun, waits for the pane's readiness URL |
+Default ports (5850-5857) are in `dev/default.env`, copied to `.env` the first time: `.env` overrides it and is
+never overwritten. Production names (`MONGO_URL`, `PRIVATE_DIRECTORY_URL`, `SECRET_INTERNAL_SERVICES`,
+`SCANNING_ENABLED`...) override `api/config/development.js`. The upstream api takes its database from
+`DEV_UPSTREAM_MONGO_URL` when set (default `data-fair-registry-upstream` on `MONGO_PORT`).
 
-- Read the logs before restarting: nodemon and vite already reload on file changes.
-- "not ready" from `restart` → report to the user with the logs, never retry in a loop.
-- Never `docker compose restart`, `kill`, `zellij action`, nor `npm ci` / `npm install` while the env runs
-  (watchers restart on half-installed modules).
-- Always `npx --no`: a bare `npx df-dev` downloads an unrelated public package when the dependency is
-  missing (dependency confusion). Scripts and CI call `./node_modules/.bin/df-dev`.
+The UI and simple-directory are served on `http://$DEV_HOST:$NGINX_PORT`; the APIs answer directly on
+`localhost:<port>` too.
 
-Containers: nginx, simple-directory and mongo. registry sends no events, so the dev env has no events
-service.
+- Read the logs before restarting: nodemon (api) and vite (ui) already reload on file changes.
+- Do not start, stop or restart the dev processes or containers of the user: ask.
+- Never `npm ci` / `npm install` while the env runs.
+- If a service is down, do not try to fix the infrastructure: read its logs (`dev/logs/`, or
+  `docker compose logs <service>` for a container) and report the problem to the user with the relevant lines.
 
-The UI and simple-directory are served on `http://$DEV_HOST:$NGINX_PORT` (`<branch>.localhost`, so the
-session cookies of two worktrees never mix); the APIs answer directly on `localhost:<port>` too.
-
-Worktrees, from the main checkout: `npx --no df-worktree <branch>` / `npx --no df-worktree-delete <branch>`
-(branch names: letters, digits, `.`, `_`, `-`, no `/`, and `registry_<branch>` at most 60 characters).
-
-Ports are drawn per checkout into `.env` (`npx --no df-dev init-env`). Do not modify them.
-
-If a service is down, do not try to fix the infrastructure: run `npx --no df-dev status`, read the pane's
-logs (`npx --no df-dev logs <pane>`, or `docker compose logs <service>` for a container), and report the
-problem to the user with the relevant lines.
+Design specs and implementation plans are not kept in this repository; durable architecture docs live in `docs/architecture/`.
 
 ### Vulnerability scanner (osv-scanner)
 
-Dev config enables npm vulnerability scanning (`api/config/development.js`), which shells out to the **osv-scanner v2** binary. Install it once so it's on your PATH (Linux x86_64):
+Dev config enables npm vulnerability scanning (`api/config/development.js`), but `dev/default.env` turns it off (`SCANNING_ENABLED=false`): set it to `true` in `.env` to work on it. It shells out to the **osv-scanner v2** binary. Install it once so it's on your PATH (Linux x86_64):
 
     OSV_VERSION=v2.7.0
     sudo curl -sSfL -o /usr/local/bin/osv-scanner \
@@ -80,13 +71,28 @@ Run a specific test file, or a single test. Note `npm run test` is a compound `a
     npm run test-api -- tests/artefacts.api.spec.ts -g "upload happy path"
     npm run test-unit -- tests/artefacts-operations.unit.spec.ts
 
-Test users are defined in @dev/resources/users.json and organizations in @dev/resources/organizations.json.
+Test sub-space: the tests own the simple-directory accounts whose ids start with `test_registry_`
+(@tests/support/sd-fixtures.ts, password `passwd`, email `<id>@test.com`), seeded through simple-directory's
+test API by `tests/global-setup.ts` and, under a lock against a second concurrent run, by `tests/state-setup.ts`.
+`DELETE /api/test-env?prefix=test_<suite>_` cleans one sub-space only (400 without a valid prefix), also through
+nginx (`/registry/api/test-env`, where a dev environment of several services cleans each one):
+
+- the artefacts whose id starts with the prefix, optionally after an `@` (`@test_registry_/pkg@1`,
+  `test_registry_terrain`), with their tarballs, thumbnails, scans and scan locks: an artefact a test creates
+  carries the prefix in its id, or no clean removes it;
+- the api keys created by or owned by the prefix's accounts, and their access grants;
+- the remote registries whose name starts with the prefix, with their sync locks.
+
+Several suites can share one registry: the clean of one prefix never touches another prefix nor unprefixed
+artefacts. `tests/test-env.api.spec.ts` checks it. So a spec never asserts on a whole listing: it keeps its own
+artefacts (`ours()` and `listOpts` of `tests/support/axios.ts`), grants and remote registries (by prefix). The repository ships no dev data: dev artefacts and accounts under
+another prefix are never cleaned by the tests.
 
 ### Exercising federation sync
 
 Sync mirrors artefacts *from* an upstream registry, so it needs two registries. `api-upstream` is a second registry process (same code, `PORT`/`MONGO_URL`/`DATA_DIR` overridden). Pointing a registry at itself cannot work: selecting an artefact that already exists locally without an `origin` returns 409.
 
-`npm run dev:fixtures` seeds the upstream, mints a read key owned by org `test1`, registers the mirror and selects two artefacts. Selecting an artefact queues a background sync of that artefact alone (`pendingSync` on the registry doc, drained under the sync lock), so the mirrors land without clicking **Sync now** — that button runs a full sync. Sync progress is published on the registry's ws channel; the admin table gets each row's local state from `GET …/remote-artefacts` and loads upstream thumbnails through `GET …/remote-thumbnails/:id/data` (the browser cannot reach the upstream directly).
+To try it by hand: publish an artefact or two on the upstream (`DEV_UPSTREAM_API_PORT`) with one of its upload keys and make them public, mint a read key there owned by an organization (an admin of it, after an access grant for it), then register the upstream in the admin UI with that key and select the artefacts. The sync tests wipe the upstream between runs, so redo it after them. Selecting an artefact queues a background sync of that artefact alone (`pendingSync` on the registry doc, drained under the sync lock), so the mirrors land without clicking **Sync now** — that button runs a full sync. Sync progress is published on the registry's ws channel; the admin table gets each row's local state from `GET …/remote-artefacts` and loads upstream thumbnails through `GET …/remote-thumbnails/:id/data` (the browser cannot reach the upstream directly).
 
 Unselecting keeps the local copy but unlocks it (drops `origin`); it then blocks re-mirroring of that id (409) until it is deleted. Deleting a registry unlocks all its mirrors the same way.
 
@@ -109,7 +115,7 @@ Advisory, admin-only vulnerability scanning of `npm` artefacts (bundled `node_mo
 `GET /api/v1/api-docs.json` (`api/contract/api-docs.ts`, fr/en from `Accept-Language`) is the OpenAPI
 document data-fair fetches over a private URL and merges into its platform document; `@data-fair/openapi-mcp`
 turns its `x-agent` annotations into agent tools (`search_artefacts`, `get_artefact`). Design:
-`docs/superpowers/specs/2026-11-03-api-doc-scopes-design.md`.
+`docs/architecture/README.md`, "API doc and scopes".
 
 - The session is scope-aware. `api/src/scopes.ts` declares the `registry` scope family (read tier only) and
   the `scopedOperations` table: only those routes (`requireOperationScope`) accept scope-restricted
@@ -119,8 +125,8 @@ turns its `x-agent` annotations into agent tools (`search_artefacts`, `get_artef
   `x-api-key` stays under `registryApiKey` (never `apiKey`), `x-agent` uses only openapi-mcp's keys.
 - `tests/api-docs.api.spec.ts` pins the agent surface in `tests/fixtures/agent-surface.json`: regenerate
   with `UPDATE_GOLDEN=1 npm run test-api -- tests/api-docs.api.spec.ts` when a change is intended.
-- `tests/scopes.api.spec.ts` mints scoped sessions with the test non-human identity `test1_scope_nhi`
-  (`dev/resources/users.json`, key in `tests/resources/nhi/`, `tests/support/nhi.ts`); simple-directory
+- `tests/scopes.api.spec.ts` mints scoped sessions with the test non-human identity `test_registry_org1_scope_nhi`
+  (`tests/support/sd-fixtures.ts`, keys in `tests/resources/nhi/`, `tests/support/nhi.ts`); simple-directory
   runs with `MANAGE_NHIS` for it. Bearer tokens are tested through nginx: their audience is the site.
 
 ## Logging

@@ -4,8 +4,8 @@ import sharp from 'sharp'
 import { superAdmin, axiosWithApiKey, clean, setArtefactOrigin } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
-const pkgId = '@test/grouped-pkg@1'
-const mirrorId = '@test/mirror-demo@3'
+const pkgId = '@test_registry_/grouped-pkg@1'
+const mirrorId = '@test_registry_/mirror-demo@3'
 
 test.beforeAll(async () => {
   await clean()
@@ -13,7 +13,7 @@ test.beforeAll(async () => {
   const keyRes = await ax.post('/api/v1/api-keys', { type: 'upload', name: 'e2e-artefact-admin' })
   const upload = axiosWithApiKey(keyRes.data.key)
 
-  const tarball = await createTestTarball({ name: '@test/grouped-pkg', version: '1.0.0' })
+  const tarball = await createTestTarball({ name: '@test_registry_/grouped-pkg', version: '1.0.0' })
   const form = new FormData()
   form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
   await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent(pkgId), form, { headers: form.getHeaders() })
@@ -28,7 +28,7 @@ test.beforeAll(async () => {
   // A mirrored artefact: metadata is owned by the (simulated) remote registry,
   // only local access (public/privateAccess) may be edited here.
   const mirrorForm = new FormData()
-  mirrorForm.append('file', await createTestTarball({ name: '@test/mirror-demo', version: '3.4.5' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+  mirrorForm.append('file', await createTestTarball({ name: '@test_registry_/mirror-demo', version: '3.4.5' }), { filename: 'p.tgz', contentType: 'application/gzip' })
   await upload.post('/api/v1/artefacts/npm/' + encodeURIComponent(mirrorId), mirrorForm, { headers: mirrorForm.getHeaders() })
   await ax.patch('/api/v1/artefacts/' + encodeURIComponent(mirrorId), {
     title: { en: 'Mirror Demo', fr: 'Démo Miroir' },
@@ -142,7 +142,7 @@ test.describe('Artefact admin metadata editing for a mirrored artefact', () => {
 async function loginAdmin (page: Page) {
   const directoryUrl = `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/simple-directory`
   const res = await page.request.post(directoryUrl + '/api/auth/password', {
-    data: { email: 'superadmin@test.com', password: 'passwd', adminMode: true },
+    data: { email: 'test_registry_superadmin@test.com', password: 'passwd', adminMode: true },
     params: { redirect: directoryUrl },
     maxRedirects: 0
   })

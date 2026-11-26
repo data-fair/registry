@@ -1,5 +1,5 @@
 /**
- * Scope-restricted sessions: the test non-human identity (admin of org test1) exchanges an
+ * Scope-restricted sessions: the test non-human identity (admin of org test_registry_org1) exchanges an
  * assertion for a session limited to some scopes, cf tests/support/nhi.ts.
  * Only the catalog-browsing routes accept a registry scope (api/src/scopes.ts).
  */
@@ -7,14 +7,14 @@ import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
 import { decodeJwt } from 'jose'
 import type { AxiosInstance } from 'axios'
-import { superAdmin, axiosWithApiKey, clean, anonymousAx } from './support/axios.ts'
+import { superAdmin, axiosWithApiKey, clean, anonymousAx, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 import { nhiSession } from './support/nhi.ts'
 
 const enc = encodeURIComponent
-const pub = '@test/pub@1'
-const privTest1 = '@test/priv-test1@1'
-const privOther = '@test/priv-other@1'
+const pub = '@test_registry_/pub@1'
+const privTest1 = '@test_registry_/priv-test1@1'
+const privOther = '@test_registry_/priv-other@1'
 
 const expectStatus = async (promise: Promise<unknown>, status: number) => {
   try {
@@ -26,7 +26,7 @@ const expectStatus = async (promise: Promise<unknown>, status: number) => {
 }
 
 const ids = async (ax: AxiosInstance, query = '') =>
-  (await ax.get('/api/v1/artefacts' + query)).data.results.map((a: any) => a._id)
+  ours((await ax.get('/api/v1/artefacts' + query, listOpts)).data.results).map((a: any) => a._id)
 
 test.describe('scope-restricted sessions', () => {
   test.beforeEach(async () => {
@@ -40,8 +40,8 @@ test.describe('scope-restricted sessions', () => {
       await uploader.post('/api/v1/artefacts/npm/' + enc(id), form, { headers: form.getHeaders() })
     }
     await admin.patch('/api/v1/artefacts/' + enc(pub), { public: true })
-    await admin.patch('/api/v1/artefacts/' + enc(privTest1), { privateAccess: [{ type: 'organization', id: 'test1', name: 'Test Organization 1' }] })
-    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test1' } })
+    await admin.patch('/api/v1/artefacts/' + enc(privTest1), { privateAccess: [{ type: 'organization', id: 'test_registry_org1', name: 'Test Organization 1' }] })
+    await admin.post('/api/v1/access-grants', { account: { type: 'organization', id: 'test_registry_org1' } })
     await anonymousAx.put(`http://localhost:${process.env.DEV_API_PORT}/api/test-env/artefacts/${enc(pub)}/scan`, {
       summary: { critical: 1, high: 0, medium: 0, low: 0, unknown: 0, total: 1 }
     })
@@ -54,8 +54,8 @@ test.describe('scope-restricted sessions', () => {
 
   test('registry:read lists the account catalog', async () => {
     const { cookieAx } = await nhiSession('registry:read')
-    const res = await cookieAx.get('/api/v1/artefacts')
-    expect(res.data.results.map((a: any) => a._id).sort()).toEqual([privTest1, pub].sort())
+    const res = await cookieAx.get('/api/v1/artefacts', listOpts)
+    expect(ours(res.data.results).map((a: any) => a._id).sort()).toEqual([privTest1, pub].sort())
     for (const artefact of res.data.results) expect(artefact).not.toHaveProperty('scan')
   })
 
@@ -98,9 +98,9 @@ test.describe('scope-restricted sessions', () => {
 
   test('a scoped session is never admin', async () => {
     const { cookieAx } = await nhiSession('registry:read')
-    const res = await cookieAx.get('/api/v1/artefacts?sort=-vulnerabilities')
+    const res = await cookieAx.get('/api/v1/artefacts?sort=-vulnerabilities', listOpts)
     for (const artefact of res.data.results) expect(artefact).not.toHaveProperty('scan')
-    expect(res.data.results.map((a: any) => a._id)).toEqual(await ids(cookieAx))
+    expect(ours(res.data.results).map((a: any) => a._id)).toEqual(await ids(cookieAx))
   })
 
   test('unscoped session keeps working', async () => {

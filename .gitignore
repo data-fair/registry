@@ -16,10 +16,10 @@ coverage/
 .playwright-cli/
 test-results
 dev/logs/
-dev/fixtures-output.json
 tmp/
 data/
 data-upstream/
 lib-node/**/*.js
 lib-node/**/*.d.ts
 lib-node/**/*.js.map
+.superpowers/

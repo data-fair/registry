@@ -4,8 +4,8 @@ import { importPKCS8, SignJWT } from 'jose'
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import { baseURL, directoryUrl } from './axios.ts'
 
-// the non human identity of dev/resources/users.json, admin of org test1
-export const scopeNhiId = 'test1_scope_nhi'
+// the non human identity of tests/support/sd-fixtures.ts, admin of org test_registry_org1
+export const scopeNhiId = 'test_registry_org1_scope_nhi'
 const issuer = 'https://registry-tests.example.com'
 const subject = 'scope-tests'
 // the site origin simple-directory sees (reqSiteUrl), the assertion audience

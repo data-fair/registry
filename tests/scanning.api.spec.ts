@@ -3,7 +3,7 @@ import FormData from 'form-data'
 import { superAdmin, axiosWithApiKey, anonymousAx, axiosAuth, clean } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
-const id = '@test/pkg@1'
+const id = '@test_registry_/pkg@1'
 const enc = encodeURIComponent(id)
 
 const injectScan = async (artefactId: string, summary: any, findings: any[]) => {
@@ -21,7 +21,7 @@ test.describe('Scanning', () => {
     const keyRes = await admin.post('/api/v1/api-keys', { type: 'upload', name: 'test-upload' })
     uploadApiKey = keyRes.data.key
     const form = new FormData()
-    form.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+    form.append('file', await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
     await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + enc, form, { headers: form.getHeaders() })
     await admin.patch('/api/v1/artefacts/' + enc, { public: true })
   })
@@ -38,7 +38,7 @@ test.describe('Scanning', () => {
   }
 
   test('scan summary is visible to admins on GET /:id but stripped for others', async () => {
-    const fid = '@test/scan-summary'
+    const fid = '@test_registry_/scan-summary'
     const fenc = encodeURIComponent(fid)
     await uploadFile(fid)
     const admin = await superAdmin
@@ -49,13 +49,13 @@ test.describe('Scanning', () => {
     const adminRes = await admin.get('/api/v1/artefacts/' + fenc)
     expect(adminRes.data.scan?.summary?.high).toBe(1)
 
-    const userAx = await axiosAuth('test1-user1')
+    const userAx = await axiosAuth('test_registry_org1_user')
     const userRes = await userAx.get('/api/v1/artefacts/' + fenc)
     expect(userRes.data.scan).toBeUndefined()
   })
 
   test('GET /:id/scan returns full findings for admin, 403/401 for non-admin', async () => {
-    const fid = '@test/scan-findings'
+    const fid = '@test_registry_/scan-findings'
     const fenc = encodeURIComponent(fid)
     await uploadFile(fid)
     await injectScan(fid, { critical: 0, high: 1, medium: 0, low: 0, unknown: 0, total: 1 },
@@ -78,7 +78,7 @@ test.describe('Scanning', () => {
     // whether scanning is enabled.
     const admin = await superAdmin
     try {
-      await admin.get('/api/v1/artefacts/' + encodeURIComponent('@test/never-scanned@1') + '/scan')
+      await admin.get('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/never-scanned@1') + '/scan')
       expect(true).toBe(false)
     } catch (err: any) {
       expect(err.status).toBe(404)
@@ -112,7 +112,7 @@ test.describe('Scanning', () => {
       [{ id: 'GHSA-x', pkgName: 'minimist', installedVersion: '0.0.8', severity: 'critical' }])
 
     const form = new FormData()
-    form.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.1' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+    form.append('file', await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.1' }), { filename: 'p.tgz', contentType: 'application/gzip' })
     const res = await axiosWithApiKey(uploadApiKey).post('/api/v1/artefacts/npm/' + enc, form, { headers: form.getHeaders() })
     expect(res.status).toBe(201)
     expect(res.data.artefact.scan).toBeUndefined()

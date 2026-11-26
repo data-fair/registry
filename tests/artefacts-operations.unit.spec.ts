@@ -35,7 +35,7 @@ const packTarball = async (entries: Array<{ name: string, content: string | Buff
 
 test.describe('extractManifest', () => {
   const manifest = (overrides: Record<string, unknown> = {}) => JSON.stringify({
-    name: '@test/pkg',
+    name: '@test_registry_/pkg',
     version: '1.0.0',
     ...overrides
   })
@@ -43,7 +43,7 @@ test.describe('extractManifest', () => {
   test('extracts standard package/package.json entry', async () => {
     const tarball = await packTarball([{ name: 'package/package.json', content: manifest() }])
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.manifest.name).toBe('@test/pkg')
+    expect(result.manifest.name).toBe('@test_registry_/pkg')
     expect(result.manifest.version).toBe('1.0.0')
   })
 
@@ -74,7 +74,7 @@ test.describe('extractManifest', () => {
       { name: 'package/package.json', content: manifest() }
     ])
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.manifest.name).toBe('@test/pkg')
+    expect(result.manifest.name).toBe('@test_registry_/pkg')
   })
 
   test('rejects invalid JSON in package.json with 400', async () => {
@@ -111,7 +111,7 @@ test.describe('extractManifest', () => {
     }
     const tarball = await packTarball(entries)
     const result = await extractManifest(Readable.from(tarball))
-    expect(result.manifest.name).toBe('@test/pkg')
+    expect(result.manifest.name).toBe('@test_registry_/pkg')
   })
 
   test('caps entry count', async () => {
@@ -130,15 +130,15 @@ test.describe('extractManifest', () => {
 
 test.describe('extractManifest hasNativeModules detection', () => {
   test('pure JS package returns hasNativeModules=false', async () => {
-    const tarball = await createTestTarball({ name: '@test/pure', version: '1.0.0' })
+    const tarball = await createTestTarball({ name: '@test_registry_/pure', version: '1.0.0' })
     const result = await extractManifest(streamBuffer(tarball))
-    expect(result.manifest.name).toBe('@test/pure')
+    expect(result.manifest.name).toBe('@test_registry_/pure')
     expect(result.hasNativeModules).toBe(false)
   })
 
   test('package with a .node binary in node_modules returns true', async () => {
     const tarball = await createTestTarball({
-      name: '@test/native',
+      name: '@test_registry_/native',
       version: '1.0.0',
       extraEntries: [{ name: 'package/node_modules/foo/build/Release/foo.node', content: 'BINARY' }]
     })
@@ -148,7 +148,7 @@ test.describe('extractManifest hasNativeModules detection', () => {
 
   test('package with binding.gyp in node_modules returns true', async () => {
     const tarball = await createTestTarball({
-      name: '@test/gyp',
+      name: '@test_registry_/gyp',
       version: '1.0.0',
       extraEntries: [{ name: 'package/node_modules/foo/binding.gyp', content: '{}' }]
     })
@@ -159,7 +159,7 @@ test.describe('extractManifest hasNativeModules detection', () => {
   test('subpackage with node-gyp postinstall returns true', async () => {
     const subPkg = JSON.stringify({ name: 'foo', version: '1.0.0', scripts: { postinstall: 'node-gyp rebuild' } })
     const tarball = await createTestTarball({
-      name: '@test/postinstall',
+      name: '@test_registry_/postinstall',
       version: '1.0.0',
       extraEntries: [{ name: 'package/node_modules/foo/package.json', content: subPkg }]
     })
@@ -170,7 +170,7 @@ test.describe('extractManifest hasNativeModules detection', () => {
   test('subpackage with prebuild-install install script returns true', async () => {
     const subPkg = JSON.stringify({ name: 'foo', version: '1.0.0', scripts: { install: 'prebuild-install || node-gyp rebuild' } })
     const tarball = await createTestTarball({
-      name: '@test/prebuild',
+      name: '@test_registry_/prebuild',
       version: '1.0.0',
       extraEntries: [{ name: 'package/node_modules/foo/package.json', content: subPkg }]
     })
@@ -180,7 +180,7 @@ test.describe('extractManifest hasNativeModules detection', () => {
 
   test('prebuilds directory anywhere in node_modules returns true', async () => {
     const tarball = await createTestTarball({
-      name: '@test/prebuilds',
+      name: '@test_registry_/prebuilds',
       version: '1.0.0',
       extraEntries: [{ name: 'package/node_modules/foo/prebuilds/linux-x64/foo.node', content: 'BINARY' }]
     })
@@ -194,7 +194,7 @@ test.describe('extractManifest hasNativeModules detection', () => {
     // to rebuild). Detection scopes to node_modules/** to avoid false
     // positives on plugins that bundle native helpers as source.
     const tarball = await createTestTarball({
-      name: '@test/topgyp',
+      name: '@test_registry_/topgyp',
       version: '1.0.0',
       extraEntries: [{ name: 'package/binding.gyp', content: '{}' }]
     })

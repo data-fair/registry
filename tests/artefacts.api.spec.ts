@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import FormData from 'form-data'
-import { superAdmin, axiosWithApiKey, anonymousAx, clean } from './support/axios.ts'
+import { superAdmin, axiosWithApiKey, anonymousAx, clean, ours, listOpts } from './support/axios.ts'
 import { createTestTarball } from './support/test-tarball.ts'
 
 let uploadApiKey: string
@@ -24,7 +24,7 @@ test.describe('Artefacts', () => {
 
     test('upload happy path creates an npm artefact with a single tarball', async () => {
       const tarball = await createTestTarball({
-        name: '@data-fair/processing-gpkg',
+        name: '@test_registry_df/processing-gpkg',
         version: '1.2.3',
         licence: 'MIT'
       })
@@ -34,14 +34,14 @@ test.describe('Artefacts', () => {
 
       const ax = axiosWithApiKey(uploadApiKey)
       const res = await ax.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@data-fair/processing-gpkg@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_df/processing-gpkg@1'),
         form,
         { headers: form.getHeaders() }
       )
       expect(res.status).toBe(201)
-      expect(res.data.artefact._id).toBe('@data-fair/processing-gpkg@1')
+      expect(res.data.artefact._id).toBe('@test_registry_df/processing-gpkg@1')
       expect(res.data.artefact.format).toBe('npm')
-      expect(res.data.artefact.packageName).toBe('@data-fair/processing-gpkg')
+      expect(res.data.artefact.packageName).toBe('@test_registry_df/processing-gpkg')
       expect(res.data.artefact.version).toBe('1.2.3')
       expect(res.data.artefact.category).toBe('processing')
       expect(typeof res.data.artefact.path).toBe('string')
@@ -52,14 +52,14 @@ test.describe('Artefacts', () => {
     })
 
     test('uploads and lists an npm artefact in the skill category', async () => {
-      const tarball = await createTestTarball({ name: '@test/skill-demo', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/skill-demo', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
       form.append('category', 'skill')
 
       const ax = axiosWithApiKey(uploadApiKey)
       const res = await ax.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/skill-demo@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/skill-demo@1'),
         form,
         { headers: form.getHeaders() }
       )
@@ -68,9 +68,9 @@ test.describe('Artefacts', () => {
       expect(res.data.artefact.format).toBe('npm')
 
       const admin = await superAdmin
-      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/skill-demo@1'), { public: true })
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/skill-demo@1'), { public: true })
       const list = await admin.get('/api/v1/artefacts?category=skill')
-      const found = list.data.results.find((a: any) => a._id === '@test/skill-demo@1')
+      const found = list.data.results.find((a: any) => a._id === '@test_registry_/skill-demo@1')
       expect(found).toBeTruthy()
       expect(found.category).toBe('skill')
     })
@@ -81,7 +81,7 @@ test.describe('Artefacts', () => {
       form.append('category', 'skill')
       form.append('file', Buffer.from('hello'), { filename: 'a.txt', contentType: 'text/plain' })
       try {
-        await ax.post('/api/v1/artefacts/file/some-skill-file', form, { headers: form.getHeaders() })
+        await ax.post('/api/v1/artefacts/file/test_registry_some-skill-file', form, { headers: form.getHeaders() })
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(400)
@@ -90,7 +90,7 @@ test.describe('Artefacts', () => {
 
     test('upload of tarball with .node binary flags hasNativeModules=true', async () => {
       const tarball = await createTestTarball({
-        name: '@test/native',
+        name: '@test_registry_/native',
         version: '1.0.0',
         extraEntries: [{
           name: 'package/node_modules/foo/build/Release/foo.node',
@@ -101,7 +101,7 @@ test.describe('Artefacts', () => {
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
       const ax = axiosWithApiKey(uploadApiKey)
       const res = await ax.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/native@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/native@1'),
         form,
         { headers: form.getHeaders() }
       )
@@ -111,9 +111,9 @@ test.describe('Artefacts', () => {
     test('re-upload to same id swaps the tarball and bumps dataUpdatedAt', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const form1 = new FormData()
-      form1.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      form1.append('file', await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
       const first = await ax.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'),
         form1,
         { headers: form1.getHeaders() }
       )
@@ -123,9 +123,9 @@ test.describe('Artefacts', () => {
       await new Promise(resolve => setTimeout(resolve, 10))
 
       const form2 = new FormData()
-      form2.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.1' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      form2.append('file', await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.1' }), { filename: 'p.tgz', contentType: 'application/gzip' })
       const second = await ax.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'),
         form2,
         { headers: form2.getHeaders() }
       )
@@ -138,7 +138,7 @@ test.describe('Artefacts', () => {
       const ax = axiosWithApiKey(uploadApiKey)
       try {
         // No body at all → axios sends no Content-Type header
-        await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'))
+        await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'))
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(400)
@@ -149,7 +149,7 @@ test.describe('Artefacts', () => {
       const ax = axiosWithApiKey(uploadApiKey)
       try {
         await ax.post(
-          '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'),
           Buffer.from('not a multipart body'),
           { headers: { 'Content-Type': 'application/octet-stream' } }
         )
@@ -162,7 +162,7 @@ test.describe('Artefacts', () => {
     test('file upload without a Content-Type header returns 400, not 500', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       try {
-        await ax.post('/api/v1/artefacts/file/some-file')
+        await ax.post('/api/v1/artefacts/file/test_registry_some-file')
         expect(true).toBe(false)
       } catch (err: any) {
         expect(err.status).toBe(400)
@@ -172,9 +172,9 @@ test.describe('Artefacts', () => {
     test('re-upload with different manifest name on the same artefact id returns 409', async () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const form1 = new FormData()
-      form1.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      form1.append('file', await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
       await ax.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'),
         form1,
         { headers: form1.getHeaders() }
       )
@@ -183,7 +183,7 @@ test.describe('Artefacts', () => {
       form2.append('file', await createTestTarball({ name: '@other/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
       try {
         await ax.post(
-          '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+          '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'),
           form2,
           { headers: form2.getHeaders() }
         )
@@ -203,19 +203,19 @@ test.describe('Artefacts', () => {
 
       const ax = axiosWithApiKey(uploadApiKey)
       const form = new FormData()
-      form.append('file', await createTestTarball({ name: '@test/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      form.append('file', await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
       await ax.post(
-        '/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'),
+        '/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'),
         form,
         { headers: form.getHeaders() }
       )
-      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { public: true })
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { public: true })
     })
 
     test('GET /download returns the artefact tarball', async () => {
       const admin = await superAdmin
       const res = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1') + '/download',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       expect([200, 302]).toContain(res.status)
@@ -224,7 +224,7 @@ test.describe('Artefacts', () => {
     test('GET /download ignores legacy ?architecture= query', async () => {
       const admin = await superAdmin
       const res = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download?architecture=x64',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1') + '/download?architecture=x64',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       expect([200, 302]).toContain(res.status)
@@ -233,7 +233,7 @@ test.describe('Artefacts', () => {
     test('GET /download exposes Last-Modified and X-Artefact-* headers for npm', async () => {
       const admin = await superAdmin
       const res = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1') + '/download',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       expect(res.headers['last-modified']).toBeTruthy()
@@ -245,14 +245,14 @@ test.describe('Artefacts', () => {
     test('GET /download with matching If-Modified-Since returns 304 with metadata headers', async () => {
       const admin = await superAdmin
       const first = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1') + '/download',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       const lastModified = first.headers['last-modified']
       expect(lastModified).toBeTruthy()
 
       const second = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1') + '/download',
         {
           headers: { 'if-modified-since': lastModified },
           responseType: 'arraybuffer',
@@ -269,7 +269,7 @@ test.describe('Artefacts', () => {
     test('GET /download with stale If-Modified-Since returns 200 with new metadata after re-upload', async () => {
       const admin = await superAdmin
       const first = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1') + '/download',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       const staleLastModified = first.headers['last-modified']
@@ -278,11 +278,11 @@ test.describe('Artefacts', () => {
       await new Promise(resolve => setTimeout(resolve, 1100))
       const ax = axiosWithApiKey(uploadApiKey)
       const form = new FormData()
-      form.append('file', await createTestTarball({ name: '@test/pkg', version: '2.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+      form.append('file', await createTestTarball({ name: '@test_registry_/pkg', version: '2.0.0' }), { filename: 'p.tgz', contentType: 'application/gzip' })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
 
       const res = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1') + '/download',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1') + '/download',
         {
           headers: { 'if-modified-since': staleLastModified },
           responseType: 'arraybuffer',
@@ -299,16 +299,16 @@ test.describe('Artefacts', () => {
       const ax = axiosWithApiKey(uploadApiKey)
       const form = new FormData()
       form.append('file', await createTestTarball({
-        name: '@test/native-pkg',
+        name: '@test_registry_/native-pkg',
         version: '1.0.0',
         extraEntries: [{ name: 'package/node_modules/foo/build/Release/foo.node', content: 'X' }]
       }), { filename: 'p.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/native-pkg@1'), form, { headers: form.getHeaders() })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/native-pkg@1'), form, { headers: form.getHeaders() })
 
       const admin = await superAdmin
-      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/native-pkg@1'), { public: true })
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/native-pkg@1'), { public: true })
       const res = await admin.get(
-        '/api/v1/artefacts/' + encodeURIComponent('@test/native-pkg@1') + '/download',
+        '/api/v1/artefacts/' + encodeURIComponent('@test_registry_/native-pkg@1') + '/download',
         { responseType: 'arraybuffer', maxRedirects: 0, validateStatus: s => s === 200 || s === 302 }
       )
       expect(res.headers['x-artefact-has-native-modules']).toBe('true')
@@ -318,15 +318,15 @@ test.describe('Artefacts', () => {
   test.describe('PATCH & DELETE', () => {
     test.beforeEach(async () => {
       const ax = axiosWithApiKey(uploadApiKey)
-      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
     })
 
     test('superadmin can PATCH editable metadata', async () => {
       const ax = await superAdmin
-      const res = await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), {
+      const res = await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), {
         title: { fr: 'Mon paquet', en: 'My package' },
         description: { fr: 'Une description', en: 'A description' },
         public: true
@@ -337,11 +337,11 @@ test.describe('Artefacts', () => {
 
     test('superadmin can DELETE artefact', async () => {
       const ax = await superAdmin
-      const deleteRes = await ax.delete('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'))
+      const deleteRes = await ax.delete('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'))
       expect(deleteRes.status).toBe(204)
 
-      const listRes = await ax.get('/api/v1/artefacts')
-      expect(listRes.data.count).toBe(0)
+      const listRes = await ax.get('/api/v1/artefacts', listOpts)
+      expect(ours(listRes.data.results)).toHaveLength(0)
     })
   })
 
@@ -360,9 +360,9 @@ test.describe('Artefacts', () => {
     }
 
     test('returns distinct sorted group values for a category and locale', async () => {
-      await uploadWithGroup('@test/proc-a', 'processing', { en: 'Statistics', fr: 'Statistiques' })
-      await uploadWithGroup('@test/proc-b', 'processing', { en: 'Geospatial', fr: 'Géospatial' })
-      await uploadWithGroup('@test/proc-c', 'processing', { en: 'Statistics', fr: 'Statistiques' })
+      await uploadWithGroup('@test_registry_/proc-a', 'processing', { en: 'Statistics', fr: 'Statistiques' })
+      await uploadWithGroup('@test_registry_/proc-b', 'processing', { en: 'Geospatial', fr: 'Géospatial' })
+      await uploadWithGroup('@test_registry_/proc-c', 'processing', { en: 'Statistics', fr: 'Statistiques' })
 
       const admin = await superAdmin
       const en = await admin.get('/api/v1/artefacts/groups?category=processing&locale=en')
@@ -373,8 +373,8 @@ test.describe('Artefacts', () => {
     })
 
     test('scopes suggestions to the requested category', async () => {
-      await uploadWithGroup('@test/proc-a', 'processing', { en: 'Statistics' })
-      await uploadWithGroup('@test/cat-a', 'catalog', { en: 'Catalogs' })
+      await uploadWithGroup('@test_registry_/proc-a', 'processing', { en: 'Statistics' })
+      await uploadWithGroup('@test_registry_/cat-a', 'catalog', { en: 'Catalogs' })
 
       const admin = await superAdmin
       const res = await admin.get('/api/v1/artefacts/groups?category=catalog&locale=en')
@@ -414,15 +414,15 @@ test.describe('Artefacts', () => {
   test.describe('Deprecation', () => {
     test.beforeEach(async () => {
       const ax = axiosWithApiKey(uploadApiKey)
-      const tarball = await createTestTarball({ name: '@test/pkg', version: '1.0.0' })
+      const tarball = await createTestTarball({ name: '@test_registry_/pkg', version: '1.0.0' })
       const form = new FormData()
       form.append('file', tarball, { filename: 'package.tgz', contentType: 'application/gzip' })
-      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test/pkg@1'), form, { headers: form.getHeaders() })
+      await ax.post('/api/v1/artefacts/npm/' + encodeURIComponent('@test_registry_/pkg@1'), form, { headers: form.getHeaders() })
     })
 
     test('PATCH can set and unset the deprecated flag', async () => {
       const ax = await superAdmin
-      const id = encodeURIComponent('@test/pkg@1')
+      const id = encodeURIComponent('@test_registry_/pkg@1')
       const setRes = await ax.patch('/api/v1/artefacts/' + id, { deprecated: true })
       expect(setRes.data.deprecated).toBe(true)
       const unsetRes = await ax.patch('/api/v1/artefacts/' + id, { deprecated: false })
@@ -431,18 +431,16 @@ test.describe('Artefacts', () => {
 
     test('deprecated artefacts are excluded from the default list', async () => {
       const ax = await superAdmin
-      await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { deprecated: true })
-      const list = await ax.get('/api/v1/artefacts')
-      expect(list.data.count).toBe(0)
-      expect(list.data.results).toEqual([])
+      await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { deprecated: true })
+      const list = await ax.get('/api/v1/artefacts', listOpts)
+      expect(ours(list.data.results)).toEqual([])
     })
 
     test('deprecated artefacts appear with includeDeprecated=true', async () => {
       const ax = await superAdmin
-      await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test/pkg@1'), { deprecated: true })
-      const list = await ax.get('/api/v1/artefacts?includeDeprecated=true')
-      expect(list.data.count).toBe(1)
-      expect(list.data.results[0]._id).toBe('@test/pkg@1')
+      await ax.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/pkg@1'), { deprecated: true })
+      const list = await ax.get('/api/v1/artefacts?includeDeprecated=true', listOpts)
+      expect(ours(list.data.results).map((a: any) => a._id)).toEqual(['@test_registry_/pkg@1'])
     })
   })
 
@@ -461,27 +459,27 @@ test.describe('Artefacts', () => {
     }
 
     test.beforeEach(async () => {
-      await upload('@test/b', '2.0.0', { en: 'Zebra', fr: 'Zèbre' })
-      await upload('@test/a', '1.0.0', { en: 'Apple', fr: 'Pomme' })
-      await upload('@test/c', '3.0.0')
+      await upload('@test_registry_/b', '2.0.0', { en: 'Zebra', fr: 'Zèbre' })
+      await upload('@test_registry_/a', '1.0.0', { en: 'Apple', fr: 'Pomme' })
+      await upload('@test_registry_/c', '3.0.0')
     })
 
     test('sort=group.en orders by the English group (ungrouped first, as Mongo sorts missing fields)', async () => {
       const admin = await superAdmin
-      const res = await admin.get('/api/v1/artefacts?sort=group.en')
-      expect(res.data.results.map((a: any) => a._id)).toEqual(['@test/c@1', '@test/a@1', '@test/b@1'])
+      const res = await admin.get('/api/v1/artefacts?sort=group.en', listOpts)
+      expect(ours(res.data.results).map((a: any) => a._id)).toEqual(['@test_registry_/c@1', '@test_registry_/a@1', '@test_registry_/b@1'])
     })
 
     test('a leading dash reverses the order', async () => {
       const admin = await superAdmin
-      const res = await admin.get('/api/v1/artefacts?sort=-name')
-      expect(res.data.results.map((a: any) => a._id)).toEqual(['@test/c@1', '@test/b@1', '@test/a@1'])
+      const res = await admin.get('/api/v1/artefacts?sort=-name', listOpts)
+      expect(ours(res.data.results).map((a: any) => a._id)).toEqual(['@test_registry_/c@1', '@test_registry_/b@1', '@test_registry_/a@1'])
     })
 
     test('sort=version orders by version', async () => {
       const admin = await superAdmin
-      const res = await admin.get('/api/v1/artefacts?sort=-version')
-      expect(res.data.results.map((a: any) => a.version)).toEqual(['3.0.0', '2.0.0', '1.0.0'])
+      const res = await admin.get('/api/v1/artefacts?sort=-version', listOpts)
+      expect(ours(res.data.results).map((a: any) => a.version)).toEqual(['3.0.0', '2.0.0', '1.0.0'])
     })
 
     test('an unknown sort key returns 400', async () => {
@@ -496,7 +494,7 @@ test.describe('Artefacts', () => {
 
     test('sort=public is admin-only and ignored for others', async () => {
       const admin = await superAdmin
-      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test/c@1'), { public: true })
+      await admin.patch('/api/v1/artefacts/' + encodeURIComponent('@test_registry_/c@1'), { public: true })
       const res = await anonymousAx.get('/api/v1/artefacts?sort=-public')
       // anonymous only sees the public one anyway; the point is no 400
       expect(res.status).toBe(200)

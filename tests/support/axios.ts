@@ -1,12 +1,19 @@
 import { axiosBuilder } from '@data-fair/lib-node/axios.js'
 import { axiosAuth as _axiosAuth } from '@data-fair/lib-node/axios-auth.js'
+import { prefix } from './sd-fixtures.ts'
 
 export const directoryUrl = `http://${process.env.DEV_HOST}:${process.env.NGINX_PORT}/simple-directory`
 // the session cookies of simple-directory are set on DEV_HOST: authenticated calls reach the API on that
 // host too (cookies ignore the port), not on localhost
 export const baseURL = `http://${process.env.DEV_HOST}:${process.env.DEV_API_PORT}`
 
-const axiosOpts = { baseURL }
+// API tests address the server directly on DEV_API_PORT: nothing sits in front of it to set X-Forwarded-For,
+// which the server needs for the IP binding simple-directory stamps into admin sessions (a superadmin's token
+// carries the IP it logged in from, and a missing header rejects the request). The test client stands in for
+// the reverse proxy: 127.0.0.1 is the address simple-directory records at login, reached through nginx on loopback.
+export const proxyHeaders = { 'x-forwarded-for': '127.0.0.1' }
+
+const axiosOpts = { baseURL, headers: proxyHeaders }
 
 export const axios = (opts = {}) => axiosBuilder({ ...axiosOpts, ...opts })
 export const anonymousAx = axios()
@@ -17,19 +24,28 @@ export const axiosAuth = (user: string, opts?: { adminMode?: boolean, org?: stri
     password: 'passwd',
     adminMode: opts?.adminMode,
     org: opts?.org,
-    axiosOpts: opts?.baseURL ? { baseURL: opts.baseURL } : axiosOpts,
+    axiosOpts: opts?.baseURL ? { baseURL: opts.baseURL, headers: proxyHeaders } : axiosOpts,
     directoryUrl
   })
 }
 
-export const superAdmin = axiosAuth('superadmin', { adminMode: true })
+export const superAdmin = axiosAuth('test_registry_superadmin', { adminMode: true })
 
-export const axiosWithApiKey = (key: string) => axiosBuilder({ ...axiosOpts, headers: { 'x-api-key': key } })
+export const axiosWithApiKey = (key: string) => axiosBuilder({ ...axiosOpts, headers: { ...proxyHeaders, 'x-api-key': key } })
 
-export const axiosInternal = (secret: string) => axiosBuilder({ ...axiosOpts, headers: { 'x-secret-key': secret } })
+export const axiosInternal = (secret: string) => axiosBuilder({ ...axiosOpts, headers: { ...proxyHeaders, 'x-secret-key': secret } })
+
+// what the test sub-space owns here (accounts test_registry_*) and the global objects it names with the
+// prefix: artefacts `@test_registry_…` or `test_registry_…`, remote registries named `test_registry_…`
+// The artefacts of this sub-space in a listing. The registry is shared with the dev data and with other test
+// suites (their artefacts named after their own prefix), so a spec counts and orders only its own artefacts,
+// out of a page large enough to hold them all (listOpts).
+export const ourArtefact = /^@?test_registry_/
+export const ours = <T extends { _id: string }>(results: T[]): T[] => results.filter(r => ourArtefact.test(r._id))
+export const listOpts = { params: { size: 100 } }
 
 export const clean = async () => {
-  await anonymousAx.delete(`http://localhost:${process.env.DEV_API_PORT}/api/test-env`)
+  await anonymousAx.delete(`http://localhost:${process.env.DEV_API_PORT}/api/test-env`, { params: { prefix } })
 }
 
 export const setArtefactOrigin = async (artefactId: string, origin: string) => {
@@ -68,8 +84,8 @@ export const waitSyncIdle = async (registryId: string) => {
 }
 
 // --- federation upstream --------------------------------------------------
-// A second registry process, used as a mirror source. See
-// docs/superpowers/specs/2026-07-10-federation-dev-testing-design.md
+// A second registry process (npm run dev:api-upstream), used as a mirror source. See
+// AGENTS.md "Exercising federation sync".
 //
 // Resolved lazily: this module is imported by every spec, and most of them
 // never touch the upstream. A module-level throw would break them all.
@@ -77,7 +93,7 @@ export const waitSyncIdle = async (registryId: string) => {
 const upstreamPort = (): string => {
   const port = process.env.DEV_UPSTREAM_API_PORT
   if (!port) {
-    throw new Error('DEV_UPSTREAM_API_PORT is not set — run "npx --no df-dev init-env --force" to draw the ports again (dev/dev.json "ports")')
+    throw new Error('DEV_UPSTREAM_API_PORT is not set — add it to .env (see dev/default.env)')
   }
   return port
 }
@@ -87,16 +103,16 @@ export const upstreamBaseURL = () => `http://localhost:${upstreamPort()}`
 // session calls go to DEV_HOST, where the session cookies are set (see baseURL)
 const upstreamSessionURL = () => `http://${process.env.DEV_HOST}:${upstreamPort()}`
 
-export const upstreamSuperAdmin = () => axiosAuth('superadmin', { adminMode: true, baseURL: upstreamSessionURL() })
+export const upstreamSuperAdmin = () => axiosAuth('test_registry_superadmin', { adminMode: true, baseURL: upstreamSessionURL() })
 
 export const upstreamAxiosAuth = (user: string, opts?: { org?: string }) =>
   axiosAuth(user, { ...opts, baseURL: upstreamSessionURL() })
 
 export const upstreamAxiosWithApiKey = (key: string) =>
-  axiosBuilder({ baseURL: upstreamBaseURL(), headers: { 'x-api-key': key } })
+  axiosBuilder({ baseURL: upstreamBaseURL(), headers: { ...proxyHeaders, 'x-api-key': key } })
 
 // The upstream also runs NODE_ENV=development, so its test-env router is
 // mounted, and a request from localhost is internal.
 export const cleanUpstream = async () => {
-  await anonymousAx.delete(`${upstreamBaseURL()}/api/test-env`)
+  await anonymousAx.delete(`${upstreamBaseURL()}/api/test-env`, { params: { prefix } })
 }

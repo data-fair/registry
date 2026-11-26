@@ -18,9 +18,6 @@
   "enabledMcpjsonServers": [
     "playwright-test"
   ],
-  "enabledPlugins": {
-    "superpowers@claude-plugins-official": true
-  },
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true
