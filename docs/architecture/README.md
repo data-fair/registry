@@ -59,6 +59,16 @@ The flow:
 3. Otherwise download `GET /api/v1/artefacts/<id>/tarball?architecture=<arch>`
    (with noarch fallback) and extract to the cache.
 
+Known limitation: `extractTarball` (`lib-node/index.ts`) only writes `file` and `directory` entries and silently
+skips the others, hardlinks and symlinks included. node-gyp hardlinks a compiled addon into two paths (for
+example `build/Release/x.node` and `build/Release/obj.target/x.node`), and GNU tar stores whichever path it reads
+first as a file and the other as a link, so the loadable binary can disappear at extraction, intermittently from
+one build to the next. The publish action (`.github/actions/publish-plugin/action.yml`) packs with plain
+`tar czf`. A plugin with a native module that fails at runtime on a file missing from the cache while the rest
+of it loads hits this, not a bad build. Candidate fixes: materialise link entries in `extractTarball`, and pack
+with `tar --hard-dereference --sort=name` (enough on its own for a re-published plugin, with no consumer
+upgrade).
+
 Authentication uses an internal secret passed as the `x-secret-key` header, configured in `config.secretKeys.internalServices`.
 
 ## Tileset sync to tileserver
